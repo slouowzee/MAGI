@@ -2,6 +2,7 @@ import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { db } from './db.js';
 import { detect, wantsInstall } from './triggers.js';
 import { install, installReport, logChannel } from './setup.js';
+import { speak } from './webhooks.js';
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -51,6 +52,12 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   console.log(`[${message.guild.name} #${message.channel.name}] ${message.author.tag} →`, trigger);
+  const persona = trigger.persona === 'auto' ? 'melchior' : trigger.persona;
+  try {
+    await speak(message.channel, persona, `Reçu : « ${trigger.text} »`);
+  } catch (err) {
+    console.error(`[${message.guild.name} #${message.channel.name}] envoi impossible :`, err.message);
+  }
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
