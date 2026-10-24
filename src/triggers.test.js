@@ -1,6 +1,32 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { parseName } from './triggers.js';
+import { parseName, wantsInstall } from './triggers.js';
+
+test("reconnaît une demande d'installation sous plusieurs formulations", () => {
+  for (const text of [
+    'installe-toi',
+    'installe toi stp',
+    'réinstalle-toi',
+    'configure-toi',
+    'initialise-toi',
+    'mets-toi en place',
+    'fais ton installation',
+    'relance ta config',
+    'vérifie ton installation',
+    'termine ta mise en place',
+    'vérifie la hiérarchie',
+    'verifie tes rôles',
+  ]) assert.ok(wantsInstall(text), text);
+});
+
+test("n'y voit pas une demande d'installation", () => {
+  for (const text of [
+    'installe minecraft sur le serveur',
+    "c'est quoi une installation électrique ?",
+    'configure le serveur pour une communauté gaming',
+    'setup un serveur discord',
+  ]) assert.equal(wantsInstall(text), false, text);
+});
 
 test('déclenche sur un nom en ouverture', () => {
   assert.deepEqual(parseName('magi, salut'), { persona: 'auto', vote: false, text: 'salut' });

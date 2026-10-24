@@ -22,6 +22,17 @@ export function parseName(content) {
   return null;
 }
 
+const INSTALL = [
+  /\b(?:r[ée])?(?:install|configur|initialis)e[- ]?toi\b/i,
+  /\bmets[- ]toi en place\b/i,
+  /\b(?:fais|refais|lance|relance|termine|finis|v[ée]rifie)\s+(?:ton|ta)\s+(?:installation|install|config|configuration|setup|mise en place)\b/i,
+  /\bv[ée]rifie\s+(?:la hi[ée]rarchie|tes r[ôo]les|tes droits)\b/i,
+];
+
+export function wantsInstall(text) {
+  return INSTALL.some((re) => re.test(text));
+}
+
 function personaOfWebhookMessage(msg) {
   if (!msg.webhookId) return null;
   return Object.keys(PERSONAS).find((key) => PERSONAS[key] === msg.author.username) ?? null;
