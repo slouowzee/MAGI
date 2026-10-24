@@ -3,15 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": {
-    "node": ">=24"
-  },
   "scripts": {
-    "start": "node --env-file-if-exists=.env src/index.js",
-    "test": "node --test src/"
+    "start": "bun src/index.js",
+    "test": "bun test"
   },
   "dependencies": {
-    "better-sqlite3": "13.0.3",
     "discord.js": "14.27.0"
   }
 }

@@ -1,5 +1,5 @@
 import { Client, Events, GatewayIntentBits } from 'discord.js';
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { detect } from './triggers.js';
@@ -12,8 +12,8 @@ if (!token) {
 
 const dbPath = process.env.DB_PATH ?? 'data/magi.db';
 mkdirSync(dirname(dbPath), { recursive: true });
-export const db = new Database(dbPath);
-db.pragma('journal_mode = WAL');
+export const db = new Database(dbPath, { create: true });
+db.exec('PRAGMA journal_mode = WAL');
 
 const client = new Client({
   intents: [

@@ -4,7 +4,7 @@ Spec : [magi-bot.md](magi-bot.md). Chaque lot dépend des précédents ; dans un
 
 ## 1. Socle
 
-1. **Initialiser le projet Node** : discord.js, better-sqlite3, `.env`, structure des dossiers, Dockerfile. *Fini quand* : le bot se connecte et logue « prêt ».
+1. **Initialiser le projet Bun** : discord.js, `bun:sqlite`, `.env`, structure des dossiers, Dockerfile. *Fini quand* : le bot se connecte et logue « prêt ».
 2. **Application Discord** : créer le bot, activer l'intent *Message Content*, permissions explicites (pas Administrateur), inviter sur le serveur. Le rôle Opérateur MAGI vient de l'installation automatique (33).
 3. **Détection des déclencheurs** : nom en début de message (`magi`, `melchior`, `balthasar`, `casper`, mot entier), mention, reply à un message de persona ; ignorer MP et messages modifiés. *Fini quand* : « j'ai revu l'épisode des MAGI » est ignoré, « magi, salut » ne l'est pas.
 4. **Webhooks par salon** : création à la volée, cache, `thread_id`, nom et avatar par persona.

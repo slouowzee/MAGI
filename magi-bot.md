@@ -101,9 +101,9 @@ Messages fixes, sans appel au LLM, signés par une persona :
 
 ## Choix techniques
 
-- **Langage** : JavaScript (Node.js), avec **discord.js**.
+- **Langage** : JavaScript sur **Bun** (`oven/bun:1.4.2-alpine`), avec **discord.js**. `.env` chargé automatiquement par Bun, tests avec `bun test`.
 - **LLM** : **qwen3:4b-instruct** (~2,5 Go) via **Ollama**. Pas le tag `qwen3:4b`, qui « réfléchit » en anglais dans sa réponse même avec `think:false`, sur le VPS Dokploy (voir Hébergement). Le bot parle à l'API Ollama : changer de modèle ou de machine plus tard = changer une URL et un nom de modèle.
-- **Stockage** : SQLite (`better-sqlite3`) pour la mémoire, les rappels, les infractions et les salons autorisés, dans un volume Dokploy.
+- **Stockage** : SQLite intégré à Bun (`bun:sqlite`, aucune dépendance native) pour la mémoire, les rappels, les infractions et les salons autorisés, dans un volume Dokploy.
 - NanoJev a été écarté : testé sur nos décisions (persona, destinataire, spam), il répond à peu près au hasard, en français comme en anglais, pour ~600 Mo de RAM.
 
 ## Hébergement
