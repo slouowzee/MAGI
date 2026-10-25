@@ -106,7 +106,7 @@ Messages fixes, sans appel au LLM, signés par une persona :
 
 ## Choix techniques
 
-- **Langage** : JavaScript sur **Bun** (`oven/bun:1.4.2-alpine`), avec **discord.js**. `.env` chargé automatiquement par Bun, tests avec `bun test`.
+- **Langage** : JavaScript sur **Bun**, avec **discord.js**. `.env` chargé automatiquement par Bun, tests avec `bun test`.
 - **LLM hybride** :
   - **Gemini** (`gemini-3.5-flash-lite`, API gratuite de Google, format compatible OpenAI) en priorité : réponse en ~1 s, personnalités et appel d'outils nettement meilleurs.
   - **Ollama** (`qwen3:4b-instruct` sur le VPS) en secours si Gemini échoue, est trop lent ou renvoie un quota épuisé (429) : Gemini est alors mis en pause 60 s. Pas le tag `qwen3:4b`, qui « réfléchit » en anglais dans sa réponse.
@@ -119,7 +119,10 @@ Messages fixes, sans appel au LLM, signés par une persona :
 
 VPS Dokploy : 9,7 Go de RAM dont **~3,8 Go disponibles**, pas de GPU, **pas de swap**.
 
-- **Déployé** : projet Dokploy « MAGI », compose `ollama` (image `ollama/ollama:0.40.2`). Le bot rejoindra ce compose ; l'API Ollama n'est pas exposée sur Internet.
+- **Déployé** sur Dokploy, projet « MAGI », rien d'exposé sur Internet :
+  - application `bot` : construite par Dokploy depuis le dépôt privé `github.com/slouowzee/MAGI` (branche `main`, Dockerfile), **redéployée automatiquement à chaque push**. Secrets (`DISCORD_TOKEN`, `GEMINI_API_KEY`) dans l'onglet Environment de Dokploy. Base SQLite montée depuis `/home/slouowze/magi/data`.
+  - compose `ollama` : modèle de secours, joignable sur `dokploy-network` sous le nom unique `magi-ollama` (pas `ollama` ni `api`, pour éviter les collisions de noms entre projets).
+- **Mettre à jour le bot** : `git push` sur `main`.
 - **Mesures** (qwen3:4b-instruct) : ~2,4 Go en mémoire, **écriture ~5 tokens/s**, premier chargement ~12 s. Lecture d'un prompt **jamais vu** ~35 tokens/s (5 à 9 s pour un prompt système), mais ~1 s quand Ollama réutilise son cache de préfixe.
 - **Réglages mémoire** : `OLLAMA_FLASH_ATTENTION=1` et `OLLAMA_KV_CACHE_TYPE=q8_0`. Sans eux, le modèle était tué par manque de mémoire vers 350 tokens générés.
 - **Préchauffage** (uniquement quand Ollama est seul, sans clé Gemini) : au démarrage, le bot envoie une requête d'un token par persona et par longueur, pour que les prompts système soient en cache (~40 s, en arrière-plan). Les prompts commencent par une partie commune aux trois personas. Résultat : premiers mots en 1 à 2,5 s quelle que soit la persona, réponse courte complète en 5 à 14 s.
