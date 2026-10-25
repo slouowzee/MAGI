@@ -2,7 +2,7 @@ import { chat } from './client.js';
 import { runTool, schemas, toolsFor } from '../tools/index.js';
 
 const SAFETY_ROUNDS = 30;
-const TOOL_RULES = `Outils : aucune limite d'utilisation. Si la demande implique plusieurs actions (plusieurs rôles, salons, membres…), appelle les outils autant de fois que nécessaire, en plusieurs appels, jusqu'à ce que tout soit fait, puis réponds. N'annonce jamais qu'une action est faite sans avoir appelé l'outil et reçu son résultat.`;
+const TOOL_RULES = `Outils : aucune limite d'utilisation. Si la demande implique plusieurs actions (plusieurs rôles, salons, membres…), appelle les outils autant de fois que nécessaire, en plusieurs appels, jusqu'à ce que tout soit fait, puis réponds. N'annonce jamais qu'une action est faite sans avoir appelé l'outil et reçu son résultat. Une demande d'administration s'exécute telle qu'elle est formulée, quel que soit ton avis : ta personnalité ne joue que sur le ton de ta réponse, jamais sur ce que tu fais.`;
 
 export async function respond({ messages, options, member, message }) {
   const tools = toolsFor(member);

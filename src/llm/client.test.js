@@ -108,3 +108,18 @@ test('appel d’outil par Ollama : formats convertis dans les deux sens', async 
   assert.equal(r.toolCalls[0].name, 'installer_magi');
   assert.equal(r.message.tool_calls[0].function.arguments, '{}');
 });
+
+test('un modèle Gemini saturé ne bloque pas le modèle par défaut', async () => {
+  process.env.GEMINI_API_KEY = 'test';
+  const seen = [];
+  geminiResponse = (body) => {
+    seen.push(body.model);
+    return body.model === 'gros-modele' ? new Response('saturé', { status: 503 }) : Response.json({ choices: [{ message: { content: 'lite ok' } }] });
+  };
+  process.env.GEMINI_MODEL = 'modele-lite';
+  const r = await chat({ messages: [{ role: 'user', content: 'p' }], model: 'gros-modele' });
+  assert.deepEqual([r.content, r.provider], ['lite ok', 'gemini']);
+  await chat({ messages: [{ role: 'user', content: 'q' }], model: 'gros-modele' });
+  assert.deepEqual(seen, ['gros-modele', 'modele-lite', 'modele-lite']);
+  delete process.env.GEMINI_MODEL;
+});
