@@ -1,6 +1,6 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { parseName, wantsInstall } from './triggers.js';
+import { parseName, wantsDetail, wantsInstall } from './triggers.js';
 
 test("reconnaît une demande d'installation sous plusieurs formulations", () => {
   for (const text of [
@@ -57,4 +57,13 @@ test('vote forcé', () => {
   assert.deepEqual(parseName('magi vote : on fait une soirée film ?'), { persona: 'auto', vote: true, text: 'on fait une soirée film ?' });
   assert.equal(parseName('magi votez pour moi').vote, false);
   assert.equal(parseName('casper vote pour moi').vote, false);
+});
+
+test('demande de réponse détaillée', () => {
+  assert.ok(wantsDetail('explique-moi la récursivité'));
+  assert.ok(wantsDetail('tu peux détailler ?'));
+  assert.ok(wantsDetail('en détail stp'));
+  assert.ok(wantsDetail('fais-moi un tuto docker'));
+  assert.equal(wantsDetail('ça va ?'), false);
+  assert.equal(wantsDetail("t'en penses quoi de l'ananas ?"), false);
 });

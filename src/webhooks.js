@@ -40,8 +40,3 @@ async function withWebhook(channel, action) {
 export function speak(channel, persona, content) {
   return withWebhook(channel, (wh) => wh.send(payload(channel, persona, content)));
 }
-
-export function edit(channel, persona, messageId, content) {
-  const { threadId, allowedMentions } = payload(channel, persona, content);
-  return withWebhook(channel, (wh) => wh.editMessage(messageId, { content, threadId, allowedMentions }));
-}

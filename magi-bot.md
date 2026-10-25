@@ -36,7 +36,7 @@ Aucune commande : tout passe par les noms, détectés **n'importe où** dans le 
 5. Persona mémorisée par fil de discussion, effacée en fin de conversation ou après **expiration** (ex. 10 min d'inactivité)
 6. **Contexte** : les N derniers messages du salon, relus via l'API Discord, chaque message attribué à son auteur (utilisateur ou persona, d'après le `username` du webhook), plus les **souvenirs** des personnes présentes (voir Mémoire)
 7. **Appel de réponse** au LLM : prompt système de la persona, réponse et actions (appel d'outils)
-8. Réponse envoyée par **webhook** avec le `username` et l'`avatar_url` de la persona, **affichée au fur et à mesure** (le message du webhook est modifié environ chaque seconde pendant la génération), découpée si elle dépasse 2000 caractères
+8. Réponse envoyée par **webhook** avec le `username` et l'`avatar_url` de la persona, envoyée **en une fois** quand elle est complète (pas de modification de message), découpée si elle dépasse 2000 caractères ; indicateur « en train d'écrire » pendant la génération
 
 ## Décisions
 
@@ -111,7 +111,9 @@ Messages fixes, sans appel au LLM, signés par une persona :
 VPS Dokploy : 9,7 Go de RAM dont **~3,8 Go disponibles**, pas de GPU, **pas de swap**.
 
 - **Déployé** : projet Dokploy « MAGI », compose `ollama` (image `ollama/ollama:0.40.2`). Le bot rejoindra ce compose ; l'API Ollama n'est pas exposée sur Internet.
-- **Mesures** (qwen3:4b-instruct) : ~2,4 Go en mémoire, lecture du prompt ~150-200 tokens/s, **écriture ~5 tokens/s**, premier chargement ~12 s. Une réponse de ~100 tokens prend 15 à 20 s.
+- **Mesures** (qwen3:4b-instruct) : ~2,4 Go en mémoire, **écriture ~5 tokens/s**, premier chargement ~12 s. Lecture d'un prompt **jamais vu** ~35 tokens/s (5 à 9 s pour un prompt système), mais ~1 s quand Ollama réutilise son cache de préfixe.
+- **Réglages mémoire** : `OLLAMA_FLASH_ATTENTION=1` et `OLLAMA_KV_CACHE_TYPE=q8_0`. Sans eux, le modèle était tué par manque de mémoire vers 350 tokens générés.
+- **Préchauffage** : au démarrage, le bot envoie une requête d'un token par persona et par longueur, pour que les prompts système soient en cache (~40 s, en arrière-plan). Les prompts commencent par une partie commune aux trois personas. Résultat : premiers mots en 1 à 2,5 s quelle que soit la persona, réponse courte complète en 5 à 14 s.
 - **Limite mémoire** sur le conteneur Ollama (ex. 3,2 Go) : en cas de dépassement, c'est Ollama qui tombe, pas Dokploy.
 - **Ajouter un fichier de swap** (2 à 4 Go) comme filet de sécurité.
 - Réglages Ollama : `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_KEEP_ALIVE=-1` (pas de rechargement), contexte limité (`num_ctx` 4096 à 8192).

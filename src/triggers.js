@@ -29,6 +29,12 @@ export function wantsInstall(text) {
   return INSTALL.some((re) => re.test(text));
 }
 
+const DETAIL = /\b(?:expli(?:que|quer|cation|cations)|d[ée]taill\w*|en d[ée]tail|d[ée]veloppe\w*|approfondi\w*|tuto\w*|[ée]tape par [ée]tape|pas [àa] pas)\b/i;
+
+export function wantsDetail(text) {
+  return DETAIL.test(text);
+}
+
 export async function detect(message, client) {
   if (!message.inGuild() || message.author.bot || message.webhookId) return null;
 
