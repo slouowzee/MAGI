@@ -36,8 +36,14 @@ export function cleanReply(text) {
     .trim();
 }
 
-export function systemPrompt(persona, length) {
-  return `${COMMON}\n${CHARACTER[persona]}\n${STYLE[length]}`;
+export function nowLine(now = new Date()) {
+  const date = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'full', timeStyle: 'short' }).format(now);
+  const offset = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Paris', timeZoneName: 'longOffset' }).formatToParts(now).find((p) => p.type === 'timeZoneName').value;
+  return `Nous sommes le ${date}, heure de Paris (${offset.replace('GMT', 'UTC')}).`;
+}
+
+export function systemPrompt(persona, length, now = new Date()) {
+  return `${COMMON}\n${CHARACTER[persona]}\n${STYLE[length]}\n${nowLine(now)}`;
 }
 
 export function warmupRequests() {
@@ -46,7 +52,7 @@ export function warmupRequests() {
   );
 }
 
-export function buildMessages(persona, conversation, length) {
+export function buildMessages(persona, conversation, length, extra = '') {
   if (!PERSONAS[persona]) throw new Error(`Persona inconnue : ${persona}`);
-  return [{ role: 'system', content: systemPrompt(persona, length) }, ...conversation];
+  return [{ role: 'system', content: `${systemPrompt(persona, length)}${extra ? `\n${extra}` : ''}` }, ...conversation];
 }

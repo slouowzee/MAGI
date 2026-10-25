@@ -16,7 +16,7 @@ async function webhookFor(channel) {
   return webhook;
 }
 
-function payload(channel, persona, content, components) {
+function payload(channel, persona, content, components, mentions = []) {
   const { name, avatar } = PERSONAS[persona];
   return {
     content,
@@ -25,7 +25,7 @@ function payload(channel, persona, content, components) {
     username: name,
     avatarURL: avatar,
     threadId: channel.isThread() ? channel.id : undefined,
-    allowedMentions: { parse: [] },
+    allowedMentions: { parse: [], users: mentions },
   };
 }
 
@@ -39,6 +39,6 @@ async function withWebhook(channel, action) {
   }
 }
 
-export function speak(channel, persona, content, components) {
-  return withWebhook(channel, (wh) => wh.send(payload(channel, persona, content, components)));
+export function speak(channel, persona, content, components, mentions) {
+  return withWebhook(channel, (wh) => wh.send(payload(channel, persona, content, components, mentions)));
 }

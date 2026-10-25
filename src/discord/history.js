@@ -24,7 +24,14 @@ function record(msg, botId) {
     return speaker ? { speaker, content: msg.content } : null;
   }
   if (msg.author.bot || msg.author.id === botId) return null;
-  return { author: msg.member?.displayName ?? msg.author.username, content: msg.content };
+  return { userId: msg.author.id, author: msg.member?.displayName ?? msg.author.username, content: msg.content };
+}
+
+export function transcriptLine(msg) {
+  const persona = msg.webhookId ? personaByName(msg.author.username) : null;
+  if (msg.webhookId && !persona) return null;
+  const author = persona ? PERSONAS[persona].name : msg.member?.displayName ?? msg.author.username;
+  return msg.content.trim() ? `${author} : ${msg.content.trim().slice(0, 400)}` : null;
 }
 
 export async function conversationFor(message, persona, text) {
@@ -35,6 +42,7 @@ export async function conversationFor(message, persona, text) {
     .reverse()
     .map((m) => record(m, message.client.user.id))
     .filter(Boolean);
-  records.push({ author: message.member?.displayName ?? message.author.username, content: text });
-  return toConversation(records, persona);
+  records.push({ userId: message.author.id, author: message.member?.displayName ?? message.author.username, content: text });
+  const participants = [...new Map(records.filter((r) => r.userId).map((r) => [r.userId, { id: r.userId, name: r.author }])).values()];
+  return { turns: toConversation(records, persona), participants };
 }

@@ -1,4 +1,5 @@
-import { activePersona, awaitingAnswer, forgetPersona, pickPersona, rememberPersona } from './router.js';
+import { activePersona, awaitingAnswer, forgetPersona, joinConversation, pickPersona, rememberPersona } from './router.js';
+import { memoryContext, summarizeConversation } from './memory.js';
 import { floodCheck, quickReaction } from './rules.js';
 import { runVote } from './vote.js';
 import { detect, wantsDetail } from './triggers.js';
@@ -17,11 +18,12 @@ export async function handleMessage(message) {
 
   console.log(`[${message.guild.name} #${message.channel.name}] ${message.author.tag} →`, trigger);
   const channelId = message.channel.id;
+  joinConversation(channelId, message.guild.id, message.author.id);
 
   const quick = quickReaction(message.content);
   if (quick && !awaitingAnswer(channelId, message.author.id)) {
     await message.react(quick.emoji).catch(() => {});
-    if (quick.ends) forgetPersona(channelId);
+    if (quick.ends) summarizeConversation(message.client, forgetPersona(channelId));
     return;
   }
 
@@ -32,7 +34,7 @@ export async function handleMessage(message) {
   }
   const question = trigger.text || message.content;
   if (trigger.vote) {
-    forgetPersona(channelId);
+    rememberPersona(channelId, null);
     return runVote(message, question);
   }
   let persona = trigger.persona;
@@ -51,8 +53,9 @@ export async function handleMessage(message) {
   const typing = setInterval(() => message.channel.sendTyping().catch(() => {}), 8_000);
   message.channel.sendTyping().catch(() => {});
   try {
+    const { turns, participants } = await conversationFor(message, persona, message.content);
     const { content: reply, provider, actions } = await respond({
-      messages: buildMessages(persona, await conversationFor(message, persona, message.content), length),
+      messages: buildMessages(persona, turns, length, memoryContext(message.guild.id, participants)),
       options: { num_predict: MAX_TOKENS[length], repeat_penalty: 1.1 },
       member: message.member,
       message,

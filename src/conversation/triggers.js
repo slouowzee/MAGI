@@ -18,7 +18,7 @@ export function parseName(content) {
   return null;
 }
 
-const DETAIL = /\b(?:expli(?:que|quer|cation|cations)|d[ée]taill\w*|en d[ée]tail|d[ée]veloppe\w*|approfondi\w*|tuto\w*|[ée]tape par [ée]tape|pas [àa] pas)\b/i;
+const DETAIL = /\b(?:r[ée]sum\w*|expli(?:que|quer|cation|cations)|d[ée]taill\w*|en d[ée]tail|d[ée]veloppe\w*|approfondi\w*|tuto\w*|[ée]tape par [ée]tape|pas [àa] pas)\b/i;
 
 export function wantsDetail(text) {
   return DETAIL.test(text);

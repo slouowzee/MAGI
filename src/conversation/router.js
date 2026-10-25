@@ -17,14 +17,35 @@ export function randomPersona(random = Math.random) {
   return keys[Math.floor(random() * keys.length)];
 }
 
-export function activePersona(channelId, now = Date.now()) {
+function fresh(channelId, now) {
   const entry = active.get(channelId);
-  if (!entry || now - entry.at > EXPIRY) return null;
-  return entry.persona;
+  return entry && now - entry.at <= EXPIRY ? entry : null;
+}
+
+export function activePersona(channelId, now = Date.now()) {
+  return fresh(channelId, now)?.persona ?? null;
+}
+
+export function joinConversation(channelId, guildId, userId, now = Date.now()) {
+  const entry = fresh(channelId, now) ?? { persona: null, askedUserId: null, startedAt: now, guildId, participants: new Set() };
+  entry.at = now;
+  entry.participants.add(userId);
+  active.set(channelId, entry);
 }
 
 export function rememberPersona(channelId, persona, now = Date.now(), askedUserId = null) {
-  active.set(channelId, { persona, at: now, askedUserId });
+  const entry = fresh(channelId, now) ?? { startedAt: now, guildId: null, participants: new Set() };
+  active.set(channelId, { ...entry, persona, at: now, askedUserId });
+}
+
+export function expiredConversations(now = Date.now()) {
+  const ended = [];
+  for (const [channelId, entry] of active) {
+    if (now - entry.at <= EXPIRY) continue;
+    active.delete(channelId);
+    ended.push({ channelId, ...entry });
+  }
+  return ended;
 }
 
 export function awaitingAnswer(channelId, userId, now = Date.now()) {
@@ -33,7 +54,9 @@ export function awaitingAnswer(channelId, userId, now = Date.now()) {
 }
 
 export function forgetPersona(channelId) {
+  const entry = active.get(channelId);
   active.delete(channelId);
+  return entry ? { channelId, ...entry } : null;
 }
 
 export async function pickPersona(text) {

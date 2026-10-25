@@ -1,11 +1,12 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { adminEnabled, isOperator, logChannel } from '../server/installation.js';
 import { INSTALLATION_TOOLS } from './installation.js';
+import { MEMORY_TOOLS } from './memory.js';
+import { CHANNEL_TOOLS } from './channel.js';
+import { REMINDER_TOOLS } from './reminders.js';
 
 const silent = { allowedMentions: { parse: [] } };
-const CONFIRM_TIMEOUT = 60_000;
 
-export const TOOLS = [...INSTALLATION_TOOLS];
+export const TOOLS = [...INSTALLATION_TOOLS, ...MEMORY_TOOLS, ...CHANNEL_TOOLS, ...REMINDER_TOOLS];
 
 export function canUse(tool, member) {
   if (tool.access === 'everyone') return true;
@@ -39,43 +40,20 @@ async function execute(tool, args, { member, message, actions = [] }) {
   }
 }
 
-function askConfirmation(tool, args, ctx) {
-  const { member, message } = ctx;
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('confirmer').setLabel('Confirmer').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('annuler').setLabel('Annuler').setStyle(ButtonStyle.Secondary),
-  );
-  const description = tool.confirm(args, ctx);
-
-  return message.reply({ content: `**Confirmation requise** : ${description}`, components: [row], ...silent }).then((prompt) => {
-    const collector = prompt.createMessageComponentCollector({ time: CONFIRM_TIMEOUT });
-    collector.on('collect', async (click) => {
-      if (click.user.id !== member.id) {
-        await click.reply({ content: `Seul ${member} peut confirmer cette action.`, flags: MessageFlags.Ephemeral, ...silent }).catch(() => {});
-        return;
-      }
-      collector.stop('answered');
-      if (click.customId !== 'confirmer') {
-        await click.update({ content: `Annulé : ${description}`, components: [] }).catch(() => {});
-        return;
-      }
-      await click.update({ content: `Confirmé par ${member} : ${description}`, components: [], ...silent }).catch(() => {});
-      const output = await execute(tool, args, ctx);
-      await click.followUp({ content: output, ...silent }).catch(() => {});
-    });
-    collector.on('end', async (_, why) => {
-      if (why !== 'answered') await prompt.edit({ content: `Expiré sans confirmation : ${description}`, components: [] }).catch(() => {});
-    });
-  });
-}
-
 export async function runTool(call, ctx, tools = TOOLS) {
   const tool = tools.find((t) => t.name === call.name);
   if (!tool) return `Outil inconnu : ${call.name}.`;
   if (!canUse(tool, ctx.member)) return `Refusé : ${ctx.member.displayName} n'a pas le droit d'utiliser ${call.name}.`;
   if (tool.confirm) {
-    await askConfirmation(tool, call.args, ctx);
-    return "Un bouton de confirmation a été envoyé : l'action ne sera exécutée que si la personne clique sur « Confirmer ». Dis-le-lui brièvement.";
+    const { member } = ctx;
+    ctx.actions?.push({
+      label: tool.confirm(call.args, ctx),
+      danger: true,
+      allowed: (m) => m.id === member.id,
+      refusal: `Seul ${member.displayName} peut confirmer.`,
+      run: () => execute(tool, call.args, ctx),
+    });
+    return "Un bouton de confirmation sera affiché sous ta réponse : l'action ne sera faite que si la personne clique dessus. Dis-le-lui brièvement.";
   }
   return execute(tool, call.args, ctx);
 }

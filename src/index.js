@@ -4,6 +4,8 @@ import { handleInteraction } from './discord/buttons.js';
 import { warmupOllama } from './llm/client.js';
 import { warmupRequests } from './llm/prompts.js';
 import { installAndReport } from './server/installation.js';
+import { startReminders } from './tools/reminders.js';
+import { startConversationSweeper } from './conversation/memory.js';
 import { db } from './storage/db.js';
 
 const token = process.env.DISCORD_TOKEN;
@@ -23,6 +25,8 @@ const client = new Client({
 client.once(Events.ClientReady, async (c) => {
   console.log(`MAGI prêt : connecté en tant que ${c.user.tag} sur ${c.guilds.cache.size} serveur(s)`);
   for (const guild of c.guilds.cache.values()) await installAndReport(guild);
+  startReminders(c);
+  startConversationSweeper(c);
   if (process.env.GEMINI_API_KEY) {
     console.log(`LLM : Gemini (${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'}), Ollama en secours`);
     return;

@@ -18,6 +18,19 @@ test('persona mémorisée par salon, oubliée après 10 minutes', () => {
   assert.equal(activePersona('salon', 0), null);
 });
 
+test('conversation : participants suivis, fin détectée après 10 minutes', async () => {
+  const { expiredConversations, joinConversation } = await import('./router.js');
+  joinConversation('conv', 'g', 'slou', 0);
+  rememberPersona('conv', 'casper', 1_000);
+  joinConversation('conv', 'g', 'lea', 2_000);
+  assert.deepEqual(expiredConversations(5 * 60_000), []);
+  const [ended] = expiredConversations(13 * 60_000);
+  assert.equal(ended.channelId, 'conv');
+  assert.equal(ended.startedAt, 0);
+  assert.deepEqual([...ended.participants], ['slou', 'lea']);
+  assert.equal(activePersona('conv', 13 * 60_000), null);
+});
+
 test("une question posée par la persona attend une réponse", async () => {
   const { awaitingAnswer } = await import('./router.js');
   rememberPersona('q', 'balthasar', 0, 'slou');
