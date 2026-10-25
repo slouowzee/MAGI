@@ -38,7 +38,7 @@ globalThis.fetch = (url, init) => {
   return realFetch(url, init);
 };
 
-const { chat, choose, LLMUnavailable } = await import('./llm.js');
+const { chat, choose, LLMUnavailable } = await import('./client.js');
 
 test('Gemini répond en priorité quand une clé est configurée', async () => {
   process.env.GEMINI_API_KEY = 'test';

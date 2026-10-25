@@ -1,5 +1,5 @@
-import { chat } from './llm.js';
-import { runTool, schemas, toolsFor } from './tools.js';
+import { chat } from './client.js';
+import { runTool, schemas, toolsFor } from '../tools/index.js';
 
 const MAX_ROUNDS = 3;
 

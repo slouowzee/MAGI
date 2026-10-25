@@ -1,4 +1,4 @@
-import { personaByName } from './personas.js';
+import { personaByName } from '../personas.js';
 
 const NAME = /(?<![\p{L}\p{N}])(magi|melchior|balthasar|casper)(?![\p{L}\p{N}])/giu;
 const MENTIONED_ABOUT = /(?:^|[^\p{L}])(?:le|la|les|des|du|de|d'|d’|l'|l’|un|une|ce|cet|cette|ces|au|aux|avec|sur|sans|pour|par|chez|mon|ma|mes|ton|ta|tes|son|sa|ses|notre|nos|votre|vos|leur|leurs)\s*$/iu;

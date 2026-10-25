@@ -1,5 +1,5 @@
 import { RESTJSONErrorCodes } from 'discord.js';
-import { PERSONAS } from './personas.js';
+import { PERSONAS } from '../personas.js';
 
 const WEBHOOK_NAME = 'MAGI';
 const cache = new Map();

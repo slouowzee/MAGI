@@ -2,7 +2,7 @@ import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 
 process.env.DB_PATH = ':memory:';
-const { canUse, runTool, schemas, toolsFor } = await import('./tools.js');
+const { canUse, runTool, schemas, toolsFor } = await import('./index.js');
 
 const guild = { id: 'g', ownerId: 'owner', roles: { cache: new Map() }, members: { me: { roles: { highest: { position: 5 } } } } };
 const member = (id) => ({ id, guild, displayName: id, user: { tag: id }, roles: { cache: new Map() } });
@@ -32,7 +32,7 @@ test('schéma transmis au LLM', () => {
 });
 
 test("rapport d'état de l'installation", async () => {
-  const { statusReport } = await import('./setup.js');
+  const { statusReport } = await import('../server/installation.js');
   const steps = [
     { step: 'rôle créé', done: true, manual: false },
     { step: 'salon créé', done: false, manual: false },

@@ -1,5 +1,5 @@
-import { choose } from './llm.js';
-import { PERSONAS } from './personas.js';
+import { choose } from '../llm/client.js';
+import { PERSONAS } from '../personas.js';
 
 const EXPIRY = 10 * 60_000;
 const active = new Map();

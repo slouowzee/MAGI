@@ -1,4 +1,4 @@
-import { PERSONAS, personaByName } from './personas.js';
+import { PERSONAS, personaByName } from '../personas.js';
 
 const MAX_MESSAGES = 12;
 const WINDOW = 30 * 60_000;

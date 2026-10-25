@@ -1,5 +1,5 @@
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
-import { db } from './db.js';
+import { db } from '../storage/db.js';
 
 const OPERATOR_ROLE = 'Opérateur MAGI';
 const LOG_CHANNEL = 'magi-logs';

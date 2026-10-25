@@ -1,6 +1,6 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { toConversation } from './context.js';
+import { toConversation } from './history.js';
 
 test('les messages de la persona deviennent ses tours, les autres sont attribués', () => {
   const turns = toConversation(

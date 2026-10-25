@@ -1,6 +1,6 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { registerAction, takeAction } from './actions.js';
+import { registerAction, takeAction } from './buttons.js';
 
 const owner = { id: 'owner' };
 const action = { label: 'Compléter', allowed: (m) => m.id === 'owner', refusal: 'Réservé au propriétaire.', run: async () => 'fait' };
