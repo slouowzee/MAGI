@@ -3,10 +3,11 @@ import { INSTALLATION_TOOLS } from './installation.js';
 import { MEMORY_TOOLS } from './memory.js';
 import { CHANNEL_TOOLS } from './channel.js';
 import { REMINDER_TOOLS } from './reminders.js';
+import { ADMIN_TOOLS } from './admin/index.js';
 
 const silent = { allowedMentions: { parse: [] } };
 
-export const TOOLS = [...INSTALLATION_TOOLS, ...MEMORY_TOOLS, ...CHANNEL_TOOLS, ...REMINDER_TOOLS];
+export const TOOLS = [...INSTALLATION_TOOLS, ...MEMORY_TOOLS, ...CHANNEL_TOOLS, ...REMINDER_TOOLS, ...ADMIN_TOOLS];
 
 export function canUse(tool, member) {
   if (tool.access === 'everyone') return true;
@@ -46,8 +47,14 @@ export async function runTool(call, ctx, tools = TOOLS) {
   if (!canUse(tool, ctx.member)) return `Refusé : ${ctx.member.displayName} n'a pas le droit d'utiliser ${call.name}.`;
   if (tool.confirm) {
     const { member } = ctx;
+    let label;
+    try {
+      label = String(await tool.confirm({ guild: member.guild, member, message: ctx.message, args: call.args })).slice(0, 80);
+    } catch (err) {
+      return `Impossible : ${err.message}`;
+    }
     ctx.actions?.push({
-      label: tool.confirm(call.args, ctx),
+      label,
       danger: true,
       allowed: (m) => m.id === member.id,
       refusal: `Seul ${member.displayName} peut confirmer.`,

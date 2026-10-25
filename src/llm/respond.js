@@ -1,22 +1,28 @@
 import { chat } from './client.js';
 import { runTool, schemas, toolsFor } from '../tools/index.js';
 
-const MAX_ROUNDS = 3;
+const SAFETY_ROUNDS = 30;
+const TOOL_RULES = `Outils : aucune limite d'utilisation. Si la demande implique plusieurs actions (plusieurs rôles, salons, membres…), appelle les outils autant de fois que nécessaire, en plusieurs appels, jusqu'à ce que tout soit fait, puis réponds. N'annonce jamais qu'une action est faite sans avoir appelé l'outil et reçu son résultat.`;
 
 export async function respond({ messages, options, member, message }) {
   const tools = toolsFor(member);
   const declared = schemas(tools);
+  if (tools.length) messages[0] = { ...messages[0], content: `${messages[0].content}\n${TOOL_RULES}` };
   const actions = [];
-  let last;
-  for (let round = 0; round < MAX_ROUNDS; round++) {
-    last = await chat({ messages, options, tools: declared });
+  const done = new Set();
+  for (let round = 0; round < SAFETY_ROUNDS; round++) {
+    const last = await chat({ messages, options, tools: declared });
     if (!last.toolCalls.length) return { ...last, actions };
     messages.push(last.message);
     for (const call of last.toolCalls) {
-      console.log(`  outil demandé : ${call.name}`, call.args);
-      const output = await runTool(call, { member, message, actions });
+      const key = `${call.name} ${JSON.stringify(call.args)}`;
+      const repeated = done.has(key);
+      done.add(key);
+      console.log(`  outil demandé : ${call.name}${repeated ? ' (répété, ignoré)' : ''}`, call.args);
+      const output = repeated ? 'Cet appel identique a déjà été fait : ne le refais pas, passe à la suite ou réponds.' : await runTool(call, { member, message, actions });
       messages.push({ role: 'tool', tool_call_id: call.id, name: call.name, content: String(output) });
     }
   }
-  return { ...(await chat({ messages, options, tools: declared })), actions };
+  console.warn(`  limite de sécurité de ${SAFETY_ROUNDS} allers-retours atteinte`);
+  return { ...(await chat({ messages, options })), actions };
 }
