@@ -4,25 +4,42 @@ import { PERSONAS } from '../personas.js';
 
 const AVATAR_VERSION = 12;
 const cache = new Map();
+const cleanups = new Map();
 const avatarFile = (persona) => readFileSync(new URL(`../../assets/avatars/${persona}.png`, import.meta.url));
 const webhookName = (persona) => `MAGI ${PERSONAS[persona].name} v${AVATAR_VERSION}`;
 const CURRENT = new Set(Object.keys(PERSONAS).map(webhookName));
 const parentOf = (channel) => (channel.isThread() ? channel.parent : channel);
+const keyOf = (channel, persona) => `${parentOf(channel).id}:${persona}`;
 
-async function webhookFor(channel, persona) {
-  const parent = parentOf(channel);
-  const key = `${parent.id}:${persona}`;
-  const cached = cache.get(key);
-  if (cached) return cached;
+export function personaOf(msg) {
+  if (!msg.webhookId || msg.applicationId !== msg.client.application?.id) return null;
+  return Object.keys(PERSONAS).find((key) => [PERSONAS[key].name, PERSONAS[key].legacy].includes(msg.author.username)) ?? null;
+}
 
-  const me = channel.client.user.id;
+async function loadWebhook(parent, persona) {
+  const me = parent.client.user.id;
   const owned = (await parent.fetchWebhooks()).filter((wh) => wh.owner?.id === me);
-  for (const old of owned.filter((wh) => wh.name.startsWith('MAGI') && !CURRENT.has(wh.name)).values()) await old.delete('Ancienne version des avatars').catch(() => {});
-  const webhook =
+  if (!cleanups.has(parent.id)) {
+    const old = owned.filter((wh) => wh.name.startsWith('MAGI') && !CURRENT.has(wh.name));
+    cleanups.set(parent.id, Promise.all(old.map((wh) => wh.delete('Ancienne version des avatars').catch(() => {}))));
+  }
+  await cleanups.get(parent.id);
+  return (
     owned.find((wh) => wh.name === webhookName(persona)) ??
-    (await parent.createWebhook({ name: webhookName(persona), avatar: avatarFile(persona), reason: `Voix de ${PERSONAS[persona].name}` }));
-  cache.set(key, webhook);
-  return webhook;
+    (await parent.createWebhook({ name: webhookName(persona), avatar: avatarFile(persona), reason: `Voix de ${PERSONAS[persona].name}` }))
+  );
+}
+
+function webhookFor(channel, persona) {
+  const key = keyOf(channel, persona);
+  if (!cache.has(key)) {
+    const pending = loadWebhook(parentOf(channel), persona).catch((err) => {
+      if (cache.get(key) === pending) cache.delete(key);
+      throw err;
+    });
+    cache.set(key, pending);
+  }
+  return cache.get(key);
 }
 
 function payload(channel, persona, content, components, mentions = []) {
@@ -39,11 +56,13 @@ function payload(channel, persona, content, components, mentions = []) {
 }
 
 async function withWebhook(channel, persona, action) {
+  const pending = webhookFor(channel, persona);
   try {
-    return await action(await webhookFor(channel, persona));
+    return await action(await pending);
   } catch (err) {
     if (err.code !== RESTJSONErrorCodes.UnknownWebhook) throw err;
-    cache.delete(`${parentOf(channel).id}:${persona}`);
+    const key = keyOf(channel, persona);
+    if (cache.get(key) === pending) cache.delete(key);
     return action(await webhookFor(channel, persona));
   }
 }

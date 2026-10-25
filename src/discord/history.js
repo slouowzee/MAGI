@@ -1,4 +1,5 @@
-import { PERSONAS, personaByName } from '../personas.js';
+import { personaLabel } from '../personas.js';
+import { personaOf } from './webhooks.js';
 
 const MAX_MESSAGES = 12;
 const WINDOW = 30 * 60_000;
@@ -10,7 +11,7 @@ export function toConversation(records, persona) {
     const text = content.trim().slice(0, MAX_CHARS);
     if (!text) continue;
     const role = speaker === persona ? 'assistant' : 'user';
-    const line = role === 'assistant' ? text : `${speaker ? PERSONAS[speaker].name : author} : ${text}`;
+    const line = role === 'assistant' ? text : `${speaker ? personaLabel(speaker) : author} : ${text}`;
     const last = turns.at(-1);
     if (last?.role === role) last.content += `\n${line}`;
     else turns.push({ role, content: line });
@@ -20,7 +21,7 @@ export function toConversation(records, persona) {
 
 function record(msg, botId) {
   if (msg.webhookId) {
-    const speaker = personaByName(msg.author.username);
+    const speaker = personaOf(msg);
     return speaker ? { speaker, content: msg.content } : null;
   }
   if (msg.author.bot || msg.author.id === botId) return null;
@@ -28,9 +29,9 @@ function record(msg, botId) {
 }
 
 export function transcriptLine(msg) {
-  const persona = msg.webhookId ? personaByName(msg.author.username) : null;
+  const persona = personaOf(msg);
   if (msg.webhookId && !persona) return null;
-  const author = persona ? PERSONAS[persona].name : msg.member?.displayName ?? msg.author.username;
+  const author = persona ? personaLabel(persona) : msg.member?.displayName ?? msg.author.username;
   return msg.content.trim() ? `${author} : ${msg.content.trim().slice(0, 400)}` : null;
 }
 
