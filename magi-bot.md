@@ -102,7 +102,11 @@ Messages fixes, sans appel au LLM, signés par une persona :
 ## Choix techniques
 
 - **Langage** : JavaScript sur **Bun** (`oven/bun:1.4.2-alpine`), avec **discord.js**. `.env` chargé automatiquement par Bun, tests avec `bun test`.
-- **LLM** : **qwen3:4b-instruct** (~2,5 Go) via **Ollama**. Pas le tag `qwen3:4b`, qui « réfléchit » en anglais dans sa réponse même avec `think:false`, sur le VPS Dokploy (voir Hébergement). Le bot parle à l'API Ollama : changer de modèle ou de machine plus tard = changer une URL et un nom de modèle.
+- **LLM hybride** :
+  - **Gemini** (`gemini-3.5-flash-lite`, API gratuite de Google, format compatible OpenAI) en priorité : réponse en ~1 s, personnalités et appel d'outils nettement meilleurs.
+  - **Ollama** (`qwen3:4b-instruct` sur le VPS) en secours si Gemini échoue, est trop lent ou renvoie un quota épuisé (429) : Gemini est alors mis en pause 60 s. Pas le tag `qwen3:4b`, qui « réfléchit » en anglais dans sa réponse.
+  - Confidentialité : les messages traités partent chez Google. D'après les conditions de l'API, les utilisateurs de l'EEE bénéficient des règles de la formule payante (pas d'entraînement sur leurs données), à revérifier.
+  - Quotas gratuits à surveiller dans AI Studio (limite par minute et par jour, changés plusieurs fois en 2026).
 - **Stockage** : SQLite intégré à Bun (`bun:sqlite`, aucune dépendance native) pour la mémoire, les rappels, les infractions et les salons autorisés, dans un volume Dokploy.
 - NanoJev a été écarté : testé sur nos décisions (persona, destinataire, spam), il répond à peu près au hasard, en français comme en anglais, pour ~600 Mo de RAM.
 

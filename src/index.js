@@ -5,7 +5,7 @@ import { splitMessage } from './split.js';
 import { buildMessages, cleanReply, MAX_TOKENS, warmupRequests } from './prompts.js';
 import { install, installReport, logChannel } from './setup.js';
 import { speak } from './webhooks.js';
-import { chat, OllamaUnavailable } from './ollama.js';
+import { chat, LLMUnavailable, warmupOllama } from './llm.js';
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -41,8 +41,8 @@ client.once(Events.ClientReady, async (c) => {
   console.log(`MAGI prêt : connecté en tant que ${c.user.tag} sur ${c.guilds.cache.size} serveur(s)`);
   for (const guild of c.guilds.cache.values()) await installAndReport(guild);
   const started = Date.now();
-  await Promise.all(warmupRequests().map((messages) => chat({ messages, options: { num_predict: 1 } })))
-    .then(() => console.log(`Personas préchauffées en ${Math.round((Date.now() - started) / 1000)} s`))
+  await Promise.all(warmupRequests().map(warmupOllama))
+    .then(() => console.log(`Personas préchauffées sur Ollama en ${Math.round((Date.now() - started) / 1000)} s`))
     .catch((err) => console.error('Préchauffage impossible :', err.message));
 });
 
@@ -64,15 +64,16 @@ client.on(Events.MessageCreate, async (message) => {
   const typing = setInterval(() => message.channel.sendTyping().catch(() => {}), 8_000);
   message.channel.sendTyping().catch(() => {});
   try {
-    const reply = await chat({
+    const { content: reply, provider } = await chat({
       messages: buildMessages(persona, trigger.text || message.content, length),
       options: { num_predict: MAX_TOKENS[length], repeat_penalty: 1.1 },
     });
     clearInterval(typing);
+    console.log(`  réponse ${persona} via ${provider}`);
     for (const part of splitMessage(cleanReply(reply))) if (part) await speak(message.channel, persona, part);
   } catch (err) {
     console.error(`[${message.guild.name} #${message.channel.name}] réponse impossible :`, err.message);
-    if (err instanceof OllamaUnavailable) await speak(message.channel, 'melchior', 'Unité hors ligne.').catch(() => {});
+    if (err instanceof LLMUnavailable) await speak(message.channel, 'melchior', 'Unité hors ligne.').catch(() => {});
   } finally {
     clearInterval(typing);
   }
