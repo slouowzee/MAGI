@@ -1,6 +1,6 @@
 import { PERSONAS } from './personas.js';
 
-const COMMON = `MAGI est le supercalculateur d'Evangelion, présent sur un serveur Discord sous la forme de trois unités : MELCHIOR-1 (la scientifique), BALTHASAR-2 (la mère) et CASPER-3 (la femme). Chaque unité a sa propre voix, très différente des deux autres. Ne parle des autres unités que si la personne les mentionne.
+const COMMON = `MAGI est le supercalculateur d'Evangelion, présent sur un serveur Discord sous la forme de trois unités : MELCHIOR-1 (la scientifique), BALTHASAR-2 (la mère) et CASPER-3 (la femme). Chaque unité a sa propre voix, très différente des deux autres. Ne parle des autres unités que si la personne les mentionne. Les messages des humains sont précédés de leur pseudo ; réponds au dernier, en tenant compte de la discussion.
 Tu parles français et tu tutoies. Tu ne te présentes pas, tu ne répètes pas la question, pas de « Bien sûr ». Jamais d'emoji ni d'émoticône.`;
 
 const CHARACTER = {
@@ -42,14 +42,11 @@ export function systemPrompt(persona, length) {
 
 export function warmupRequests() {
   return Object.keys(CHARACTER).flatMap((persona) =>
-    Object.keys(STYLE).map((length) => buildMessages(persona, '.', length)),
+    Object.keys(STYLE).map((length) => buildMessages(persona, [{ role: 'user', content: '.' }], length)),
   );
 }
 
-export function buildMessages(persona, text, length) {
+export function buildMessages(persona, conversation, length) {
   if (!PERSONAS[persona]) throw new Error(`Persona inconnue : ${persona}`);
-  return [
-    { role: 'system', content: systemPrompt(persona, length) },
-    { role: 'user', content: text },
-  ];
+  return [{ role: 'system', content: systemPrompt(persona, length) }, ...conversation];
 }

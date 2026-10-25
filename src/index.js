@@ -6,7 +6,9 @@ import { buildMessages, cleanReply, MAX_TOKENS, warmupRequests } from './prompts
 import { install, installReport, logChannel } from './setup.js';
 import { speak } from './webhooks.js';
 import { chat, LLMUnavailable, warmupOllama } from './llm.js';
-import { activePersona, pickPersona, rememberPersona } from './router.js';
+import { activePersona, forgetPersona, pickPersona, rememberPersona } from './router.js';
+import { floodCheck, quickReaction } from './rules.js';
+import { conversationFor } from './context.js';
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -61,6 +63,19 @@ client.on(Events.MessageCreate, async (message) => {
 
   console.log(`[${message.guild.name} #${message.channel.name}] ${message.author.tag} →`, trigger);
   const channelId = message.channel.id;
+
+  const quick = quickReaction(message.content);
+  if (quick) {
+    await message.react(quick.emoji).catch(() => {});
+    if (quick.ends) forgetPersona(channelId);
+    return;
+  }
+
+  const flood = floodCheck(message.author.id);
+  if (flood !== 'ok') {
+    if (flood === 'warn') await speak(message.channel, 'balthasar', 'Doucement. Une question à la fois, je ne vais nulle part.').catch(() => {});
+    return;
+  }
   let persona = trigger.persona;
   if (persona === 'auto') persona = activePersona(channelId);
   if (!persona) {
@@ -74,7 +89,7 @@ client.on(Events.MessageCreate, async (message) => {
   message.channel.sendTyping().catch(() => {});
   try {
     const { content: reply, provider } = await chat({
-      messages: buildMessages(persona, trigger.text || message.content, length),
+      messages: buildMessages(persona, await conversationFor(message, persona, message.content), length),
       options: { num_predict: MAX_TOKENS[length], repeat_penalty: 1.1 },
     });
     clearInterval(typing);

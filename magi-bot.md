@@ -34,7 +34,7 @@ Aucune commande : tout passe par les noms, détectés **n'importe où** dans le 
 3. Détection d'un déclencheur (tableau ci-dessus) ; les replies sont repérés via `message.reference` et le `webhook_id` du message cité
 4. **Décisions** (voir plus bas) : règles dans le code pour répondre ou non, la forme et la longueur ; court appel au LLM pour la persona
 5. Persona mémorisée par fil de discussion, effacée en fin de conversation ou après **expiration** (ex. 10 min d'inactivité)
-6. **Contexte** : les N derniers messages du salon, relus via l'API Discord, chaque message attribué à son auteur (utilisateur ou persona, d'après le `username` du webhook), plus les **souvenirs** des personnes présentes (voir Mémoire)
+6. **Contexte** : les 12 derniers messages du salon (30 dernières minutes, 600 caractères max chacun), relus via l'API Discord, chaque message attribué à son auteur (utilisateur ou persona, d'après le `username` du webhook), plus les **souvenirs** des personnes présentes (voir Mémoire)
 7. **Appel de réponse** au LLM : prompt système de la persona, réponse et actions (appel d'outils)
 8. Réponse envoyée par **webhook** avec le `username` et l'`avatar_url` de la persona, envoyée **en une fois** quand elle est complète (pas de modification de message), découpée si elle dépasse 2000 caractères ; indicateur « en train d'écrire » pendant la génération
 
@@ -47,8 +47,9 @@ Le test sur le VPS a montré qu'un appel unique remplissant cinq champs prenait 
 | Décision | Règle |
 |---|---|
 | Répondre ou ignorer | Répondre si un nom apparaît **n'importe où** dans le message (« magi, … », « t'en penses quoi casper ? », « merci magi »), si le bot est mentionné ou si c'est un reply à une persona. Ignorer si le nom suit un déterminant ou une préposition : on parle alors **de** lui, pas **à** lui (« l'épisode des MAGI », « avec les magi »). |
-| Réaction plutôt que réponse | Message court qui correspond à une liste (merci, mdr, ok, 👍…) : un emoji, sans appel au LLM |
-| Fin de conversation | Même liste (merci, ok, bonne nuit…) : efface la persona mémorisée |
+| Réaction plutôt que réponse | Message qui, sans les noms ni la ponctuation, correspond **entièrement** à une liste : remerciement → ❤️, au revoir → 👋, rire → 😄, accord → 👍. Réaction Discord sur le message, sans appel au LLM. |
+| Fin de conversation | Remerciements et au revoir (merci, bonne nuit, à plus…) : efface la persona mémorisée |
+| Anti-flood | 5 s minimum entre deux demandes d'un même membre. Au-delà : un seul « Doucement. » de BALTHASAR, puis silence. Les réactions rapides ne comptent pas. |
 | Longueur | Courte par défaut ; détaillée si le message contient « explique », « détaille », « en détail »… |
 
 ### Choix de la persona par le LLM
