@@ -6,6 +6,7 @@ import { buildMessages, cleanReply, MAX_TOKENS, warmupRequests } from './prompts
 import { install, installReport, logChannel } from './setup.js';
 import { speak } from './webhooks.js';
 import { chat, LLMUnavailable, warmupOllama } from './llm.js';
+import { activePersona, pickPersona, rememberPersona } from './router.js';
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -59,7 +60,15 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   console.log(`[${message.guild.name} #${message.channel.name}] ${message.author.tag} →`, trigger);
-  const persona = trigger.persona === 'auto' ? 'melchior' : trigger.persona;
+  const channelId = message.channel.id;
+  let persona = trigger.persona;
+  if (persona === 'auto') persona = activePersona(channelId);
+  if (!persona) {
+    const pick = await pickPersona(trigger.text || message.content);
+    persona = pick.persona;
+    console.log(`  persona choisie : ${persona} (${pick.reason})`);
+  }
+  rememberPersona(channelId, persona);
   const length = wantsDetail(trigger.text) ? 'detaillee' : 'courte';
   const typing = setInterval(() => message.channel.sendTyping().catch(() => {}), 8_000);
   message.channel.sendTyping().catch(() => {});

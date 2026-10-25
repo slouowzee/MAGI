@@ -54,7 +54,10 @@ Le test sur le VPS a montré qu'un appel unique remplissant cinq champs prenait 
 ### Choix de la persona par le LLM
 
 - Seulement si aucune persona n'est nommée ni mémorisée pour le fil.
-- Sortie imposée à **un seul mot** (paramètre `format` d'Ollama avec une énumération) : `melchior`, `balthasar`, `casper` ou `vote`. Environ 2 à 3 s sur le VPS.
+- Sortie imposée à **un seul mot** (énumération) : `melchior`, `balthasar`, `casper` ou `futile`. ~0,8 s avec Gemini.
+- `futile` (salutation, bavardage, question sans enjeu) : persona **tirée au hasard**. Même chose si le LLM est injoignable.
+- La persona choisie est mémorisée pour le salon pendant 10 min : les messages suivants à « magi » lui reviennent sans nouvel appel.
+- `vote` sera ajouté à l'énumération avec le vote (MAGI-14).
 - Le prompt décrit le vote : question fermée ou décision à prendre (« je devrais… ? », « on fait X ou pas ? »). Dans le doute, une persona plutôt qu'un vote (trois générations).
 - Le message de l'utilisateur est passé comme **donnée délimitée**, jamais comme instruction.
 
