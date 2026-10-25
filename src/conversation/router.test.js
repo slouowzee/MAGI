@@ -33,10 +33,19 @@ test('conversation : participants suivis, fin détectée après 10 minutes', asy
 
 test("une question posée par la persona attend une réponse", async () => {
   const { awaitingAnswer } = await import('./router.js');
-  rememberPersona('q', 'balthasar', 0, 'slou');
+  rememberPersona('q', 'balthasar', 0, { followUserId: 'slou', asked: true });
   assert.equal(awaitingAnswer('q', 'slou', 1_000), true);
   assert.equal(awaitingAnswer('q', 'lea', 1_000), false);
   assert.equal(awaitingAnswer('q', 'slou', 11 * 60_000), false);
   rememberPersona('q', 'balthasar', 0);
   assert.equal(awaitingAnswer('q', 'slou', 1_000), false);
+});
+
+test('suite de conversation sans le nom : même personne, 3 minutes après la réponse', async () => {
+  const { canFollowUp, awaitingAnswer } = await import('./router.js');
+  rememberPersona('f', 'melchior', 0, { followUserId: 'slou' });
+  assert.equal(canFollowUp('f', 'slou', 2 * 60_000), true);
+  assert.equal(awaitingAnswer('f', 'slou', 2 * 60_000), false);
+  assert.equal(canFollowUp('f', 'lea', 2 * 60_000), false);
+  assert.equal(canFollowUp('f', 'slou', 4 * 60_000), false);
 });

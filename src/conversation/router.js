@@ -2,6 +2,7 @@ import { choose } from '../llm/client.js';
 import { PERSONAS } from '../personas.js';
 
 const EXPIRY = 10 * 60_000;
+const FOLLOW_UP = 3 * 60_000;
 const active = new Map();
 
 const ROUTER_PROMPT = `Tu choisis quelle unité de MAGI répond à un message Discord.
@@ -27,15 +28,21 @@ export function activePersona(channelId, now = Date.now()) {
 }
 
 export function joinConversation(channelId, guildId, userId, now = Date.now()) {
-  const entry = fresh(channelId, now) ?? { persona: null, askedUserId: null, startedAt: now, guildId, participants: new Set() };
+  const entry = fresh(channelId, now) ?? { persona: null, followUserId: null, followUntil: 0, asked: false, startedAt: now, guildId, participants: new Set() };
   entry.at = now;
   entry.participants.add(userId);
   active.set(channelId, entry);
 }
 
-export function rememberPersona(channelId, persona, now = Date.now(), askedUserId = null) {
+export function rememberPersona(channelId, persona, now = Date.now(), { followUserId = null, asked = false } = {}) {
   const entry = fresh(channelId, now) ?? { startedAt: now, guildId: null, participants: new Set() };
-  active.set(channelId, { ...entry, persona, at: now, askedUserId });
+  const followUntil = followUserId ? now + (asked ? EXPIRY : FOLLOW_UP) : 0;
+  active.set(channelId, { ...entry, persona, at: now, followUserId, followUntil, asked });
+}
+
+export function canFollowUp(channelId, userId, now = Date.now()) {
+  const entry = active.get(channelId);
+  return Boolean(entry && entry.followUserId === userId && now <= entry.followUntil);
 }
 
 export function expiredConversations(now = Date.now()) {
@@ -49,8 +56,7 @@ export function expiredConversations(now = Date.now()) {
 }
 
 export function awaitingAnswer(channelId, userId, now = Date.now()) {
-  const entry = active.get(channelId);
-  return Boolean(entry && now - entry.at <= EXPIRY && entry.askedUserId === userId);
+  return canFollowUp(channelId, userId, now) && active.get(channelId).asked;
 }
 
 export function forgetPersona(channelId) {
@@ -59,18 +65,25 @@ export function forgetPersona(channelId) {
   return entry ? { channelId, ...entry } : null;
 }
 
-export async function pickPersona(text) {
+function continuation(current) {
+  return `Une conversation est en cours avec ${current}.
+- rester : le message poursuit l'échange avec ${current} (réaction, relance, question sur ce qu'elle vient de dire, message qui s'adresse à elle). Si le message change de sujet, choisis l'unité la plus adaptée au nouveau sujet.`;
+}
+
+export async function pickPersona(text, current = null) {
   try {
     const choice = await choose({
       messages: [
-        { role: 'system', content: ROUTER_PROMPT },
+        { role: 'system', content: current ? `${ROUTER_PROMPT}\n${continuation(current)}` : ROUTER_PROMPT },
         { role: 'user', content: `<message>${text}</message>` },
       ],
-      choices: [...Object.keys(PERSONAS), 'futile', 'vote'],
+      choices: [...Object.keys(PERSONAS), 'futile', 'vote', ...(current ? ['rester'] : [])],
     });
     if (choice === 'vote') return { persona: null, vote: true, reason: choice };
-    return { persona: choice === 'futile' ? randomPersona() : choice, reason: choice };
+    if (choice === 'rester') return { persona: current, reason: choice };
+    if (choice === 'futile') return { persona: current ?? randomPersona(), reason: choice };
+    return { persona: choice, reason: choice };
   } catch (err) {
-    return { persona: randomPersona(), reason: `aléatoire (${err.message})` };
+    return { persona: current ?? randomPersona(), reason: `repli (${err.message})` };
   }
 }

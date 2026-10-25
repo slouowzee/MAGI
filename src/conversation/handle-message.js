@@ -1,4 +1,4 @@
-import { activePersona, awaitingAnswer, forgetPersona, joinConversation, pickPersona, rememberPersona } from './router.js';
+import { activePersona, awaitingAnswer, canFollowUp, forgetPersona, joinConversation, pickPersona, rememberPersona } from './router.js';
 import { memoryContext, summarizeConversation } from './memory.js';
 import { floodCheck, quickReaction } from './rules.js';
 import { runVote } from './vote.js';
@@ -11,9 +11,16 @@ import { LLMUnavailable } from '../llm/client.js';
 import { buildMessages, cleanReply, MAX_TOKENS } from '../llm/prompts.js';
 import { respond } from '../llm/respond.js';
 
+function addressesSomeoneElse(message) {
+  const others = message.mentions.users.filter((u) => !u.bot && u.id !== message.author.id);
+  const replied = message.mentions.repliedUser;
+  return others.size > 0 || Boolean(replied && !replied.bot && replied.id !== message.author.id);
+}
+
 export async function handleMessage(message) {
-  const answering = message.inGuild() && !message.author.bot && awaitingAnswer(message.channel.id, message.author.id);
-  const trigger = (await detect(message, message.client)) ?? (answering ? { persona: activePersona(message.channel.id), vote: false, text: message.content } : null);
+  const answering =
+    message.inGuild() && !message.author.bot && canFollowUp(message.channel.id, message.author.id) && !addressesSomeoneElse(message);
+  const trigger = (await detect(message, message.client)) ?? (answering ? { persona: 'auto', vote: false, text: message.content } : null);
   if (!trigger) return;
 
   console.log(`[${message.guild.name} #${message.channel.name}] ${message.author.tag} →`, trigger);
@@ -37,10 +44,9 @@ export async function handleMessage(message) {
     rememberPersona(channelId, null);
     return runVote(message, question);
   }
-  let persona = trigger.persona;
-  if (persona === 'auto') persona = activePersona(channelId);
+  let persona = trigger.persona === 'auto' ? null : trigger.persona;
   if (!persona) {
-    const pick = await pickPersona(question);
+    const pick = await pickPersona(question, activePersona(channelId));
     if (pick.vote) {
       console.log('  vote détecté');
       return runVote(message, question);
@@ -67,7 +73,7 @@ export async function handleMessage(message) {
     for (const [i, part] of parts.entries()) {
       await speak(message.channel, persona, part, i === parts.length - 1 ? buttonsFor(actions) : undefined);
     }
-    rememberPersona(channelId, persona, Date.now(), cleaned.endsWith('?') ? message.author.id : null);
+    rememberPersona(channelId, persona, Date.now(), { followUserId: message.author.id, asked: cleaned.endsWith('?') });
   } catch (err) {
     console.error(`[${message.guild.name} #${message.channel.name}] réponse impossible :`, err.message);
     if (err instanceof LLMUnavailable) await speak(message.channel, 'melchior', 'Unité hors ligne.').catch(() => {});
