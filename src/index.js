@@ -3,6 +3,8 @@ import { db } from './db.js';
 import { detect, wantsInstall } from './triggers.js';
 import { install, installReport, logChannel } from './setup.js';
 import { speak } from './webhooks.js';
+import { chat, OllamaUnavailable } from './ollama.js';
+import { PERSONAS } from './personas.js';
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -53,10 +55,21 @@ client.on(Events.MessageCreate, async (message) => {
 
   console.log(`[${message.guild.name} #${message.channel.name}] ${message.author.tag} →`, trigger);
   const persona = trigger.persona === 'auto' ? 'melchior' : trigger.persona;
+  const typing = setInterval(() => message.channel.sendTyping().catch(() => {}), 8_000);
+  message.channel.sendTyping().catch(() => {});
   try {
-    await speak(message.channel, persona, `Reçu : « ${trigger.text} »`);
+    const reply = await chat({
+      messages: [
+        { role: 'system', content: `Tu es ${PERSONAS[persona].name}, une des trois unités du supercalculateur MAGI. Réponds en français, en quelques phrases.` },
+        { role: 'user', content: trigger.text || message.content },
+      ],
+    });
+    await speak(message.channel, persona, reply.slice(0, 2000));
   } catch (err) {
-    console.error(`[${message.guild.name} #${message.channel.name}] envoi impossible :`, err.message);
+    console.error(`[${message.guild.name} #${message.channel.name}] réponse impossible :`, err.message);
+    if (err instanceof OllamaUnavailable) await speak(message.channel, 'melchior', 'Unité hors ligne.').catch(() => {});
+  } finally {
+    clearInterval(typing);
   }
 });
 
