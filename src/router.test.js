@@ -17,3 +17,13 @@ test('persona mémorisée par salon, oubliée après 10 minutes', () => {
   forgetPersona('salon');
   assert.equal(activePersona('salon', 0), null);
 });
+
+test("une question posée par la persona attend une réponse", async () => {
+  const { awaitingAnswer } = await import('./router.js');
+  rememberPersona('q', 'balthasar', 0, 'slou');
+  assert.equal(awaitingAnswer('q', 'slou', 1_000), true);
+  assert.equal(awaitingAnswer('q', 'lea', 1_000), false);
+  assert.equal(awaitingAnswer('q', 'slou', 11 * 60_000), false);
+  rememberPersona('q', 'balthasar', 0);
+  assert.equal(awaitingAnswer('q', 'slou', 1_000), false);
+});

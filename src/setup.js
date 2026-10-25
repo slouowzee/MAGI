@@ -4,6 +4,7 @@ import { db } from './db.js';
 const OPERATOR_ROLE = 'Opérateur MAGI';
 const LOG_CHANNEL = 'magi-logs';
 const REASON = 'Installation de MAGI';
+const silent = { allowedMentions: { parse: [] } };
 
 const getConfig = db.query('SELECT operator_role_id, log_channel_id FROM guilds WHERE guild_id = ?');
 const saveConfig = db.query(`INSERT INTO guilds (guild_id, operator_role_id, log_channel_id) VALUES (?1, ?2, ?3)
@@ -77,4 +78,41 @@ export function installReport({ created, role, ok }, guild) {
     );
   }
   return lines.join('\n');
+}
+
+export async function installStatus(guild) {
+  const role = operatorRole(guild);
+  const owner = await guild.fetchOwner();
+  return [
+    { step: 'rôle Opérateur MAGI créé', done: Boolean(role), manual: false },
+    { step: 'salon #magi-logs créé', done: Boolean(logChannel(guild)), manual: false },
+    { step: 'rôle Opérateur MAGI attribué au propriétaire', done: Boolean(role && owner.roles.cache.has(role.id)), manual: false },
+    { step: 'glisser le rôle Opérateur MAGI au-dessus du rôle du bot MAGI, dans Paramètres du serveur → Rôles', done: adminEnabled(guild), manual: true },
+  ];
+}
+
+export function statusReport(steps) {
+  const missing = steps.filter((s) => !s.done);
+  if (!missing.length) return 'Installation complète. Outils d\'administration activés.';
+  return [
+    'État de l\'installation :',
+    ...steps.map((s) => `- ${s.done ? 'fait' : 'manquant'} : ${s.step}${!s.done && s.manual ? ' (à faire à la main)' : ''}`),
+    missing.some((s) => !s.manual)
+      ? 'Les étapes non manuelles peuvent être faites par l\'outil installer_magi, après accord de la personne.'
+      : 'Il ne reste que l\'étape manuelle : outils d\'administration désactivés en attendant.',
+  ].join('\n');
+}
+
+export async function installAndReport(guild) {
+  try {
+    const result = await install(guild);
+    if (result.created.length || !result.ok) {
+      await logChannel(guild)?.send({ content: installReport(result, guild), ...silent });
+    }
+    console.log(`[${guild.name}] installation : ${result.created.length ? result.created.join(', ') : 'rien à créer'}, admin ${result.ok ? 'activé' : 'désactivé'}`);
+    return result;
+  } catch (err) {
+    console.error(`[${guild.name}] installation impossible :`, err.message);
+    return null;
+  }
 }

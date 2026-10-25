@@ -32,25 +32,51 @@ async function post(url, headers, body, timeoutMs) {
   return res.json();
 }
 
-async function gemini({ messages, format, options = {}, timeoutMs }) {
+function forGemini(messages) {
+  return messages.map(({ name, ...m }) => m);
+}
+
+function forOllama(messages) {
+  return messages.map((m) => {
+    if (m.role === 'assistant' && m.tool_calls) {
+      return {
+        role: 'assistant',
+        content: m.content ?? '',
+        tool_calls: m.tool_calls.map((c) => ({ function: { name: c.function.name, arguments: JSON.parse(c.function.arguments || '{}') } })),
+      };
+    }
+    if (m.role === 'tool') return { role: 'tool', content: m.content, tool_name: m.name };
+    return m;
+  });
+}
+
+async function gemini({ messages, format, options = {}, tools, timeoutMs }) {
   const body = {
     model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
-    messages,
+    messages: forGemini(messages),
     max_tokens: options.num_predict,
     temperature: options.temperature,
   };
   if (format) body.response_format = { type: 'json_schema', json_schema: { name: 'reponse', schema: format } };
+  if (tools?.length) body.tools = tools;
   const data = await post(GEMINI_URL, { Authorization: `Bearer ${process.env.GEMINI_API_KEY}` }, body, timeoutMs);
-  const content = data.choices?.[0]?.message?.content;
-  if (typeof content !== 'string') throw new LLMUnavailable('réponse Gemini vide');
-  return content;
+  const message = data.choices?.[0]?.message;
+  if (!message || (typeof message.content !== 'string' && !message.tool_calls?.length)) throw new LLMUnavailable('réponse Gemini vide');
+  return { role: 'assistant', content: message.content ?? '', ...(message.tool_calls?.length ? { tool_calls: message.tool_calls } : {}) };
 }
 
-function ollama({ messages, format, options, timeoutMs }) {
+function ollama({ messages, format, options, tools, timeoutMs }) {
   return ollamaQueue(async () => {
     const url = `${process.env.OLLAMA_URL || 'http://localhost:11434'}/api/chat`;
-    const body = { model: process.env.OLLAMA_MODEL || 'qwen3:4b-instruct', messages, format, options, stream: false };
-    return (await post(url, {}, body, timeoutMs)).message.content;
+    const body = { model: process.env.OLLAMA_MODEL || 'qwen3:4b-instruct', messages: forOllama(messages), format, options, stream: false };
+    if (tools?.length) body.tools = tools;
+    const { message } = await post(url, {}, body, timeoutMs);
+    const calls = (message.tool_calls ?? []).map((c, i) => ({
+      id: `ollama_${Date.now()}_${i}`,
+      type: 'function',
+      function: { name: c.function.name, arguments: JSON.stringify(c.function.arguments ?? {}) },
+    }));
+    return { role: 'assistant', content: message.content ?? '', ...(calls.length ? { tool_calls: calls } : {}) };
   });
 }
 
@@ -58,18 +84,27 @@ export function warmupOllama(messages) {
   return ollama({ messages, options: { num_predict: 1 }, timeoutMs: 180_000 });
 }
 
-export async function chat({ messages, format, options, timeoutMs = 180_000 }) {
+function result(message, provider) {
+  const toolCalls = (message.tool_calls ?? []).map((c) => {
+    let args = {};
+    try {
+      args = JSON.parse(c.function.arguments || '{}');
+    } catch {}
+    return { id: c.id, name: c.function.name, args };
+  });
+  return { content: message.content, toolCalls, message, provider };
+}
+
+export async function chat({ messages, format, options, tools, timeoutMs = 180_000 }) {
   if (process.env.GEMINI_API_KEY && Date.now() >= geminiPausedUntil) {
     try {
-      const content = await gemini({ messages, format, options, timeoutMs: Math.min(timeoutMs, 30_000) });
-      return { content, provider: 'gemini' };
+      return result(await gemini({ messages, format, options, tools, timeoutMs: Math.min(timeoutMs, 30_000) }), 'gemini');
     } catch (err) {
       if (err.status === 429 || err.status >= 500) geminiPausedUntil = Date.now() + GEMINI_COOLDOWN;
       console.warn(`Gemini indisponible (${err.message}), bascule sur Ollama`);
     }
   }
-  const content = await ollama({ messages, format, options, timeoutMs });
-  return { content, provider: 'ollama' };
+  return result(await ollama({ messages, format, options, tools, timeoutMs }), 'ollama');
 }
 
 export async function choose({ messages, choices, timeoutMs = 60_000 }) {

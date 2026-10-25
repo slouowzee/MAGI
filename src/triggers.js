@@ -18,17 +18,6 @@ export function parseName(content) {
   return null;
 }
 
-const INSTALL = [
-  /\b(?:r[ée])?(?:install|configur|initialis)e[- ]?toi\b/i,
-  /\bmets[- ]toi en place\b/i,
-  /\b(?:fais|refais|lance|relance|termine|finis|v[ée]rifie)\s+(?:ton|ta)\s+(?:installation|install|config|configuration|setup|mise en place)\b/i,
-  /\bv[ée]rifie\s+(?:la hi[ée]rarchie|tes r[ôo]les|tes droits)\b/i,
-];
-
-export function wantsInstall(text) {
-  return INSTALL.some((re) => re.test(text));
-}
-
 const DETAIL = /\b(?:expli(?:que|quer|cation|cations)|d[ée]taill\w*|en d[ée]tail|d[ée]veloppe\w*|approfondi\w*|tuto\w*|[ée]tape par [ée]tape|pas [àa] pas)\b/i;
 
 export function wantsDetail(text) {

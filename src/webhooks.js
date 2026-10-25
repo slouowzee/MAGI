@@ -16,10 +16,12 @@ async function webhookFor(channel) {
   return webhook;
 }
 
-function payload(channel, persona, content) {
+function payload(channel, persona, content, components) {
   const { name, avatar } = PERSONAS[persona];
   return {
     content,
+    components,
+    withComponents: Boolean(components?.length),
     username: name,
     avatarURL: avatar,
     threadId: channel.isThread() ? channel.id : undefined,
@@ -37,6 +39,6 @@ async function withWebhook(channel, action) {
   }
 }
 
-export function speak(channel, persona, content) {
-  return withWebhook(channel, (wh) => wh.send(payload(channel, persona, content)));
+export function speak(channel, persona, content, components) {
+  return withWebhook(channel, (wh) => wh.send(payload(channel, persona, content, components)));
 }

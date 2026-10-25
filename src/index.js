@@ -1,12 +1,14 @@
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { db } from './db.js';
-import { detect, wantsDetail, wantsInstall } from './triggers.js';
+import { detect, wantsDetail } from './triggers.js';
 import { splitMessage } from './split.js';
 import { buildMessages, cleanReply, MAX_TOKENS, warmupRequests } from './prompts.js';
-import { install, installReport, logChannel } from './setup.js';
+import { installAndReport } from './setup.js';
+import { respond } from './respond.js';
+import { buttonsFor, handleInteraction } from './actions.js';
 import { speak } from './webhooks.js';
-import { chat, LLMUnavailable, warmupOllama } from './llm.js';
-import { activePersona, forgetPersona, pickPersona, rememberPersona } from './router.js';
+import { LLMUnavailable, warmupOllama } from './llm.js';
+import { activePersona, awaitingAnswer, forgetPersona, pickPersona, rememberPersona } from './router.js';
 import { floodCheck, quickReaction } from './rules.js';
 import { conversationFor } from './context.js';
 
@@ -24,25 +26,14 @@ const client = new Client({
   ],
 });
 
-const silent = { allowedMentions: { parse: [] } };
-
-async function installAndReport(guild) {
-  try {
-    const result = await install(guild);
-    if (result.created.length || !result.ok) {
-      await logChannel(guild)?.send({ content: installReport(result, guild), ...silent });
-    }
-    console.log(`[${guild.name}] installation : ${result.created.length ? result.created.join(', ') : 'rien à créer'}, admin ${result.ok ? 'activé' : 'désactivé'}`);
-    return result;
-  } catch (err) {
-    console.error(`[${guild.name}] installation impossible :`, err.message);
-    return null;
-  }
-}
-
 client.once(Events.ClientReady, async (c) => {
   console.log(`MAGI prêt : connecté en tant que ${c.user.tag} sur ${c.guilds.cache.size} serveur(s)`);
   for (const guild of c.guilds.cache.values()) await installAndReport(guild);
+  if (process.env.GEMINI_API_KEY) {
+    console.log(`LLM : Gemini (${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'}), Ollama en secours`);
+    return;
+  }
+  console.log('LLM : Ollama seul (pas de GEMINI_API_KEY)');
   const started = Date.now();
   await Promise.all(warmupRequests().map(warmupOllama))
     .then(() => console.log(`Personas préchauffées sur Ollama en ${Math.round((Date.now() - started) / 1000)} s`))
@@ -50,22 +41,18 @@ client.once(Events.ClientReady, async (c) => {
 });
 
 client.on(Events.GuildCreate, installAndReport);
+client.on(Events.InteractionCreate, handleInteraction);
 
 client.on(Events.MessageCreate, async (message) => {
-  const trigger = await detect(message, client);
+  const answering = message.inGuild() && !message.author.bot && awaitingAnswer(message.channel.id, message.author.id);
+  const trigger = (await detect(message, client)) ?? (answering ? { persona: activePersona(message.channel.id), vote: false, text: message.content } : null);
   if (!trigger) return;
-
-  if (wantsInstall(trigger.text) && message.author.id === message.guild.ownerId) {
-    const result = await installAndReport(message.guild);
-    await message.reply({ content: result ? installReport(result, message.guild) : 'Installation impossible, voir les logs.', ...silent });
-    return;
-  }
 
   console.log(`[${message.guild.name} #${message.channel.name}] ${message.author.tag} →`, trigger);
   const channelId = message.channel.id;
 
   const quick = quickReaction(message.content);
-  if (quick) {
+  if (quick && !awaitingAnswer(channelId, message.author.id)) {
     await message.react(quick.emoji).catch(() => {});
     if (quick.ends) forgetPersona(channelId);
     return;
@@ -88,13 +75,20 @@ client.on(Events.MessageCreate, async (message) => {
   const typing = setInterval(() => message.channel.sendTyping().catch(() => {}), 8_000);
   message.channel.sendTyping().catch(() => {});
   try {
-    const { content: reply, provider } = await chat({
+    const { content: reply, provider, actions } = await respond({
       messages: buildMessages(persona, await conversationFor(message, persona, message.content), length),
       options: { num_predict: MAX_TOKENS[length], repeat_penalty: 1.1 },
+      member: message.member,
+      message,
     });
     clearInterval(typing);
     console.log(`  réponse ${persona} via ${provider}`);
-    for (const part of splitMessage(cleanReply(reply))) if (part) await speak(message.channel, persona, part);
+    const cleaned = cleanReply(reply);
+    const parts = splitMessage(cleaned).filter(Boolean);
+    for (const [i, part] of parts.entries()) {
+      await speak(message.channel, persona, part, i === parts.length - 1 ? buttonsFor(actions) : undefined);
+    }
+    rememberPersona(channelId, persona, Date.now(), cleaned.endsWith('?') ? message.author.id : null);
   } catch (err) {
     console.error(`[${message.guild.name} #${message.channel.name}] réponse impossible :`, err.message);
     if (err instanceof LLMUnavailable) await speak(message.channel, 'melchior', 'Unité hors ligne.').catch(() => {});

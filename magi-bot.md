@@ -20,6 +20,7 @@ Aucune commande : tout passe par les noms, détectés **n'importe où** dans le 
 | `magi ...` ou mention du bot | Choix automatique de la persona |
 | `melchior ...`, `balthasar ...`, `casper ...` | Persona forcée |
 | Réponse (reply) à un message d'une persona | Continue avec cette persona |
+| Message de la personne à qui une persona vient de poser une question (10 min) | Pris comme sa réponse, même sans nom (« oui vas-y ») ; pas de réaction rapide dans ce cas |
 | `magi ...` sur une décision à prendre | Vote détecté par le LLM (voir plus bas) |
 | `magi vote ...` | Vote forcé |
 | Message sans déclencheur dans un salon autorisé | Intervention spontanée possible (voir plus bas) |
@@ -121,7 +122,7 @@ VPS Dokploy : 9,7 Go de RAM dont **~3,8 Go disponibles**, pas de GPU, **pas de s
 - **Déployé** : projet Dokploy « MAGI », compose `ollama` (image `ollama/ollama:0.40.2`). Le bot rejoindra ce compose ; l'API Ollama n'est pas exposée sur Internet.
 - **Mesures** (qwen3:4b-instruct) : ~2,4 Go en mémoire, **écriture ~5 tokens/s**, premier chargement ~12 s. Lecture d'un prompt **jamais vu** ~35 tokens/s (5 à 9 s pour un prompt système), mais ~1 s quand Ollama réutilise son cache de préfixe.
 - **Réglages mémoire** : `OLLAMA_FLASH_ATTENTION=1` et `OLLAMA_KV_CACHE_TYPE=q8_0`. Sans eux, le modèle était tué par manque de mémoire vers 350 tokens générés.
-- **Préchauffage** : au démarrage, le bot envoie une requête d'un token par persona et par longueur, pour que les prompts système soient en cache (~40 s, en arrière-plan). Les prompts commencent par une partie commune aux trois personas. Résultat : premiers mots en 1 à 2,5 s quelle que soit la persona, réponse courte complète en 5 à 14 s.
+- **Préchauffage** (uniquement quand Ollama est seul, sans clé Gemini) : au démarrage, le bot envoie une requête d'un token par persona et par longueur, pour que les prompts système soient en cache (~40 s, en arrière-plan). Les prompts commencent par une partie commune aux trois personas. Résultat : premiers mots en 1 à 2,5 s quelle que soit la persona, réponse courte complète en 5 à 14 s.
 - **Limite mémoire** sur le conteneur Ollama (ex. 3,2 Go) : en cas de dépassement, c'est Ollama qui tombe, pas Dokploy.
 - **Ajouter un fichier de swap** (2 à 4 Go) comme filet de sécurité.
 - Réglages Ollama : `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_KEEP_ALIVE=-1` (pas de rechargement), contexte limité (`num_ctx` 4096 à 8192).
@@ -143,6 +144,7 @@ VPS Dokploy : 9,7 Go de RAM dont **~3,8 Go disponibles**, pas de GPU, **pas de s
   - `rappel` : « balthasar, rappelle-moi demain à 18h de… », stocké en SQLite et rechargé au démarrage
   - `retenir` / `oublier` : mémoire (voir plus haut)
 - Outils d'administration : voir plus bas, réservés aux Opérateurs MAGI.
+- **Fonctionnement** : seuls les outils autorisés pour l'auteur du message sont proposés au LLM (`everyone`, `operator`, `owner`). Le code revérifie l'accès avant d'exécuter. Jusqu'à 3 allers-retours outil → résultat → réponse de la persona, qui annonce le résultat avec sa propre voix. Chaque exécution est notée dans `#magi-logs`.
 - Toute action destructive demande une confirmation par **bouton**, envoyé par le bot (pas le webhook), cliquable uniquement par l'auteur de la demande. Le texte du bouton est rédigé par le code à partir des paramètres de l'outil, jamais par le LLM.
 - Prompt injection : partir du principe que n'importe quel membre essaiera de détourner les outils.
 
@@ -157,7 +159,9 @@ VPS Dokploy : 9,7 Go de RAM dont **~3,8 Go disponibles**, pas de GPU, **pas de s
 
 - Une fois le rôle du bot en dessous, MAGI ne peut plus ni attribuer ni retirer Opérateur MAGI : personne ne peut le manipuler pour devenir opérateur. Les opérateurs suivants sont nommés à la main par le propriétaire.
 - Au démarrage et avant chaque outil d'administration, le code vérifie cette hiérarchie : **outils d'administration désactivés tant qu'elle n'est pas correcte**.
-- Relançable par le propriétaire (« magi, installe-toi ») : saute ce qui existe déjà.
+- Relançable par le propriétaire, en langage naturel, avec deux outils réservés au propriétaire :
+  - `etat_installation` (lecture seule) pour toute question (« ton installation est ok ? ») : la persona liste les étapes faites et manquantes, avec un **bouton « Compléter l'installation »** sous son message (propriétaire uniquement, valable 15 min, retiré après le clic) ;
+  - `installer_magi` quand la personne le demande explicitement ou accepte (« oui vas-y »). Saute ce qui existe déjà.
 
 ## Administration (Opérateurs MAGI)
 

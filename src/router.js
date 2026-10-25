@@ -22,8 +22,13 @@ export function activePersona(channelId, now = Date.now()) {
   return entry.persona;
 }
 
-export function rememberPersona(channelId, persona, now = Date.now()) {
-  active.set(channelId, { persona, at: now });
+export function rememberPersona(channelId, persona, now = Date.now(), askedUserId = null) {
+  active.set(channelId, { persona, at: now, askedUserId });
+}
+
+export function awaitingAnswer(channelId, userId, now = Date.now()) {
+  const entry = active.get(channelId);
+  return Boolean(entry && now - entry.at <= EXPIRY && entry.askedUserId === userId);
 }
 
 export function forgetPersona(channelId) {
