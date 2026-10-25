@@ -1,5 +1,6 @@
 import { activePersona, awaitingAnswer, forgetPersona, pickPersona, rememberPersona } from './router.js';
 import { floodCheck, quickReaction } from './rules.js';
+import { runVote } from './vote.js';
 import { detect, wantsDetail } from './triggers.js';
 import { buttonsFor } from '../discord/buttons.js';
 import { conversationFor } from '../discord/history.js';
@@ -29,10 +30,19 @@ export async function handleMessage(message) {
     if (flood === 'warn') await speak(message.channel, 'balthasar', 'Doucement. Une question à la fois, je ne vais nulle part.').catch(() => {});
     return;
   }
+  const question = trigger.text || message.content;
+  if (trigger.vote) {
+    forgetPersona(channelId);
+    return runVote(message, question);
+  }
   let persona = trigger.persona;
   if (persona === 'auto') persona = activePersona(channelId);
   if (!persona) {
-    const pick = await pickPersona(trigger.text || message.content);
+    const pick = await pickPersona(question);
+    if (pick.vote) {
+      console.log('  vote détecté');
+      return runVote(message, question);
+    }
     persona = pick.persona;
     console.log(`  persona choisie : ${persona} (${pick.reason})`);
   }

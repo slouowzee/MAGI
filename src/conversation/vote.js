@@ -1,0 +1,89 @@
+import { PERSONAS } from '../personas.js';
+import { chat } from '../llm/client.js';
+import { cleanReply, systemPrompt } from '../llm/prompts.js';
+import { speak } from '../discord/webhooks.js';
+
+export const VERDICTS = ['APPROUVÉ', 'REFUSÉ', 'ABSTENTION'];
+
+const VOTE_FORMAT = {
+  type: 'object',
+  properties: {
+    avis: { type: 'string' },
+    verdict: { type: 'string', enum: VERDICTS },
+  },
+  required: ['avis', 'verdict'],
+};
+
+const VOTE_INSTRUCTION = `Délibération MAGI : on soumet une question aux trois unités, qui votent chacune de leur côté.
+Donne ton avis en une ou deux phrases, avec ta propre voix, puis ton verdict : APPROUVÉ (oui, à faire), REFUSÉ (non) ou ABSTENTION (impossible de trancher).`;
+
+export function tally(votes) {
+  const pour = votes.filter((v) => v.verdict === 'APPROUVÉ');
+  const contre = votes.filter((v) => v.verdict === 'REFUSÉ');
+  const abstentions = votes.length - pour.length - contre.length;
+  const outcome = pour.length >= 2 ? 'adoptée' : contre.length >= 2 ? 'rejetée' : 'impossible';
+  const minority = outcome === 'adoptée' ? contre : outcome === 'rejetée' ? pour : [];
+  return { outcome, pour: pour.length, contre: contre.length, abstentions, minority: minority.map((v) => v.persona) };
+}
+
+export function announcement({ outcome, pour, contre, abstentions }) {
+  if (outcome === 'impossible') return '**MAGI — Délibération impossible.** Aucune majorité.';
+  const unanimous = (outcome === 'adoptée' ? pour : contre) === 3;
+  if (unanimous) return `**MAGI — Résolution ${outcome} à l'unanimité.**`;
+  const score = outcome === 'adoptée' ? `${pour} contre ${contre}` : `${contre} contre ${pour}`;
+  return `**MAGI — Résolution ${outcome}, ${score}${abstentions ? `, ${abstentions} abstention${abstentions > 1 ? 's' : ''}` : ''}.**`;
+}
+
+export async function castVote(persona, question) {
+  try {
+    const { content } = await chat({
+      messages: [
+        { role: 'system', content: `${systemPrompt(persona, 'courte')}\n${VOTE_INSTRUCTION}` },
+        { role: 'user', content: question },
+      ],
+      format: VOTE_FORMAT,
+      options: { num_predict: 200 },
+    });
+    const { avis, verdict } = JSON.parse(content);
+    return { persona, avis: cleanReply(avis), verdict: VERDICTS.includes(verdict) ? verdict : 'ABSTENTION' };
+  } catch (err) {
+    return { persona, avis: 'Unité hors ligne.', verdict: 'ABSTENTION' };
+  }
+}
+
+export async function minorityOpinion(persona, question, result) {
+  try {
+    const { content } = await chat({
+      messages: [
+        { role: 'system', content: systemPrompt(persona, 'courte') },
+        { role: 'user', content: `La résolution « ${question} » a été ${result.outcome} contre ton avis. Ajoute une seule phrase d'avis minoritaire, avec ta voix.` },
+      ],
+      options: { num_predict: 80 },
+    });
+    return cleanReply(content);
+  } catch {
+    return null;
+  }
+}
+
+export function formatVote({ avis, verdict }) {
+  return `${avis}\n**${verdict}**`;
+}
+
+export async function runVote(message, question) {
+  const typing = setInterval(() => message.channel.sendTyping().catch(() => {}), 8_000);
+  message.channel.sendTyping().catch(() => {});
+  try {
+    const votes = await Promise.all(Object.keys(PERSONAS).map((persona) => castVote(persona, question)));
+    for (const vote of votes) await speak(message.channel, vote.persona, formatVote(vote));
+    const result = tally(votes);
+    console.log('  vote :', votes.map((v) => `${v.persona}=${v.verdict}`).join(', '), '→', result.outcome);
+    await message.channel.send({ content: announcement(result), allowedMentions: { parse: [] } });
+    for (const persona of result.minority) {
+      const line = await minorityOpinion(persona, question, result);
+      if (line) await speak(message.channel, persona, `Avis minoritaire : ${line}`);
+    }
+  } finally {
+    clearInterval(typing);
+  }
+}
