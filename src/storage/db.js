@@ -36,3 +36,16 @@ db.exec(`CREATE TABLE IF NOT EXISTS reminders (
   due_at INTEGER NOT NULL,
   done INTEGER NOT NULL DEFAULT 0
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS infractions (
+  id INTEGER PRIMARY KEY,
+  guild_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  revoked INTEGER NOT NULL DEFAULT 0
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS moderation (
+  guild_id TEXT PRIMARY KEY,
+  mode TEXT NOT NULL,
+  since INTEGER NOT NULL
+)`);

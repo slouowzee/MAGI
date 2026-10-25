@@ -1,5 +1,6 @@
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { handleMessage } from './conversation/handle-message.js';
+import { moderate } from './moderation/index.js';
 import { handleInteraction } from './discord/buttons.js';
 import { warmupOllama } from './llm/client.js';
 import { warmupRequests } from './llm/prompts.js';
@@ -40,7 +41,10 @@ client.once(Events.ClientReady, async (c) => {
 
 client.on(Events.GuildCreate, installAndReport);
 client.on(Events.InteractionCreate, handleInteraction);
-client.on(Events.MessageCreate, handleMessage);
+client.on(Events.MessageCreate, async (message) => {
+  if (await moderate(message).catch((err) => console.error('modération :', err.message))) return;
+  await handleMessage(message);
+});
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {
