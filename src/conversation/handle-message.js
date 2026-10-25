@@ -2,6 +2,7 @@ import { activePersona, awaitingAnswer, canFollowUp, forgetPersona, joinConversa
 import { memoryContext, summarizeConversation } from './memory.js';
 import { floodCheck, quickReaction } from './rules.js';
 import { runVote } from './vote.js';
+import { maybeIntervene } from './spontaneous.js';
 import { detect, wantsDetail } from './triggers.js';
 import { buttonsFor } from '../discord/buttons.js';
 import { conversationFor } from '../discord/history.js';
@@ -21,7 +22,10 @@ export async function handleMessage(message) {
   const answering =
     message.inGuild() && !message.author.bot && canFollowUp(message.channel.id, message.author.id) && !addressesSomeoneElse(message);
   const trigger = (await detect(message, message.client)) ?? (answering ? { persona: 'auto', vote: false, text: message.content } : null);
-  if (!trigger) return;
+  if (!trigger) {
+    if (message.inGuild() && !message.author.bot && !message.webhookId) await maybeIntervene(message).catch((err) => console.error('intervention spontanée :', err.message));
+    return;
+  }
 
   console.log(`[${message.guild.name} #${message.channel.name}] ${message.author.tag} →`, trigger);
   const channelId = message.channel.id;

@@ -49,3 +49,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS moderation (
   mode TEXT NOT NULL,
   since INTEGER NOT NULL
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS interventions (
+  channel_id TEXT PRIMARY KEY,
+  guild_id TEXT NOT NULL
+)`);
