@@ -16,7 +16,7 @@ test('les messages de la persona deviennent ses tours, les autres sont attribué
   assert.deepEqual(turns, [
     { role: 'user', content: 'Slou : magi, pizza ou sushi ?' },
     { role: 'assistant', content: 'Sushi, évidemment.' },
-    { role: 'user', content: 'Léa : moi je dis pizza\nMELCHIOR-1 : Les deux se valent.\nSlou : et toi casper, pourquoi ?' },
+    { role: 'user', content: 'Léa : moi je dis pizza\nMelchior : Les deux se valent.\nSlou : et toi casper, pourquoi ?' },
   ]);
 });
 
