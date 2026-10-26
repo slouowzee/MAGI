@@ -7,6 +7,7 @@ import { log } from '../logging/log.js';
 import { activeInfractions, addInfraction, moderationMode } from '../storage/moderation.js';
 import { setting } from '../storage/settings.js';
 import { createTracker, detect } from './detect.js';
+import { countTrigger } from '../security/honeypot.js';
 
 const HOUR = 3600_000;
 const track = createTracker();
@@ -77,6 +78,7 @@ async function trapped(message) {
     .then(() => true)
     .catch((err) => report(guild, 'err', [`échec ban ${member} : ${err.message}`], 'honeypot'));
   if (banned) report(guild, 'warning', [`${member.user.tag} (${member.id}) banni : message dans ${message.channel}, 24 h de messages supprimées`, `« ${message.content.slice(0, 500)} »`], 'honeypot');
+  await countTrigger(guild).catch((err) => report(guild, 'err', [`échec compteur : ${err.message}`], 'honeypot'));
 }
 
 export async function moderate(message) {

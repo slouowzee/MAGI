@@ -4,13 +4,19 @@ import { setSetting, setting } from '../storage/settings.js';
 const NAME = '🍯・honeypot';
 const OLD_NAMES = ['ne-pas-écrire-ici', '⛔・ne-pas-écrire'];
 const TOPIC = '🍯 Piège à bots : tout message envoyé ici entraîne un bannissement automatique.';
-const VERSION = '4';
+const VERSION = '5';
 
 export function warning(guild) {
+  const count = Number(setting(guild.id, 'honeypot_count') ?? 0);
   return new EmbedBuilder()
     .setColor(0xd65c62)
-    .setTitle("N'écrivez rien ici")
-    .setDescription('Ce salon est un piège à bots. Tout message posté ici entraîne un bannissement immédiat et la suppression des messages des dernières 24 heures.');
+    .setDescription(
+      [
+        "# N'écrivez rien ici",
+        '### Ce salon est un piège à bots. Tout message posté ici entraîne un bannissement immédiat et la suppression des messages des dernières 24 heures.',
+        `## Déclenché ${count} fois`,
+      ].join('\n'),
+    );
 }
 
 export function honeypotOf(guild) {
@@ -28,7 +34,7 @@ export async function enableHoneypot(guild, reason) {
     permissionOverwrites: [{ id: guild.roles.everyone.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }],
   });
   await channel.setPosition(0).catch(() => {});
-  await channel.send({ embeds: [warning(guild)] });
+  setSetting(guild.id, 'honeypot_message', (await channel.send({ embeds: [warning(guild)] })).id);
   setSetting(guild.id, 'honeypot', channel.id);
   setSetting(guild.id, 'honeypot_version', VERSION);
   return channel;
@@ -41,13 +47,20 @@ export async function refreshHoneypot(guild) {
   if (setting(guild.id, 'honeypot_version') === VERSION) return;
   const recent = await channel.messages.fetch({ limit: 20 }).catch(() => null);
   for (const message of recent?.values() ?? []) if (message.author.id === guild.client.user.id) await message.delete().catch(() => {});
-  await channel.send({ embeds: [warning(guild)] });
+  setSetting(guild.id, 'honeypot_message', (await channel.send({ embeds: [warning(guild)] })).id);
   setSetting(guild.id, 'honeypot_version', VERSION);
+}
+
+export async function countTrigger(guild) {
+  setSetting(guild.id, 'honeypot_count', Number(setting(guild.id, 'honeypot_count') ?? 0) + 1);
+  const message = await honeypotOf(guild)?.messages.fetch(setting(guild.id, 'honeypot_message') ?? '0').catch(() => null);
+  await message?.edit({ embeds: [warning(guild)] });
 }
 
 export async function disableHoneypot(guild, reason) {
   const current = honeypotOf(guild);
   setSetting(guild.id, 'honeypot', null);
   setSetting(guild.id, 'honeypot_version', null);
+  setSetting(guild.id, 'honeypot_message', null);
   await current?.delete(reason).catch(() => {});
 }

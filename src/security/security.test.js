@@ -38,7 +38,10 @@ test('la restauration ne reprend que ce qui manque', () => {
 
 test('message du salon piège : embed valide et clair', async () => {
   const { warning } = await import('./honeypot.js');
-  const embed = warning({}).toJSON();
-  assert.equal(embed.title, "N'écrivez rien ici");
+  const { setSetting } = await import('../storage/settings.js');
+  setSetting('piege-test', 'honeypot_count', 3);
+  const embed = warning({ id: 'piege-test' }).toJSON();
+  assert.ok(embed.description.startsWith("# N'écrivez rien ici\n### "));
+  assert.ok(embed.description.endsWith('## Déclenché 3 fois'));
   assert.ok(embed.description.includes('bannissement immédiat'));
 });
