@@ -69,7 +69,13 @@ async function gemini({ messages, format, options = {}, tools, model, timeoutMs 
 function ollama({ messages, format, options, tools, timeoutMs }) {
   return ollamaQueue(async () => {
     const url = `${process.env.OLLAMA_URL || 'http://localhost:11434'}/api/chat`;
-    const body = { model: process.env.OLLAMA_MODEL || 'qwen3:4b-instruct', messages: forOllama(messages), format, options, stream: false };
+    const body = {
+      model: process.env.OLLAMA_MODEL || 'qwen3:4b-instruct',
+      messages: forOllama(messages),
+      format,
+      options: { num_ctx: Number(process.env.OLLAMA_NUM_CTX) || 8192, ...options },
+      stream: false,
+    };
     if (tools?.length) body.tools = tools;
     const { message } = await post(url, {}, body, timeoutMs);
     const calls = (message.tool_calls ?? []).map((c, i) => ({
