@@ -32,6 +32,7 @@ export const CHANNEL_ADMIN_TOOLS = [
     description: "Supprime les derniers messages du salon actuel (1 à 100), éventuellement seulement ceux d'un membre. Discord ne permet pas de supprimer en masse des messages de plus de 14 jours. Demande une confirmation.",
     parameters: { type: 'object', properties: { nombre: { type: 'integer' }, membre: { type: 'string' } }, required: ['nombre'] },
     access: 'operator',
+    cleanup: true,
     async confirm({ message, args }) {
       const n = (await recentMessages(message, args)).length;
       if (!n) throw new Error('aucun message à supprimer');

@@ -44,5 +44,10 @@ export async function handleInteraction(interaction) {
   }
   await interaction.update({ components: [] }).catch(() => {});
   const output = await action.run(interaction.member).catch((err) => `Échec : ${err.message}`);
-  await interaction.followUp({ content: output, ...silent }).catch(() => {});
+  if (!action.cleanup) {
+    await interaction.followUp({ content: output, ...silent }).catch(() => {});
+    return;
+  }
+  await interaction.followUp({ content: output, flags: MessageFlags.Ephemeral, ...silent }).catch(() => {});
+  await Promise.all([interaction.message, action.cleanup].map((m) => m.delete().catch(() => {})));
 }
