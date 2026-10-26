@@ -5,6 +5,17 @@ const MENTIONED_ABOUT = /(?:^|[^\p{L}])(?:le|la|les|des|du|de|d'|d’|l'|l’|un
 const SEPARATORS = /^[\s,:;!?.-]*/;
 const VOTE = /^vote(?![\p{L}\p{N}])[\s,:;!?.-]*/iu;
 
+export const VOTE_INTENT = /(?<![\p{L}])vot(?:e|es|ez|ons|er)(?![\p{L}])/iu;
+
+export function addressedPersonas(content) {
+  const names = [];
+  for (const m of content.matchAll(NAME)) {
+    const name = m[1].toLowerCase();
+    if (name !== 'magi' && !MENTIONED_ABOUT.test(content.slice(0, m.index)) && !names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
 export function parseName(content) {
   for (const m of content.matchAll(NAME)) {
     const before = content.slice(0, m.index);

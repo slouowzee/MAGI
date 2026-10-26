@@ -14,21 +14,21 @@ const VOTE_FORMAT = {
   required: ['avis', 'verdict'],
 };
 
-const VOTE_INSTRUCTION = `Délibération MAGI : on soumet une question aux trois unités, qui votent chacune de leur côté.
+const VOTE_INSTRUCTION = `Délibération MAGI : on soumet une question aux unités de MAGI, qui votent chacune de leur côté.
 Donne ton avis en une ou deux phrases, avec ta propre voix, puis ton verdict : APPROUVÉ (oui, à faire), REFUSÉ (non) ou ABSTENTION (impossible de trancher).`;
 
 export function tally(votes) {
   const pour = votes.filter((v) => v.verdict === 'APPROUVÉ');
   const contre = votes.filter((v) => v.verdict === 'REFUSÉ');
   const abstentions = votes.length - pour.length - contre.length;
-  const outcome = pour.length >= 2 ? 'adoptée' : contre.length >= 2 ? 'rejetée' : 'impossible';
+  const outcome = pour.length > votes.length / 2 ? 'adoptée' : contre.length > votes.length / 2 ? 'rejetée' : 'impossible';
   const minority = outcome === 'adoptée' ? contre : outcome === 'rejetée' ? pour : [];
-  return { outcome, pour: pour.length, contre: contre.length, abstentions, minority: minority.map((v) => v.persona) };
+  return { outcome, pour: pour.length, contre: contre.length, abstentions, total: votes.length, minority: minority.map((v) => v.persona) };
 }
 
-export function announcement({ outcome, pour, contre, abstentions }) {
+export function announcement({ outcome, pour, contre, abstentions, total }) {
   if (outcome === 'impossible') return '**MAGI — Délibération impossible.** Aucune majorité.';
-  const unanimous = (outcome === 'adoptée' ? pour : contre) === 3;
+  const unanimous = (outcome === 'adoptée' ? pour : contre) === total;
   if (unanimous) return `**MAGI — Résolution ${outcome} à l'unanimité.**`;
   const score = outcome === 'adoptée' ? `${pour} contre ${contre}` : `${contre} contre ${pour}`;
   return `**MAGI — Résolution ${outcome}, ${score}${abstentions ? `, ${abstentions} abstention${abstentions > 1 ? 's' : ''}` : ''}.**`;
@@ -72,11 +72,11 @@ export function formatVote({ avis, verdict }) {
   return `${avis}\n**${verdict}**`;
 }
 
-export async function runVote(message, question) {
+export async function runVote(message, question, personas = Object.keys(PERSONAS)) {
   const typing = setInterval(() => message.channel.sendTyping().catch(() => {}), 8_000);
   message.channel.sendTyping().catch(() => {});
   try {
-    const votes = await Promise.all(Object.keys(PERSONAS).map((persona) => castVote(persona, question)));
+    const votes = await Promise.all(personas.map((persona) => castVote(persona, question)));
     for (const vote of votes) await speak(message.channel, vote.persona, formatVote(vote));
     const result = tally(votes);
     console.log('  vote :', votes.map((v) => `${v.persona}=${v.verdict}`).join(', '), '→', result.outcome);

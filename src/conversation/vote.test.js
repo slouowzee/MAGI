@@ -6,7 +6,7 @@ const v = (persona, verdict) => ({ persona, verdict });
 
 test('unanimité', () => {
   const r = tally([v('melchior', 'APPROUVÉ'), v('balthasar', 'APPROUVÉ'), v('casper', 'APPROUVÉ')]);
-  assert.deepEqual(r, { outcome: 'adoptée', pour: 3, contre: 0, abstentions: 0, minority: [] });
+  assert.deepEqual(r, { outcome: 'adoptée', pour: 3, contre: 0, abstentions: 0, total: 3, minority: [] });
   assert.equal(announcement(r), "**MAGI — Résolution adoptée à l'unanimité.**");
   assert.equal(announcement(tally([v('a', 'REFUSÉ'), v('b', 'REFUSÉ'), v('c', 'REFUSÉ')])), "**MAGI — Résolution rejetée à l'unanimité.**");
 });
@@ -27,4 +27,10 @@ test('abstention : majorité à 2 sans minorité, ou délibération impossible',
   const impossible = tally([v('melchior', 'APPROUVÉ'), v('balthasar', 'REFUSÉ'), v('casper', 'ABSTENTION')]);
   assert.equal(impossible.outcome, 'impossible');
   assert.equal(announcement(impossible), '**MAGI — Délibération impossible.** Aucune majorité.');
+});
+
+test('vote à deux unités : unanimité requise, sinon délibération impossible', () => {
+  const accord = tally([v('melchior', 'APPROUVÉ'), v('balthasar', 'APPROUVÉ')]);
+  assert.equal(announcement(accord), "**MAGI — Résolution adoptée à l'unanimité.**");
+  assert.equal(tally([v('melchior', 'APPROUVÉ'), v('balthasar', 'REFUSÉ')]).outcome, 'impossible');
 });

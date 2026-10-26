@@ -1,6 +1,6 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { parseName, wantsDetail } from './triggers.js';
+import { addressedPersonas, VOTE_INTENT, parseName, wantsDetail } from './triggers.js';
 
 test('déclenche sur un nom en ouverture', () => {
   assert.deepEqual(parseName('magi, salut'), { persona: 'auto', vote: false, text: 'salut' });
@@ -40,4 +40,11 @@ test('demande de réponse détaillée', () => {
   assert.ok(wantsDetail('fais-moi un tuto docker'));
   assert.equal(wantsDetail('ça va ?'), false);
   assert.equal(wantsDetail("t'en penses quoi de l'ananas ?"), false);
+});
+
+test('toutes les unités interpellées sont repérées, pas celles dont on parle', () => {
+  assert.deepEqual(addressedPersonas('balthasar et melchior, votez : on commande des pizzas ?'), ['balthasar', 'melchior']);
+  assert.deepEqual(addressedPersonas('casper, tu es d’accord avec la réponse de melchior ?'), ['casper']);
+  assert.equal(VOTE_INTENT.test('votez : on commande ?'), true);
+  assert.equal(VOTE_INTENT.test('le votant arrive'), false);
 });
