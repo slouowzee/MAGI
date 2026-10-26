@@ -19,6 +19,15 @@ export function timestamp(date = new Date()) {
   return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}${p.timeZoneName.replace('GMT', '') || '+00:00'}`;
 }
 
+export function readable(text, guild) {
+  return text
+    .replace(/<@!?(\d+)>/g, (_, id) => `@${guild?.members?.cache.get(id)?.displayName ?? guild?.client?.users.cache.get(id)?.username ?? id}`)
+    .replace(/<@&(\d+)>/g, (_, id) => `@${guild?.roles?.cache.get(id)?.name ?? id}`)
+    .replace(/<#(\d+)>/g, (_, id) => `#${guild?.channels?.cache.get(id)?.name ?? id}`)
+    .replace(/<t:(\d+)(?::\w)?>/g, (_, s) => timestamp(new Date(Number(s) * 1000)).slice(0, 16).replace('T', ' '))
+    .replace(/\*\*/g, '');
+}
+
 export function where({ guild, channel }) {
   if (channel) return `${guild?.name ?? channel.guild?.name} #${channel.name}`;
   return guild?.name ?? null;
@@ -26,7 +35,7 @@ export function where({ guild, channel }) {
 
 export function serverLine(entry) {
   const place = where(entry);
-  return `${timestamp(entry.at)} ${entry.host} ${entry.component}: ${entry.level}: ${place ? `[${place}] ` : ''}${entry.message.replace(/\s*\n\s*/g, ' ')}`;
+  return `${timestamp(entry.at)} ${entry.host} ${entry.component}: ${entry.level}: ${place ? `[${place}] ` : ''}${readable(entry.message, entry.guild).replace(/\s*\n\s*/g, ' ')}`;
 }
 
 function serverThreshold() {

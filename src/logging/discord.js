@@ -1,4 +1,4 @@
-import { addSink, severity, timestamp } from './log.js';
+import { addSink, readable, severity, timestamp } from './log.js';
 import { logChannels } from '../server/installation.js';
 import { setting } from '../storage/settings.js';
 
@@ -42,19 +42,8 @@ export function discordLevel(guildId) {
   return DISCORD_LEVELS[level] ? level : DEFAULT_DISCORD_LEVEL;
 }
 
-function date(seconds) {
-  return timestamp(new Date(Number(seconds) * 1000)).slice(0, 16).replace('T', ' ');
-}
-
 export function plain(text, guild) {
-  return text
-    .replace(/<@!?(\d+)>/g, (_, id) => `@${guild.members.cache.get(id)?.displayName ?? guild.client.users.cache.get(id)?.username ?? id}`)
-    .replace(/<@&(\d+)>/g, (_, id) => `@${guild.roles.cache.get(id)?.name ?? id}`)
-    .replace(/<#(\d+)>/g, (_, id) => `#${guild.channels.cache.get(id)?.name ?? id}`)
-    .replace(/<t:(\d+)(?::\w)?>/g, (_, s) => date(s))
-    .replace(/\*\*|__/g, '')
-    .replace(/```/g, "'''")
-    .replace(/\u001b/g, '');
+  return readable(text, guild).replace(/```/g, "'''").replace(/\u001b/g, '');
 }
 
 export function ansiLine(entry, guild) {

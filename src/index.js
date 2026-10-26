@@ -17,7 +17,7 @@ import { followHostJournal } from './logging/host.js';
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
-  log.emerg('magi', 'DISCORD_TOKEN manquant (voir .env.example)');
+  log.emerg('bot', 'DISCORD_TOKEN manquant (voir .env.example)');
   process.exit(1);
 }
 
@@ -34,7 +34,7 @@ const client = new Client({
 client.once(Events.ClientReady, async (c) => {
   await attachDiscord(c);
   for (const guild of c.guilds.cache.values()) await setupGuild(guild);
-  log.notice('magi', `démarré : connecté en tant que ${c.user.tag} sur ${c.guilds.cache.size} serveur(s), Gemini ${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'} puis ${process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite'}`);
+  log.notice('bot', `démarré : connecté en tant que ${c.user.tag} sur ${c.guilds.cache.size} serveur(s), Gemini ${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'} puis ${process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite'}`);
   followHostJournal();
   await catchUp(c).catch((err) => log.err('rattrapage', `rattrapage impossible : ${err.message}`));
   startReminders(c);
@@ -61,7 +61,7 @@ client.on(Events.MessageCreate, async (message) => {
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {
-    log.notice('magi', `arrêt (${signal})`);
+    log.notice('bot', `arrêt (${signal})`);
     await flushAll();
     await client.destroy();
     db.close();
@@ -69,6 +69,6 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   });
 }
 
-process.on('unhandledRejection', (err) => log.err('magi', `erreur non gérée : ${err?.stack ?? err}`));
+process.on('unhandledRejection', (err) => log.err('bot', `erreur non gérée : ${err?.stack ?? err}`));
 
 await client.login(token);
