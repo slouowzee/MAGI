@@ -1,28 +1,28 @@
 import { ChannelType, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { setSetting, setting } from '../storage/settings.js';
 
-const NAME = '⛔・ne-pas-écrire';
-const OLD_NAMES = ['ne-pas-écrire-ici'];
-const TOPIC = 'Salon piège à bots : tout message envoyé ici entraîne un bannissement automatique.';
-const VERSION = '2';
+const NAME = '🍯・honeypot';
+const OLD_NAMES = ['ne-pas-écrire-ici', '⛔・ne-pas-écrire'];
+const TOPIC = '🍯 Piège à bots : tout message envoyé ici entraîne un bannissement automatique.';
+const VERSION = '3';
 
 export function warning(guild) {
   return new EmbedBuilder()
     .setColor(0xd65c62)
     .setAuthor({ name: 'Protection de MAGI', iconURL: guild.client.user.displayAvatarURL() })
-    .setTitle('Salon piège')
+    .setTitle('🍯 Honeypot')
     .setDescription(
       [
-        "**N'écris rien dans ce salon.**",
+        "🚫 **N'écris rien dans ce salon.**",
         '',
-        'Il sert à repérer les comptes automatiques, qui publient dans tous les salons à la fois.',
+        '🤖 Il sert à repérer les comptes automatiques, qui publient dans tous les salons à la fois.',
         '',
-        'Un message envoyé ici entraîne :',
-        "• le bannissement immédiat de l'auteur ;",
-        '• la suppression de ses messages des dernières 24 heures, sur tout le serveur.',
+        '⚠️ Un message envoyé ici entraîne :',
+        "🔨 le bannissement immédiat de l'auteur ;",
+        '🧹 la suppression de ses messages des dernières 24 heures, sur tout le serveur.',
       ].join('\n'),
     )
-    .setFooter({ text: 'Rien à faire de ton côté : passe simplement ton chemin.' });
+    .setFooter({ text: '👋 Rien à faire de ton côté : passe simplement ton chemin.' });
 }
 
 export function honeypotOf(guild) {
