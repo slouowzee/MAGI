@@ -29,7 +29,7 @@ export async function welcome(member) {
     const { content } = await chat({
       messages: [
         { role: 'system', content: systemPrompt(persona, 'courte') },
-        { role: 'user', content: `${member.displayName} vient d'arriver sur le serveur ${guild.name}. Souhaite la bienvenue à cette personne en une ou deux phrases, avec ta voix, sans citer son pseudo (il sera mentionné avant ton message).${hint}` },
+        { role: 'user', content: `${member.displayName} vient d'arriver sur le serveur ${guild.name}. Souhaite la bienvenue à cette personne avec ta voix et ta longueur habituelle, sans citer son pseudo (il sera mentionné avant ton message).${hint}` },
       ],
       options: { num_predict: 120 },
       ...forReply(),
