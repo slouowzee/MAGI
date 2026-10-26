@@ -2,7 +2,7 @@ import { afterAll, expect, test } from 'bun:test';
 
 process.env.DB_PATH = ':memory:';
 const { addSink, log, serverLine, timestamp } = await import('./log.js');
-const { ansiLine, deliver, flush, plain, sourceOf } = await import('./discord.js');
+const { deliver, flush, plain, sourceOf, textLine } = await import('./discord.js');
 const { classify, handleLine, reportFailures } = await import('./host.js');
 const { db } = await import('../storage/db.js');
 const { setSetting } = await import('../storage/settings.js');
@@ -46,11 +46,15 @@ test('les sources Discord suivent le composant', () => {
   expect([sourceOf('moderation'), sourceOf('sshd'), sourceOf('antinuke'), sourceOf('config'), sourceOf('llm'), sourceOf('kernel')]).toEqual(['moderation', 'securite', 'securite', 'logs', 'systeme', 'systeme']);
 });
 
-test('sur Discord : mentions en clair, markdown retiré, couleur par niveau', () => {
+test('sur Discord : mentions en clair, markdown retiré, texte blanc', async () => {
   const { guild } = fakeGuild('g-texte');
   expect(plain('**Ban** de <@42> par <@&7>, arrivé le <t:1793021041>', guild)).toBe('Ban de @Slou par @Opérateur MAGI, arrivé le 2026-10-26 14:24');
-  const line = ansiLine({ at: new Date('2026-10-26T13:24:01Z'), host: 'vps', component: 'sshd', level: 'warning', message: 'échec' }, guild);
-  expect(line).toBe('\u001b[30m14:24:01\u001b[0m \u001b[34mvps sshd\u001b[0m: \u001b[33mwarning\u001b[0m: échec');
+  const line = textLine({ at: new Date('2026-10-26T13:24:01Z'), host: 'vps', component: 'sshd', level: 'warning', message: 'échec' }, guild);
+  expect(line).toBe('14:24:01 vps sshd: warning: échec');
+  const { guild: g, sent } = fakeGuild('g-blanc');
+  await deliver(g, { at: new Date('2026-10-26T13:24:01Z'), host: 'magi', level: 'err', component: 'llm', message: 'a\nb', guild: g, channel: null, mention: null });
+  await flush('g-blanc-magi-système');
+  expect(sent['magi-système'][0].content).toBe('```ansi\n\u001b[37m14:24:01 llm: err: a\u001b[0m\n\u001b[37mb\u001b[0m\n```');
 });
 
 test('sur Discord : regroupées par salon, répétitions comptées, sous le seuil ignorées', async () => {

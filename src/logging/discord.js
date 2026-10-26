@@ -29,7 +29,6 @@ const SOURCES = {
   installation: 'logs',
   rappels: 'logs',
 };
-const COLORS = { emerg: '1;31', alert: '1;31', crit: '1;31', err: '31', warning: '33', notice: '36', info: '37', debug: '30' };
 const FLUSH_DELAY = 2_000;
 const LIMIT = 1_900;
 const pending = new Map();
@@ -46,13 +45,14 @@ export function plain(text, guild) {
   return readable(text, guild).replace(/```/g, "'''").replace(/\u001b/g, '');
 }
 
-export function ansiLine(entry, guild) {
+export function textLine(entry, guild) {
   const host = entry.host === 'magi' ? '' : `${entry.host} `;
   const place = entry.channel ? `#${entry.channel.name} ` : '';
-  return `\u001b[30m${timestamp(entry.at).slice(11, 19)}\u001b[0m \u001b[34m${host}${entry.component}\u001b[0m: \u001b[${COLORS[entry.level]}m${entry.level}\u001b[0m: ${plain(place + entry.message, guild)}`;
+  return `${timestamp(entry.at).slice(11, 19)} ${host}${entry.component}: ${entry.level}: ${plain(place + entry.message, guild)}`;
 }
 
-const block = (lines) => `\`\`\`ansi\n${lines.join('\n')}\n\`\`\``;
+const white = (line) => line.split('\n').map((l) => `\u001b[37m${l}\u001b[0m`).join('\n');
+const block = (lines) => `\`\`\`ansi\n${lines.map(white).join('\n')}\n\`\`\``;
 const clip = (line) => (line.length > LIMIT ? `${line.slice(0, LIMIT - 1)}…` : line);
 
 function send(channel, payload) {
@@ -64,7 +64,7 @@ export async function flush(channelId) {
   if (!batch) return;
   pending.delete(channelId);
   clearTimeout(batch.timer);
-  const lines = batch.lines.map((l) => clip(l.count > 1 ? `${l.text} \u001b[30m(×${l.count})\u001b[0m` : l.text));
+  const lines = batch.lines.map((l) => clip(l.count > 1 ? `${l.text} (×${l.count})` : l.text));
   let chunk = [];
   for (const line of lines) {
     if (chunk.length && [...chunk, line].join('\n').length > LIMIT) {
@@ -97,7 +97,7 @@ export async function deliver(guild, entry) {
   const channels = logChannels(guild);
   const channel = channels[sourceOf(entry.component)] ?? channels.logs;
   if (!channel) return;
-  const text = ansiLine(entry, guild);
+  const text = textLine(entry, guild);
   if (!entry.mention) return queue(channel, `${entry.host} ${entry.component} ${entry.level} ${entry.channel?.id} ${entry.message}`, text);
   await flush(channel.id);
   const { users = [], roles = [] } = entry.mention;

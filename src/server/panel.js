@@ -18,13 +18,14 @@ import { interventionChannels, replaceInterventions } from '../storage/intervent
 import { MODES, moderationMode, setModerationMode } from '../storage/moderation.js';
 import { setSetting, setting } from '../storage/settings.js';
 import { activePersonas, enabledModules, MODULES, mutedChannels, setActivePersonas, setModules, setMutedChannels } from './config.js';
-import { installAndReport, isOperator, magiCategory, operatorRole } from './installation.js';
+import { installAndReport, isOperator, logChannels, magiCategory, operatorRole } from './installation.js';
 import { log } from '../logging/log.js';
 import { DISCORD_LEVELS, discordLevel } from '../logging/discord.js';
 import { atLeast, currentLevel, inviteUrl, LEVELS } from './permissions.js';
 
 const PREFIX = 'magi-config:';
-const SECTIONS = ['permissions', 'modules', 'salons', 'securite'];
+const PAGES = { modules: 'Modules', salons: 'Salons', logs: 'Logs', securite: 'Sécurité', permissions: 'Permissions' };
+const DEFAULT_PAGE = 'modules';
 const COLOR = 0xd65c62;
 const TEXT_CHANNELS = [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildForum];
 const silent = { allowedMentions: { parse: [] } };
@@ -44,23 +45,21 @@ function permissionsSection(guild) {
     'Clique sur un niveau pour l’accorder : Discord ouvre la page d’autorisation et met à jour le rôle de MAGI.',
   ];
   const buttons = Object.entries(LEVELS).map(([key, l]) => new ButtonBuilder().setLabel(l.label).setStyle(ButtonStyle.Link).setURL(inviteUrl(guild.client.user.id, guild.id, key)));
-  return { embeds: [new EmbedBuilder().setColor(COLOR).setTitle('Permissions').setDescription(lines.join('\n'))], components: [row(buttons)] };
+  return { description: lines.join('\n'), components: [row(buttons)] };
 }
 
 function modulesSection(guild) {
   const enabled = enabledModules(guild.id);
   const personas = activePersonas(guild.id);
   const { mode } = moderationMode(guild.id);
-  const level = discordLevel(guild.id);
   const description = [
     ...Object.entries(MODULES).map(([key, label]) => `${enabled.includes(key) ? 'Actif' : 'Coupé'} : ${label}`),
     '',
     `Personas actives : ${personas.map((p) => PERSONAS[p].name).join(', ')}`,
     `Modération automatique : ${MODE_LABELS[mode]}`,
-    `Logs Discord : ${level} et au-dessus (${DISCORD_LEVELS[level].toLowerCase()})`,
   ].join('\n');
   return {
-    embeds: [new EmbedBuilder().setColor(COLOR).setTitle('Modules et personas').setDescription(description)],
+    description,
     components: [
       row(
         new StringSelectMenuBuilder()
@@ -84,6 +83,29 @@ function modulesSection(guild) {
           .setPlaceholder('Modération automatique')
           .addOptions(MODES.map((value) => ({ label: MODE_LABELS[value], value, default: value === mode }))),
       ),
+    ],
+  };
+}
+
+const LOG_PURPOSES = {
+  logs: 'outils, configuration, installation, arrivées et départs, rappels',
+  moderation: 'décisions de la modération automatique',
+  securite: 'anti-nuke, salon piège, SSH et sudo du VPS',
+  systeme: 'démarrage, Gemini, erreurs, journal du VPS',
+};
+
+function logsSection(guild) {
+  const level = discordLevel(guild.id);
+  const targets = logChannels(guild);
+  const description = [
+    ...Object.entries(LOG_PURPOSES).map(([source, purpose]) => `${targets[source] ?? 'salon manquant'} : ${purpose}`),
+    '',
+    `Niveau minimal : **${level}** et au-dessus (${DISCORD_LEVELS[level].toLowerCase()})`,
+    'Les alertes qui mentionnent passent quel que soit le niveau.',
+  ].join('\n');
+  return {
+    description,
+    components: [
       row(
         new StringSelectMenuBuilder()
           .setCustomId(id('log_level'))
@@ -109,7 +131,7 @@ function channelsSection(guild) {
     return row(menu);
   };
   return {
-    embeds: [new EmbedBuilder().setColor(COLOR).setTitle('Salons').setDescription(description)],
+    description,
     components: [
       select('muted', 'Salons où MAGI se tait', muted, 25),
       select('interventions', 'Salons des interventions spontanées', interventions, 25),
@@ -127,7 +149,7 @@ function securitySection(guild) {
     `Anti-nuke : ${enabledModules(guild.id).includes('antinuke') ? 'actif' : 'coupé'}`,
   ].join('\n');
   return {
-    embeds: [new EmbedBuilder().setColor(COLOR).setTitle('Sécurité').setDescription(description)],
+    description,
     components: [
       row([
         new ButtonBuilder().setCustomId(id('audit')).setLabel('Lancer l’audit').setStyle(ButtonStyle.Primary),
@@ -140,10 +162,31 @@ function securitySection(guild) {
   };
 }
 
-const BUILDERS = { permissions: permissionsSection, modules: modulesSection, salons: channelsSection, securite: securitySection };
+const BUILDERS = { modules: modulesSection, salons: channelsSection, logs: logsSection, securite: securitySection, permissions: permissionsSection };
 
-export function panelSection(guild, name) {
-  return BUILDERS[name](guild);
+function currentPage(guild) {
+  const page = setting(guild.id, 'config_page');
+  return PAGES[page] ? page : DEFAULT_PAGE;
+}
+
+export function panelPage(guild, name = currentPage(guild)) {
+  const { description, components } = BUILDERS[name](guild);
+  const names = Object.keys(PAGES);
+  const nav = row(
+    names.map((page) =>
+      new ButtonBuilder()
+        .setCustomId(id(`page:${page}`))
+        .setLabel(PAGES[page])
+        .setStyle(page === name ? ButtonStyle.Primary : ButtonStyle.Secondary)
+        .setDisabled(page === name),
+    ),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(COLOR)
+    .setTitle(`Configuration de MAGI · ${PAGES[name]}`)
+    .setDescription(description)
+    .setFooter({ text: `Page ${names.indexOf(name) + 1}/${names.length}` });
+  return { embeds: [embed], components: [nav, ...components] };
 }
 
 function configChannel(guild) {
@@ -181,19 +224,16 @@ async function ensureConfigChannel(guild) {
 export async function refreshPanel(guild, { repost = false } = {}) {
   if (!operatorRole(guild) || !atLeast(guild.members.me.permissions, 'gestion')) return null;
   const channel = await ensureConfigChannel(guild);
-  const ids = JSON.parse(setting(guild.id, 'config_panel') ?? '{}');
-  const next = {};
-  for (const name of SECTIONS) {
-    const old = ids[name] ? await channel.messages.fetch(ids[name]).catch(() => null) : null;
-    if (old && !repost) {
-      await old.edit(panelSection(guild, name));
-      next[name] = old.id;
-      continue;
-    }
-    await old?.delete().catch(() => {});
-    next[name] = (await channel.send({ ...panelSection(guild, name), ...silent })).id;
+  for (const old of Object.values(JSON.parse(setting(guild.id, 'config_panel') ?? '{}'))) await channel.messages.delete(old).catch(() => {});
+  setSetting(guild.id, 'config_panel', null);
+  const existing = setting(guild.id, 'config_message');
+  const message = existing ? await channel.messages.fetch(existing).catch(() => null) : null;
+  if (message && !repost) {
+    await message.edit(panelPage(guild));
+    return channel;
   }
-  setSetting(guild.id, 'config_panel', JSON.stringify(next));
+  await message?.delete().catch(() => {});
+  setSetting(guild.id, 'config_message', (await channel.send({ ...panelPage(guild), ...silent })).id);
   return channel;
 }
 
@@ -215,7 +255,7 @@ const APPLY = {
   muted: { section: 'salons', apply: (guild, values) => setMutedChannels(guild.id, values) },
   interventions: { section: 'salons', apply: (guild, values) => replaceInterventions(guild.id, values) },
   welcome: { section: 'salons', apply: (guild, values) => setSetting(guild.id, 'welcome_channel', values[0] ?? null) },
-  log_level: { section: 'modules', apply: (guild, values) => setSetting(guild.id, 'log_level', values[0] ?? null) },
+  log_level: { section: 'logs', apply: (guild, values) => setSetting(guild.id, 'log_level', values[0] ?? null) },
 };
 
 export async function handlePanelInteraction(interaction) {
@@ -225,17 +265,24 @@ export async function handlePanelInteraction(interaction) {
   if (!isOperator(member)) return ephemeral('Ce panneau est réservé aux opérateurs MAGI.');
   const changed = (text) => log.notice('config', `${text} par ${member.user.tag}`, { guild });
 
+  if (field.startsWith('page:')) {
+    const page = field.slice('page:'.length);
+    if (!PAGES[page]) return ephemeral('Page inconnue.');
+    setSetting(guild.id, 'config_page', page);
+    return interaction.update(panelPage(guild, page));
+  }
   if (APPLY[field]) {
     const { section, apply } = APPLY[field];
     apply(guild, interaction.values ?? []);
-    await interaction.update(panelSection(guild, section));
+    setSetting(guild.id, 'config_page', section);
+    await interaction.update(panelPage(guild, section));
     const values = (interaction.values ?? []).map((v) => (interaction.isChannelSelectMenu?.() ? `<#${v}>` : v));
     return changed(`${FIELD_LABELS[field] ?? field} = ${values.join(', ') || 'aucun'}`);
   }
   if (field === 'audit') return ephemeral(auditReport(guild));
   if (field === 'backup') {
     backupGuild(guild);
-    await interaction.update(panelSection(guild, 'securite'));
+    await interaction.update(panelPage(guild, 'securite'));
     return changed('structure sauvegardée');
   }
   if (field === 'honeypot') {
@@ -243,7 +290,7 @@ export async function handlePanelInteraction(interaction) {
     const existed = Boolean(honeypotOf(guild));
     if (existed) await disableHoneypot(guild, reason);
     else await enableHoneypot(guild, reason);
-    await interaction.update(panelSection(guild, 'securite'));
+    await interaction.update(panelPage(guild, 'securite'));
     return changed(existed ? 'salon piège supprimé' : 'salon piège créé');
   }
   return ephemeral('Réglage inconnu.');
