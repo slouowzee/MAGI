@@ -35,3 +35,11 @@ test('la restauration ne reprend que ce qui manque', () => {
   assert.deepEqual(missing.roles.map((r) => r.name), ['Ancien']);
   assert.deepEqual(missing.channels.map((c) => c.name), ['annonces']);
 });
+
+test('message du salon piège : embed valide et clair', async () => {
+  const { warning } = await import('./honeypot.js');
+  const embed = warning({ client: { user: { displayAvatarURL: () => 'https://cdn.test/magi.png' } } }).toJSON();
+  assert.equal(embed.title, 'Salon piège');
+  assert.ok(embed.description.startsWith("**N'écris rien dans ce salon.**"));
+  assert.ok(embed.description.includes('bannissement immédiat'));
+});
