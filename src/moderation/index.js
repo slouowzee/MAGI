@@ -4,6 +4,7 @@ import { speak } from '../discord/webhooks.js';
 import { choose } from '../llm/client.js';
 import { isOperator, logChannel, operatorRole } from '../server/installation.js';
 import { activeInfractions, addInfraction, moderationMode } from '../storage/moderation.js';
+import { setting } from '../storage/settings.js';
 import { createTracker, detect } from './detect.js';
 
 const HOUR = 3600_000;
@@ -71,11 +72,26 @@ async function voteBan(message, reasons, count) {
   }
 }
 
+async function trapped(message) {
+  const { guild, member } = message;
+  await message.delete().catch(() => {});
+  const banned = await guild.members
+    .ban(member, { reason: 'MAGI : message dans le salon piège', deleteMessageSeconds: 86_400 })
+    .then(() => true)
+    .catch((err) => report(guild, [`Bannissement de ${member} impossible après le salon piège : ${err.message}`]));
+  if (banned) await report(guild, [`**Salon piège** : ${member.user.tag} (${member.id}) a écrit dans ${message.channel}, banni et messages des dernières 24 h supprimés.`, `Message : ${message.content.slice(0, 500)}`]);
+}
+
 export async function moderate(message) {
   if (!message.inGuild() || message.author.bot || message.webhookId) return false;
   const { guild, member } = message;
+  if (exempt(member)) return false;
+  if (message.channel.id === setting(guild.id, 'honeypot')) {
+    await trapped(message);
+    return true;
+  }
   const { mode } = moderationMode(guild.id);
-  if (mode === 'desactivee' || exempt(member)) return false;
+  if (mode === 'desactivee') return false;
 
   const now = Date.now();
   const finding = detect({

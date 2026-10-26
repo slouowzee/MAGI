@@ -61,3 +61,9 @@ db.exec(`CREATE TABLE IF NOT EXISTS publications (
   title TEXT NOT NULL,
   created_at INTEGER NOT NULL
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS settings (
+  guild_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY (guild_id, key)
+)`);
