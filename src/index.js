@@ -38,7 +38,7 @@ client.once(Events.ClientReady, async (c) => {
   startConversationSweeper(c);
   startBackups(c);
   if (process.env.GEMINI_API_KEY) {
-    console.log(`LLM : Gemini (${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'}), Ollama en secours`);
+    console.log(`LLM : Gemini (${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'}, puis ${process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite'} s'il est lent), Ollama en secours`);
     return;
   }
   console.log('LLM : Ollama seul (pas de GEMINI_API_KEY)');

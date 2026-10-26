@@ -3,9 +3,11 @@ export class ContentRefused extends Error {}
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 const GEMINI_COOLDOWN = 60_000;
+const GEMINI_PATIENCE = 12_000;
 
 const geminiPausedUntil = new Map();
 const defaultModel = () => process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+const backupModel = () => process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite';
 export const forReply = () => (process.env.GEMINI_REPLY_MODEL ? { model: process.env.GEMINI_REPLY_MODEL, reasoning: 'none' } : {});
 let ollamaTail = Promise.resolve();
 
@@ -25,7 +27,8 @@ async function post(url, headers, body, timeoutMs) {
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
-    throw new LLMUnavailable(err.name === 'TimeoutError' ? `pas de réponse en ${timeoutMs / 1000} s` : err.message);
+    const timedOut = err.name === 'TimeoutError';
+    throw Object.assign(new LLMUnavailable(timedOut ? `pas de réponse en ${timeoutMs / 1000} s` : err.message), { timedOut });
   }
   if (!res.ok) {
     const error = new LLMUnavailable(`HTTP ${res.status} : ${(await res.text()).slice(0, 200)}`);
@@ -140,13 +143,14 @@ function result(message, provider) {
 
 export async function chat({ messages, format, options, tools, model, reasoning, timeoutMs = 180_000 }) {
   if (process.env.GEMINI_API_KEY) {
-    for (const candidate of new Set([model ?? defaultModel(), defaultModel()])) {
-      if (Date.now() < (geminiPausedUntil.get(candidate) ?? 0)) continue;
+    const candidates = [...new Set([model ?? defaultModel(), defaultModel(), backupModel()])].filter((c) => Date.now() >= (geminiPausedUntil.get(c) ?? 0));
+    for (const [i, candidate] of candidates.entries()) {
+      const patience = i < candidates.length - 1 ? GEMINI_PATIENCE : 60_000;
       try {
-        return result(await geminiWithMedia({ messages, format, options, tools, model: candidate, reasoning: candidate === model ? reasoning : undefined, timeoutMs: Math.min(timeoutMs, 60_000) }), 'gemini');
+        return result(await geminiWithMedia({ messages, format, options, tools, model: candidate, reasoning: candidate === model ? reasoning : undefined, timeoutMs: Math.min(timeoutMs, patience) }), 'gemini');
       } catch (err) {
         if (err instanceof ContentRefused) throw err;
-        if (err.status === 429 || err.status >= 500) geminiPausedUntil.set(candidate, Date.now() + GEMINI_COOLDOWN);
+        if (err.timedOut || err.status === 429 || err.status >= 500) geminiPausedUntil.set(candidate, Date.now() + GEMINI_COOLDOWN);
         console.warn(`Gemini ${candidate} indisponible (${err.message.replace(/\s+/g, ' ')})`);
       }
     }

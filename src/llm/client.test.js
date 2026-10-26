@@ -33,7 +33,10 @@ const realFetch = globalThis.fetch;
 globalThis.fetch = (url, init) => {
   if (String(url).startsWith('https://generativelanguage.googleapis.com')) {
     calls.push('gemini');
-    return Promise.resolve(geminiResponse(JSON.parse(init.body)));
+    return new Promise((resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(init.signal.reason));
+      Promise.resolve(geminiResponse(JSON.parse(init.body))).then(resolve);
+    });
   }
   return realFetch(url, init);
 };
@@ -73,7 +76,7 @@ test('quota Gemini épuisé : bascule sur Ollama, puis Gemini mis en pause', asy
   const c = await chat({ messages: [{ role: 'user', content: 'c' }] });
   const d = await chat({ messages: [{ role: 'user', content: 'd' }] });
   assert.deepEqual([c.content, c.provider, d.content, d.provider], ['ollama c', 'ollama', 'ollama d', 'ollama']);
-  assert.deepEqual(calls, ['gemini', 'ollama:c', 'ollama:d']);
+  assert.deepEqual(calls, ['gemini', 'gemini', 'ollama:c', 'ollama:d']);
 });
 
 test('sans clé Gemini : Ollama seul, appels en file', async () => {
@@ -150,5 +153,24 @@ test('média refusé par Gemini : nouvel essai sans les vidéos, puis sans aucun
   assert.deepEqual([r.content, r.provider], ['vu', 'gemini']);
   assert.deepEqual(seen, [['video', 'image'], ['image'], []]);
   assert.ok(!calls.some((c) => c.startsWith('ollama')));
+  geminiResponse = () => Response.json({ choices: [{ message: { content: 'gemini ok' } }] });
+});
+
+test('modèle Gemini trop lent : le modèle de secours répond, puis prend le relais', async () => {
+  process.env.GEMINI_API_KEY = 'test';
+  process.env.GEMINI_MODEL = 'modele-lent';
+  process.env.GEMINI_BACKUP_MODEL = 'modele-secours';
+  const seen = [];
+  geminiResponse = async (body) => {
+    seen.push(body.model);
+    if (body.model === 'modele-lent') await Bun.sleep(300);
+    return Response.json({ choices: [{ message: { content: body.model } }] });
+  };
+  const a = await chat({ messages: [{ role: 'user', content: 'a' }], timeoutMs: 100 });
+  const b = await chat({ messages: [{ role: 'user', content: 'b' }], timeoutMs: 100 });
+  assert.deepEqual([a.content, a.provider, b.content], ['modele-secours', 'gemini', 'modele-secours']);
+  assert.deepEqual(seen, ['modele-lent', 'modele-secours', 'modele-secours']);
+  delete process.env.GEMINI_MODEL;
+  delete process.env.GEMINI_BACKUP_MODEL;
   geminiResponse = () => Response.json({ choices: [{ message: { content: 'gemini ok' } }] });
 });
