@@ -41,6 +41,7 @@ function forGemini(messages) {
 
 function forOllama(messages) {
   return messages.map((m) => {
+    if (Array.isArray(m.content)) return { ...m, content: m.content.filter((p) => p.type === 'text').map((p) => p.text).join('\n') };
     if (m.role === 'assistant' && m.tool_calls) {
       return {
         role: 'assistant',

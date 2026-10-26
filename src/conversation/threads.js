@@ -75,3 +75,7 @@ export function expiredConversations(now = Date.now()) {
   }
   return ended;
 }
+
+export function isClaimed(channelId, messageId, now = Date.now()) {
+  return live(channelId, now).some((c) => c.messages.includes(messageId));
+}

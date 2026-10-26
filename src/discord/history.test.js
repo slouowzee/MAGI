@@ -44,3 +44,7 @@ test('gifs et pièces jointes signalés', () => {
 test("l'en-tête de réponse d'une persona n'apparaît pas dans le contexte", () => {
   assert.equal(describe({ content: '-# ↪ <@42> [dommage Casper](https://discord.com/channels/1/2/3)\nProfite, ça ne durera pas.' }), 'Profite, ça ne durera pas.');
 });
+
+test('emojis personnalisés réduits à leur nom', () => {
+  assert.equal(describe({ content: "j'te shutdown <a:nerd_fast:1159963109797134377> <:pepe:123456789012345678>" }), "j'te shutdown :nerd_fast: :pepe:");
+});

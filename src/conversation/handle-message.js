@@ -1,5 +1,5 @@
 import { pickPersona, randomPersona, startsNewTopic } from './router.js';
-import { addMessage, answered, awaitingAnswer, closeConversation, followUpConversation, locateConversation, openConversation } from './threads.js';
+import { addMessage, answered, awaitingAnswer, closeConversation, followUpConversation, isClaimed, locateConversation, openConversation } from './threads.js';
 import { activePersonas, isMuted, moduleEnabled } from '../server/config.js';
 import { memoryContext, summarizeConversation } from './memory.js';
 import { floodCheck, quickReaction } from './rules.js';
@@ -95,7 +95,8 @@ export async function handleMessage(message) {
   const typing = setInterval(() => message.channel.sendTyping().catch(() => {}), 8_000);
   message.channel.sendTyping().catch(() => {});
   try {
-    const { turns, participants, target } = await conversationFor(message, persona, message.content, current);
+    const { turns, participants, target, included } = await conversationFor(message, persona, message.content, current, (id) => isClaimed(channelId, id));
+    for (const id of included) addMessage(current, id, null, Date.now());
     const { content: reply, provider, actions } = await respond({
       messages: buildMessages(persona, turns, length, memoryContext(message.guild.id, participants)),
       options: { num_predict: MAX_TOKENS[length], repeat_penalty: 1.1 },

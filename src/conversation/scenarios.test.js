@@ -10,6 +10,7 @@ let route = null;
 let reply = 0;
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, init) => {
+  if (String(url).startsWith('https://cdn.test/')) return new Response(new Uint8Array([71, 73, 70, 56, 57, 97]), { headers: { 'content-type': 'image/gif' } });
   if (!String(url).startsWith('https://generativelanguage.googleapis.com')) return realFetch(url, init);
   const body = JSON.parse(init.body);
   const props = body.response_format?.json_schema?.schema?.properties ?? {};
@@ -20,7 +21,13 @@ globalThis.fetch = async (url, init) => {
   }
   if (props.verdict) return answer(JSON.stringify({ avis: 'Je vote pour.', verdict: 'APPROUVÉ' }));
   const system = body.messages[0].content;
-  requests.push({ persona: system.match(/Tu es (\w+),/)?.[1].toLowerCase(), context: body.messages.at(-1).content });
+  const last = body.messages.at(-1).content;
+  const parts = Array.isArray(last) ? last : [{ type: 'text', text: last }];
+  requests.push({
+    persona: system.match(/Tu es (\w+),/)?.[1].toLowerCase(),
+    context: parts[0].text,
+    media: parts.filter((p) => p.type === 'image_url').map((p) => p.image_url.url),
+  });
   return answer(`Réponse ${++reply}.`);
 };
 afterAll(() => {
@@ -116,7 +123,7 @@ function world(name) {
     await welcome({ ...guild.members.cache.get(user.id), user, guild });
   }
 
-  async function say(name, content, { replyTo, mentions = [] } = {}) {
+  async function say(name, content, { replyTo, mentions = [], attachments = [] } = {}) {
     tick();
     const author = member(name);
     const message = {
@@ -126,6 +133,8 @@ function world(name) {
       webhookId: null,
       applicationId: null,
       mentions: { users: new Collection(mentions.map((m) => [member(m).id, member(m)])), repliedUser: replyTo?.author ?? null },
+      attachments: new Collection(attachments.map((a, i) => [String(i), a])),
+      embeds: [],
       reference: replyTo ? { messageId: replyTo.id } : null,
       fetchReference: async () => replyTo,
       reactions: [],
@@ -298,4 +307,13 @@ test("après l'accueil, le nouveau membre répond sans nommer personne et la per
   const reponse = await w.say('nesskuik', "salut, j'arrive pour parler de dev");
   expect(reponse.answers.map((a) => a.persona)).toEqual(['balthasar']);
   expect(lastContext('balthasar')).toContain("nesskuik : salut, j'arrive pour parler de dev");
+});
+
+test('les gifs postés sont joints au modèle, numérotés dans la conversation', async () => {
+  const w = world('media');
+  await w.say('lea', 'regardez ça', { attachments: [{ url: 'https://cdn.test/chat.gif', contentType: 'image/gif', size: 6 }] });
+  await w.say('lea', 'casper, il est pas mignon ?');
+  const request = requests.filter((r) => r.persona === 'casper').at(-1);
+  expect(request.context).toContain('lea : regardez ça [gif] [pièce jointe n°1]');
+  expect(request.media).toEqual(['data:image/gif;base64,R0lGODlh']);
 });
