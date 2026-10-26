@@ -1,4 +1,5 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags, PermissionFlagsBits } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, PermissionFlagsBits } from 'discord.js';
+import { framed } from '../../discord/embeds.js';
 import { savePublication } from '../../storage/publications.js';
 import { targetChannel, targetRole } from './resolve.js';
 
@@ -34,7 +35,7 @@ function panel(guild, args) {
   const description = [args.texte?.trim(), args.unique ? 'Un seul rôle à la fois.' : 'Clique pour prendre ou rendre un rôle.', roles.map((r) => `- ${r}`).join('\n')]
     .filter(Boolean)
     .join('\n\n');
-  return { roles, title, embed: new EmbedBuilder().setColor(0xd65c62).setTitle(title.slice(0, 256)).setDescription(description.slice(0, 4000)) };
+  return { roles, title, embed: framed(guild, { label: 'Rôles', title, text: description }) };
 }
 
 function buttons(roles, unique) {

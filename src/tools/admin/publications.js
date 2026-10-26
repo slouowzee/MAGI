@@ -1,19 +1,52 @@
-import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { PermissionFlagsBits } from 'discord.js';
+import { framed, SIGNATURE } from '../../discord/embeds.js';
 import { deletePublication, findPublication, recentPublications, renamePublication, savePublication } from '../../storage/publications.js';
+import { setSetting, setting } from '../../storage/settings.js';
 import { targetChannel } from './resolve.js';
 
-const COLOR = 0xd65c62;
+const KINDS = { annonce: 'Annonce', reglement: 'Règlement', information: 'Information', evenement: 'Événement', faq: 'FAQ' };
+const STYLE_VERSION = '2';
 const textArgs = {
+  type: { type: 'string', enum: Object.keys(KINDS), description: "Nature du message, affichée en en-tête avec le nom du serveur. Déduis-la de la demande." },
   titre: { type: 'string', description: 'Titre affiché en haut (256 caractères au plus).' },
-  texte: { type: 'string', description: 'Contenu en Markdown Discord : **gras**, listes, ## sous-titres (4000 caractères au plus).' },
+  texte: {
+    type: 'string',
+    description:
+      "Contenu en Markdown Discord (4000 caractères au plus) : phrases courtes, sections en ## sous-titres pour un texte long, listes à puces, **gras** pour l'essentiel. Pas de formule d'introduction ni de signature, l'en-tête et le pied sont ajoutés automatiquement.",
+  },
 };
 const publicationArg = { publication: { type: 'string', description: 'Titre, lien ou identifiant du message. Vide pour la dernière publication.' } };
 
-function embed({ titre, texte }) {
+function guessKind(title = '') {
+  if (/r[èe]gle/i.test(title)) return 'reglement';
+  if (/faq|questions/i.test(title)) return 'faq';
+  if (/[ée]v[ée]nement|soir[ée]e|tournoi|event/i.test(title)) return 'evenement';
+  if (/annonce|nouveaut|mise à jour/i.test(title)) return 'annonce';
+  return 'information';
+}
+
+function kindOf(message) {
+  const label = message.embeds[0]?.author?.name?.split(' · ')[0];
+  return Object.keys(KINDS).find((k) => KINDS[k] === label) ?? guessKind(message.embeds[0]?.title ?? '');
+}
+
+function embed(guild, { titre, texte, type }, fallback = 'information') {
   if (!texte?.trim()) throw new Error('le texte est vide');
-  const built = new EmbedBuilder().setColor(COLOR).setDescription(texte.trim().slice(0, 4000));
-  if (titre?.trim()) built.setTitle(titre.trim().slice(0, 256));
-  return built;
+  return framed(guild, { label: KINDS[type] ?? KINDS[fallback], title: titre?.trim(), text: texte.trim() });
+}
+
+export async function restylePublications(guild) {
+  if (setting(guild.id, 'publication_style') === STYLE_VERSION) return 0;
+  let restyled = 0;
+  for (const publication of recentPublications(guild.id)) {
+    const message = await guild.channels.cache.get(publication.channel_id)?.messages.fetch(publication.message_id).catch(() => null);
+    const old = message?.embeds[0];
+    if (!old?.description || old.footer?.text === SIGNATURE) continue;
+    await message.edit({ embeds: [embed(guild, { titre: old.title, texte: old.description }, guessKind(old.title ?? ''))] });
+    restyled++;
+  }
+  setSetting(guild.id, 'publication_style', STYLE_VERSION);
+  return restyled;
 }
 
 function publishable(guild, ref) {
@@ -56,9 +89,9 @@ export const PUBLICATION_TOOLS = [
       required: ['salon', 'texte'],
     },
     access: 'operator',
-    preview: ({ args }) => embed(args),
+    preview: ({ guild, args }) => embed(guild, args),
     confirm({ guild, args }) {
-      embed(args);
+      embed(guild, args);
       const channel = publishable(guild, args.salon);
       return `Publier dans #${channel.name}${args.mentionner_tout_le_monde ? ' avec @everyone' : ''}`;
     },
@@ -67,7 +100,7 @@ export const PUBLICATION_TOOLS = [
       const everyone = Boolean(args.mentionner_tout_le_monde);
       const sent = await channel.send({
         content: everyone ? '@everyone' : undefined,
-        embeds: [embed(args)],
+        embeds: [embed(guild, args)],
         allowedMentions: { parse: everyone ? ['everyone'] : [] },
       });
       if (args.epingler) await sent.pin().catch(() => {});
@@ -80,15 +113,15 @@ export const PUBLICATION_TOOLS = [
     description: "Remplace le titre et le texte d'un message publié par MAGI. Rédige le nouveau texte complet. Aperçu et confirmation avant modification.",
     parameters: { type: 'object', properties: { ...publicationArg, ...textArgs }, required: ['texte'] },
     access: 'operator',
-    preview: ({ args }) => embed(args),
+    preview: ({ guild, args }) => embed(guild, args),
     confirm({ guild, args }) {
-      embed(args);
+      embed(guild, args);
       return `Modifier « ${existing(guild, args.publication).title.slice(0, 50)} »`;
     },
     async run({ guild, args }) {
       const publication = existing(guild, args.publication);
       const message = await fetchPublication(guild, publication);
-      await message.edit({ embeds: [embed(args)] });
+      await message.edit({ embeds: [embed(guild, args, kindOf(message))] });
       if (args.titre?.trim()) renamePublication(publication.id, args.titre.trim());
       return `Publication modifiée : ${message.url}`;
     },

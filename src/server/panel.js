@@ -13,6 +13,7 @@ import { PERSONAS } from '../personas.js';
 import { auditReport } from '../security/audit.js';
 import { backupGuild } from '../security/backup.js';
 import { disableHoneypot, enableHoneypot, honeypotOf, refreshHoneypot } from '../security/honeypot.js';
+import { restylePublications } from '../tools/admin/publications.js';
 import { latestBackup } from '../storage/backups.js';
 import { interventionChannels, replaceInterventions } from '../storage/interventions.js';
 import { MODES, moderationMode, setModerationMode } from '../storage/moderation.js';
@@ -241,6 +242,9 @@ export async function setupGuild(guild) {
   await installAndReport(guild);
   await refreshPanel(guild).catch((err) => log.err('config', `échec panneau : ${err.message}`, { guild }));
   await refreshHoneypot(guild).catch((err) => log.err('honeypot', `échec mise à jour du salon piège : ${err.message}`, { guild }));
+  await restylePublications(guild)
+    .then((count) => count && log.notice('publications', `${count} publication(s) remise(s) en forme`, { guild }))
+    .catch((err) => log.err('publications', `échec remise en forme : ${err.message}`, { guild }));
 }
 
 export function isPanelInteraction(customId) {
