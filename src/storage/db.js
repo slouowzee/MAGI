@@ -73,3 +73,9 @@ db.exec(`CREATE TABLE IF NOT EXISTS backups (
   data TEXT NOT NULL,
   created_at INTEGER NOT NULL
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS conversations (
+  id INTEGER PRIMARY KEY,
+  channel_id TEXT NOT NULL,
+  data TEXT NOT NULL,
+  at INTEGER NOT NULL
+)`);

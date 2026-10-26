@@ -1,14 +1,21 @@
+import { deleteConversation, lastConversationId, loadConversations, saveConversation } from '../storage/conversations.js';
+
 const EXPIRY = 10 * 60_000;
 const FOLLOW_UP = 3 * 60_000;
 const MAX_MESSAGES = 40;
 const MAX_LINES = 6;
 const channels = new Map();
-let nextId = 1;
+let nextId = lastConversationId() + 1;
+
+function stored(channelId) {
+  if (!channels.has(channelId)) channels.set(channelId, []);
+  return channels.get(channelId);
+}
+
+for (const c of loadConversations(Date.now() - 24 * 3600_000)) stored(c.channelId).push(c);
 
 function live(channelId, now) {
-  const list = (channels.get(channelId) ?? []).filter((c) => now - c.at <= EXPIRY);
-  channels.set(channelId, list);
-  return list;
+  return stored(channelId).filter((c) => now - c.at <= EXPIRY);
 }
 
 const latest = (list) => list.reduce((best, c) => (!best || c.at > best.at ? c : best), null);
@@ -36,7 +43,8 @@ export function followUpConversation(channelId, userId, now = Date.now()) {
 
 export function openConversation({ channelId, guildId }, now = Date.now()) {
   const conversation = { id: nextId++, channelId, guildId, participants: new Set(), personas: new Set(), persona: null, messages: [], lines: [], follow: null, startedAt: now, at: now };
-  live(channelId, now).push(conversation);
+  stored(channelId).push(conversation);
+  saveConversation(conversation);
   return conversation;
 }
 
@@ -46,6 +54,7 @@ export function addMessage(conversation, messageId, authorId, now = Date.now(), 
   if (conversation.messages.length > MAX_MESSAGES) conversation.messages.splice(0, conversation.messages.length - MAX_MESSAGES);
   if (authorId) conversation.participants.add(authorId);
   conversation.at = now;
+  saveConversation(conversation);
 }
 
 export function answered(conversation, { persona, messageIds, userId, asked = false, text = null }, now = Date.now()) {
@@ -54,6 +63,7 @@ export function answered(conversation, { persona, messageIds, userId, asked = fa
   for (const id of messageIds) addMessage(conversation, id, null, now);
   if (text) conversation.lines = [...conversation.lines, `${persona} : ${text.slice(0, 200)}`].slice(-MAX_LINES);
   conversation.follow = userId ? { userId, asked, until: now + (asked ? EXPIRY : FOLLOW_UP) } : null;
+  saveConversation(conversation);
 }
 
 export function awaitingAnswer(conversation, userId, now = Date.now()) {
@@ -63,14 +73,17 @@ export function awaitingAnswer(conversation, userId, now = Date.now()) {
 
 export function closeConversation(conversation) {
   if (!conversation) return null;
-  channels.set(conversation.channelId, (channels.get(conversation.channelId) ?? []).filter((c) => c !== conversation));
+  channels.set(conversation.channelId, stored(conversation.channelId).filter((c) => c !== conversation));
+  deleteConversation(conversation.id);
   return conversation;
 }
 
 export function expiredConversations(now = Date.now()) {
   const ended = [];
   for (const [channelId, list] of channels) {
-    ended.push(...list.filter((c) => now - c.at > EXPIRY));
+    const gone = list.filter((c) => now - c.at > EXPIRY);
+    for (const c of gone) deleteConversation(c.id);
+    ended.push(...gone);
     channels.set(channelId, list.filter((c) => now - c.at <= EXPIRY));
   }
   return ended;

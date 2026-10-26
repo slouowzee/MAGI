@@ -1,6 +1,8 @@
-import { test } from 'bun:test';
+import { expect, test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { addMessage, answered, awaitingAnswer, closeConversation, expiredConversations, findConversation, followUpConversation, openConversation } from './threads.js';
+process.env.DB_PATH = ':memory:';
+const { addMessage, answered, awaitingAnswer, closeConversation, expiredConversations, findConversation, followUpConversation, openConversation } = await import('./threads.js');
+const { loadConversations } = await import('../storage/conversations.js');
 
 function conversation(channelId, authorId, messageId, now = 0) {
   const c = openConversation({ channelId, guildId: 'g' }, now);
@@ -49,4 +51,15 @@ test('suite sans le nom limitée dans le temps, question en attente, fin et expi
   const other = conversation('s4', 'slou', 'm3', 12 * 60_000);
   assert.equal(closeConversation(other), other);
   assert.equal(findConversation({ channelId: 's4', authorId: 'slou' }, 12 * 60_000), null);
+});
+
+test('les conversations sont sauvegardées et rechargées avec leurs participants', () => {
+  const c = conversation('s5', 'slou', 'm1', 1_000);
+  answered(c, { persona: 'casper', messageIds: ['r1'], userId: 'slou' }, 2_000);
+  const saved = loadConversations(0).find((s) => s.id === c.id);
+  expect(saved.participants.has('slou')).toBe(true);
+  expect(saved.personas.has('casper')).toBe(true);
+  expect(saved.messages).toEqual(['m1', 'r1']);
+  closeConversation(c);
+  expect(loadConversations(0).some((s) => s.id === c.id)).toBe(false);
 });
