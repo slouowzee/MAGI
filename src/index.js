@@ -6,6 +6,7 @@ import { handleRoleButton, isRoleButton } from './tools/admin/role-panels.js';
 import { warmupOllama } from './llm/client.js';
 import { warmupRequests } from './llm/prompts.js';
 import { handlePanelInteraction, isPanelInteraction, setupGuild } from './server/panel.js';
+import { farewell, welcome } from './server/welcome.js';
 import { startReminders } from './tools/reminders.js';
 import { startConversationSweeper } from './conversation/memory.js';
 import { db } from './storage/db.js';
@@ -24,6 +25,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildModeration,
+    GatewayIntentBits.GuildMembers,
   ],
 });
 
@@ -45,6 +47,8 @@ client.once(Events.ClientReady, async (c) => {
 });
 
 client.on(Events.GuildCreate, setupGuild);
+client.on(Events.GuildMemberAdd, (member) => welcome(member).catch((err) => console.error('bienvenue :', err.message)));
+client.on(Events.GuildMemberRemove, (member) => farewell(member).catch(() => {}));
 client.on(Events.GuildRoleUpdate, (before, after) => {
   if (after.tags?.botId === client.user.id && before.permissions.bitfield !== after.permissions.bitfield) setupGuild(after.guild);
 });

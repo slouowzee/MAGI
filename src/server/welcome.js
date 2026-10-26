@@ -1,0 +1,44 @@
+import { randomPersona } from '../conversation/router.js';
+import { speak } from '../discord/webhooks.js';
+import { chat } from '../llm/client.js';
+import { cleanReply, systemPrompt } from '../llm/prompts.js';
+import { findPublication } from '../storage/publications.js';
+import { setting } from '../storage/settings.js';
+import { activePersonas, moduleEnabled } from './config.js';
+import { logChannel } from './installation.js';
+
+const silent = { allowedMentions: { parse: [] } };
+
+function welcomeChannel(guild) {
+  return guild.channels.cache.get(setting(guild.id, 'welcome_channel')) ?? guild.systemChannel ?? null;
+}
+
+export async function welcome(member) {
+  const { guild } = member;
+  if (member.user.bot || !moduleEnabled(guild.id, 'bienvenue')) return;
+  const channel = welcomeChannel(guild);
+  if (!channel) return;
+  const personas = activePersonas(guild.id);
+  const persona = personas.includes('balthasar') ? 'balthasar' : randomPersona(Math.random, personas);
+  const rules = findPublication(guild.id, 'règlement');
+  const hint = rules ? ` Invite la personne à lire le règlement dans <#${rules.channel_id}>.` : '';
+  let text = 'Bienvenue parmi nous. Installe-toi, et n’hésite pas à te présenter.';
+  try {
+    const { content } = await chat({
+      messages: [
+        { role: 'system', content: systemPrompt(persona, 'courte') },
+        { role: 'user', content: `${member.displayName} vient d'arriver sur le serveur ${guild.name}. Souhaite la bienvenue à cette personne en une ou deux phrases, avec ta voix, sans citer son pseudo (il sera mentionné avant ton message).${hint}` },
+      ],
+      options: { num_predict: 120 },
+    });
+    text = cleanReply(content) || text;
+  } catch {}
+  await speak(channel, persona, `<@${member.id}> ${text}`, { mentions: [member.id] }).catch((err) => console.error('bienvenue :', err.message));
+}
+
+export async function farewell(member) {
+  const { guild } = member;
+  if (!moduleEnabled(guild.id, 'bienvenue')) return;
+  const since = member.joinedTimestamp ? `, arrivé <t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : '';
+  await logChannel(guild)?.send({ content: `Départ : ${member.user.tag} (${member.id})${since}.`, ...silent }).catch(() => {});
+}
