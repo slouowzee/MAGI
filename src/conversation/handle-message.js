@@ -85,7 +85,8 @@ export async function handleMessage(message) {
     const cleaned = cleanReply(reply);
     const parts = splitMessage(cleaned).filter(Boolean);
     for (const [i, part] of parts.entries()) {
-      rememberAnswer(await speak(message.channel, persona, part, i === parts.length - 1 ? { components: buttonsFor(actions), embeds: previewsFor(actions) } : {}), target);
+      const last = i === parts.length - 1 ? { components: buttonsFor(actions), embeds: previewsFor(actions) } : {};
+      rememberAnswer(await speak(message.channel, persona, part, { ...last, replyTo: i === 0 ? message : undefined }), target);
     }
     rememberPersona(channelId, persona, Date.now(), { followUserId: message.author.id, asked: cleaned.endsWith('?') });
   } catch (err) {

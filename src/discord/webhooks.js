@@ -1,4 +1,4 @@
-import { RESTJSONErrorCodes } from 'discord.js';
+import { escapeMarkdown, RESTJSONErrorCodes } from 'discord.js';
 import { readFileSync } from 'node:fs';
 import { PERSONAS } from '../personas.js';
 
@@ -42,10 +42,18 @@ function webhookFor(channel, persona) {
   return cache.get(key);
 }
 
-function payload(channel, persona, content, { components, embeds, mentions = [] }) {
+export const REPLY_HEADER = /^-# ↪ <@(\d+)>[^\n]*\n?/;
+
+export function replyHeader(msg) {
+  const text = msg.content.replace(/https?:\/\/\S+/g, 'lien').replace(/[\[\]]/g, '').replace(/\s+/g, ' ').trim();
+  const snippet = text.length > 50 ? `${text.slice(0, 50)}…` : text || 'message';
+  return `-# ↪ <@${msg.author.id}> [${escapeMarkdown(snippet)}](${msg.url})`;
+}
+
+function payload(channel, persona, content, { components, embeds, mentions = [], replyTo }) {
   const { name, avatar } = PERSONAS[persona];
   return {
-    content,
+    content: replyTo ? `${replyHeader(replyTo)}\n${content}` : content,
     components,
     embeds,
     withComponents: Boolean(components?.length),

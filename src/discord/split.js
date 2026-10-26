@@ -1,4 +1,4 @@
-const LIMIT = 1900;
+const LIMIT = 1800;
 
 export function splitMessage(text) {
   const parts = [];

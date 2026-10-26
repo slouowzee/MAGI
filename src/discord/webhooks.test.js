@@ -1,7 +1,7 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { Collection } from 'discord.js';
-import { personaOf, speak } from './webhooks.js';
+import { personaOf, replyHeader, speak } from './webhooks.js';
 
 const client = { application: { id: 'magi' } };
 const msg = (username, { webhookId = 'wh', applicationId = 'magi' } = {}) => ({ webhookId, applicationId, client, author: { username } });
@@ -54,4 +54,11 @@ test('les anciens webhooks sont supprimés une fois, avant la création', async 
   await Promise.all([speak(channel, 'casper', 'a'), speak(channel, 'melchior', 'b')]);
   assert.equal(channel.calls[0], 'delete');
   assert.equal(channel.calls.filter((c) => c === 'delete').length, 1);
+});
+
+test("l'en-tête de réponse mentionne l'auteur et renvoie au message, sans lien brut ni crochets", () => {
+  const msg = { author: { id: '42' }, content: 'regarde [ça] https://exemple.fr/une-page-tres-longue', url: 'https://discord.com/channels/1/2/3' };
+  assert.equal(replyHeader(msg), '-# ↪ <@42> [regarde ça lien](https://discord.com/channels/1/2/3)');
+  const long = replyHeader({ ...msg, content: 'x'.repeat(80) });
+  assert.match(long, /\[x{50}…\]/);
 });

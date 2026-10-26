@@ -44,6 +44,6 @@ export async function maybeIntervene(message) {
   const { content } = await chat({ messages: buildMessages(choice, turns, 'courte', extra), options: { num_predict: MAX_TOKENS.courte }, ...forReply() });
   const reply = cleanReply(content);
   if (!reply) return;
-  rememberAnswer(await speak(message.channel, choice, reply.slice(0, 1900)), target);
+  rememberAnswer(await speak(message.channel, choice, reply.slice(0, 1800), { replyTo: message }), target);
   rememberPersona(channelId, choice, Date.now(), { followUserId: message.author.id, asked: reply.endsWith('?') });
 }

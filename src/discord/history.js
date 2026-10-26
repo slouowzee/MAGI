@@ -1,5 +1,5 @@
 import { PERSONAS, personaLabel } from '../personas.js';
-import { personaOf } from './webhooks.js';
+import { personaOf, REPLY_HEADER } from './webhooks.js';
 
 const MAX_MESSAGES = 12;
 const WINDOW = 30 * 60_000;
@@ -18,7 +18,7 @@ function kind(attachment) {
 }
 
 export function describe(msg, text = msg.content) {
-  const parts = [text.replace(GIF_LINK, '[gif]').trim()];
+  const parts = [text.replace(REPLY_HEADER, '').replace(GIF_LINK, '[gif]').trim()];
   for (const attachment of msg.attachments?.values() ?? []) parts.push(`[${kind(attachment)}]`);
   for (const sticker of msg.stickers?.values() ?? []) parts.push(`[sticker ${sticker.name}]`);
   return parts.filter(Boolean).join(' ');
@@ -38,6 +38,8 @@ export function rememberAnswer(sent, name) {
 
 function replyTarget(msg) {
   if (answeredTo.has(msg.id)) return answeredTo.get(msg.id);
+  const quoted = msg.webhookId && msg.content.match(REPLY_HEADER)?.[1];
+  if (quoted) return msg.guild?.members.cache.get(quoted)?.displayName ?? null;
   const user = msg.mentions?.repliedUser;
   if (!user) return null;
   if (user.bot) return user.username;
@@ -73,7 +75,7 @@ export function conversationPrompt(lines, target) {
 function record(msg, botId) {
   if (msg.webhookId) {
     const speaker = personaOf(msg);
-    return speaker ? { speaker, content: msg.content, replyTo: replyTarget(msg) } : null;
+    return speaker ? { speaker, content: describe(msg), replyTo: replyTarget(msg) } : null;
   }
   if (msg.author.bot || msg.author.id === botId) return null;
   return { userId: msg.author.id, author: displayName(msg), content: describe(msg), replyTo: replyTarget(msg) };

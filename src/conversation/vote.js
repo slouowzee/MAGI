@@ -77,7 +77,7 @@ export async function runVote(message, question, personas = Object.keys(PERSONAS
   message.channel.sendTyping().catch(() => {});
   try {
     const votes = await Promise.all(personas.map((persona) => castVote(persona, question)));
-    for (const vote of votes) await speak(message.channel, vote.persona, formatVote(vote));
+    for (const [i, vote] of votes.entries()) await speak(message.channel, vote.persona, formatVote(vote), { replyTo: i === 0 ? message : undefined });
     const result = tally(votes);
     console.log('  vote :', votes.map((v) => `${v.persona}=${v.verdict}`).join(', '), '→', result.outcome);
     await message.channel.send({ content: announcement(result), allowedMentions: { parse: [] } });
