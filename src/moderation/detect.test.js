@@ -49,3 +49,11 @@ test('barème : avertissement, exclusion 1 h, puis exclusion 24 h et vote ; flag
   assert.equal(decide('suspect', 3).timeout, 24 * 3_600_000);
   assert.equal(decide('flagrant', 1).timeout, 3_600_000);
 });
+
+test('insultes fortes : suspect, le LLM juge selon le contexte', () => {
+  assert.equal(detect({ content: "Nan c'est ta mère qui les a lâché pendant que je la baisais" }).level, 'suspect');
+  assert.deepEqual(detect({ content: 'Encule ta pote' }).reasons, ['insulte ou propos grossier']);
+  assert.equal(detect({ content: 'FTG' }).level, 'suspect');
+  assert.equal(detect({ content: 'tu peux me passer la photo de ta maison ?' }), null);
+  assert.equal(detect({ content: 'il faut que je baisse le son' }), null);
+});

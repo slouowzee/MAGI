@@ -7,6 +7,7 @@ const DUPLICATE = { channels: 3, window: 120_000 };
 const MENTIONS = { suspect: 5, flagrant: 10 };
 const NEW_ACCOUNT = 7 * 24 * 3600_000;
 const NEW_MEMBER = 24 * 3600_000;
+const INSULT = /(?<![\p{L}])(?:fdp|ntm|ftg|tg|nique[rsz]?|baise[rsz]?|baisais|baisait|encul\p{L}*|putes?|salopes?|connard\p{L}*|connasses?|b[aâ]tard\p{L}*|pd|tapettes?|enfoir[ée]\p{L}*|ta m[eè]re|ta race|va te faire)(?![\p{L}])/iu;
 
 export function hosts(content) {
   return [...content.matchAll(URL)].map((m) => m[1].toLowerCase().replace(/^www\./, '').split(':')[0]);
@@ -64,6 +65,7 @@ export function detect({ content, mentionCount = 0, everyoneAttempt = false, acc
   if (activity.burst >= BURST.count) found.push({ level: 'suspect', reason: `${activity.burst} messages en quelques secondes` });
   if (INVITE.test(content)) found.push({ level: 'suspect', reason: "lien d'invitation vers un autre serveur" });
   if (links.length && (accountAge < NEW_ACCOUNT || memberAge < NEW_MEMBER)) found.push({ level: 'suspect', reason: 'lien posté par un compte ou un membre récent' });
+  if (INSULT.test(content)) found.push({ level: 'suspect', reason: 'insulte ou propos grossier' });
   if (!found.length) return null;
   const flagrant = found.find((f) => f.level === 'flagrant');
   return { level: flagrant ? 'flagrant' : 'suspect', reasons: found.map((f) => f.reason) };
