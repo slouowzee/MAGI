@@ -4,25 +4,13 @@ import { setSetting, setting } from '../storage/settings.js';
 const NAME = '🍯・honeypot';
 const OLD_NAMES = ['ne-pas-écrire-ici', '⛔・ne-pas-écrire'];
 const TOPIC = '🍯 Piège à bots : tout message envoyé ici entraîne un bannissement automatique.';
-const VERSION = '3';
+const VERSION = '4';
 
 export function warning(guild) {
   return new EmbedBuilder()
     .setColor(0xd65c62)
-    .setAuthor({ name: 'Protection de MAGI', iconURL: guild.client.user.displayAvatarURL() })
-    .setTitle('🍯 Honeypot')
-    .setDescription(
-      [
-        "🚫 **N'écris rien dans ce salon.**",
-        '',
-        '🤖 Il sert à repérer les comptes automatiques, qui publient dans tous les salons à la fois.',
-        '',
-        '⚠️ Un message envoyé ici entraîne :',
-        "🔨 le bannissement immédiat de l'auteur ;",
-        '🧹 la suppression de ses messages des dernières 24 heures, sur tout le serveur.',
-      ].join('\n'),
-    )
-    .setFooter({ text: '👋 Rien à faire de ton côté : passe simplement ton chemin.' });
+    .setTitle("N'écrivez rien ici")
+    .setDescription('Ce salon est un piège à bots. Tout message posté ici entraîne un bannissement immédiat et la suppression des messages des dernières 24 heures.');
 }
 
 export function honeypotOf(guild) {

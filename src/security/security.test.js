@@ -38,8 +38,7 @@ test('la restauration ne reprend que ce qui manque', () => {
 
 test('message du salon piège : embed valide et clair', async () => {
   const { warning } = await import('./honeypot.js');
-  const embed = warning({ client: { user: { displayAvatarURL: () => 'https://cdn.test/magi.png' } } }).toJSON();
-  assert.equal(embed.title, '🍯 Honeypot');
-  assert.ok(embed.description.startsWith("🚫 **N'écris rien dans ce salon.**"));
+  const embed = warning({}).toJSON();
+  assert.equal(embed.title, "N'écrivez rien ici");
   assert.ok(embed.description.includes('bannissement immédiat'));
 });
