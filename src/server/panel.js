@@ -18,7 +18,9 @@ import { interventionChannels, replaceInterventions } from '../storage/intervent
 import { MODES, moderationMode, setModerationMode } from '../storage/moderation.js';
 import { setSetting, setting } from '../storage/settings.js';
 import { activePersonas, enabledModules, MODULES, mutedChannels, setActivePersonas, setModules, setMutedChannels } from './config.js';
-import { installAndReport, isOperator, logChannel, operatorRole } from './installation.js';
+import { installAndReport, isOperator, magiCategory, operatorRole } from './installation.js';
+import { log } from '../logging/log.js';
+import { DISCORD_LEVELS, discordLevel } from '../logging/discord.js';
 import { atLeast, currentLevel, inviteUrl, LEVELS } from './permissions.js';
 
 const PREFIX = 'magi-config:';
@@ -49,11 +51,13 @@ function modulesSection(guild) {
   const enabled = enabledModules(guild.id);
   const personas = activePersonas(guild.id);
   const { mode } = moderationMode(guild.id);
+  const level = discordLevel(guild.id);
   const description = [
     ...Object.entries(MODULES).map(([key, label]) => `${enabled.includes(key) ? 'Actif' : 'Coupé'} : ${label}`),
     '',
     `Personas actives : ${personas.map((p) => PERSONAS[p].name).join(', ')}`,
     `Modération automatique : ${MODE_LABELS[mode]}`,
+    `Logs Discord : ${level} et au-dessus (${DISCORD_LEVELS[level].toLowerCase()})`,
   ].join('\n');
   return {
     embeds: [new EmbedBuilder().setColor(COLOR).setTitle('Modules et personas').setDescription(description)],
@@ -79,6 +83,12 @@ function modulesSection(guild) {
           .setCustomId(id('moderation'))
           .setPlaceholder('Modération automatique')
           .addOptions(MODES.map((value) => ({ label: MODE_LABELS[value], value, default: value === mode }))),
+      ),
+      row(
+        new StringSelectMenuBuilder()
+          .setCustomId(id('log_level'))
+          .setPlaceholder('Niveau minimal des logs Discord')
+          .addOptions(Object.entries(DISCORD_LEVELS).map(([value, label]) => ({ label: `${value} : ${label}`, value, default: value === level }))),
       ),
     ],
   };
@@ -142,11 +152,20 @@ function configChannel(guild) {
 
 async function ensureConfigChannel(guild) {
   const existing = configChannel(guild);
-  if (existing) return existing;
+  const category = magiCategory(guild);
+  if (existing) {
+    if (category && existing.parentId !== category.id) {
+      await existing.setParent(category.id, { lockPermissions: false, reason: 'Installation de MAGI' });
+      await existing.setPosition(0);
+    }
+    return existing;
+  }
   const role = operatorRole(guild);
   const channel = await guild.channels.create({
     name: 'magi-config',
     type: ChannelType.GuildText,
+    parent: category?.id,
+    position: 0,
     topic: 'Panneau de configuration de MAGI, réservé aux opérateurs.',
     reason: 'Installation de MAGI',
     permissionOverwrites: [
@@ -180,7 +199,7 @@ export async function refreshPanel(guild, { repost = false } = {}) {
 
 export async function setupGuild(guild) {
   await installAndReport(guild);
-  await refreshPanel(guild).catch((err) => console.error(`[${guild.name}] panneau de config impossible :`, err.message));
+  await refreshPanel(guild).catch((err) => log.err('config', `panneau de config impossible : ${err.message}`, { guild }));
 }
 
 export function isPanelInteraction(customId) {
@@ -194,6 +213,7 @@ const APPLY = {
   muted: { section: 'salons', apply: (guild, values) => setMutedChannels(guild.id, values) },
   interventions: { section: 'salons', apply: (guild, values) => replaceInterventions(guild.id, values) },
   welcome: { section: 'salons', apply: (guild, values) => setSetting(guild.id, 'welcome_channel', values[0] ?? null) },
+  log_level: { section: 'modules', apply: (guild, values) => setSetting(guild.id, 'log_level', values[0] ?? null) },
 };
 
 export async function handlePanelInteraction(interaction) {
@@ -201,19 +221,19 @@ export async function handlePanelInteraction(interaction) {
   const field = interaction.customId.slice(PREFIX.length);
   const ephemeral = (content) => interaction.reply({ content: content.slice(0, 2000), flags: MessageFlags.Ephemeral, ...silent });
   if (!isOperator(member)) return ephemeral('Ce panneau est réservé aux opérateurs MAGI.');
-  const log = (text) => logChannel(guild)?.send({ content: `Configuration : ${text} (par ${member}).`, ...silent }).catch(() => {});
+  const changed = (text) => log.notice('config', `${text} (par ${member.user.tag})`, { guild });
 
   if (APPLY[field]) {
     const { section, apply } = APPLY[field];
     apply(guild, interaction.values ?? []);
     await interaction.update(panelSection(guild, section));
-    return log(`${field} → ${(interaction.values ?? []).join(', ') || 'aucun'}`);
+    return changed(`${field} → ${(interaction.values ?? []).join(', ') || 'aucun'}`);
   }
   if (field === 'audit') return ephemeral(auditReport(guild));
   if (field === 'backup') {
     backupGuild(guild);
     await interaction.update(panelSection(guild, 'securite'));
-    return log('structure sauvegardée');
+    return changed('structure sauvegardée');
   }
   if (field === 'honeypot') {
     const reason = `MAGI, demandé par ${member.user.tag}`;
@@ -221,7 +241,7 @@ export async function handlePanelInteraction(interaction) {
     if (existed) await disableHoneypot(guild, reason);
     else await enableHoneypot(guild, reason);
     await interaction.update(panelSection(guild, 'securite'));
-    return log(existed ? 'salon piège supprimé' : 'salon piège créé');
+    return changed(existed ? 'salon piège supprimé' : 'salon piège créé');
   }
   return ephemeral('Réglage inconnu.');
 }

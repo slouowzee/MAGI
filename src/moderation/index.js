@@ -2,13 +2,13 @@ import { PermissionFlagsBits } from 'discord.js';
 import { castVote, tally } from '../conversation/vote.js';
 import { speak } from '../discord/webhooks.js';
 import { choose, ContentRefused } from '../llm/client.js';
-import { isOperator, logChannel, operatorRole } from '../server/installation.js';
+import { isOperator, operatorRole } from '../server/installation.js';
+import { log } from '../logging/log.js';
 import { activeInfractions, addInfraction, moderationMode } from '../storage/moderation.js';
 import { setting } from '../storage/settings.js';
 import { createTracker, detect } from './detect.js';
 
 const HOUR = 3600_000;
-const silent = { allowedMentions: { parse: [] } };
 const track = createTracker();
 
 const CLASSIFIER = `Tu modères un serveur Discord francophone entre amis. Les règles automatiques ont relevé des indices ; à toi de juger si c'est vraiment un problème. Dans le doute, réponds ok.
@@ -50,8 +50,8 @@ async function classify(message, reasons) {
   }
 }
 
-async function report(guild, lines) {
-  await logChannel(guild)?.send({ content: lines.join('\n').slice(0, 2000), ...silent }).catch(() => {});
+function report(guild, level, lines, component = 'moderation', mention = null) {
+  log[level](component, lines.join('\n').slice(0, 1800), { guild, mention });
 }
 
 async function voteBan(message, reasons, count) {
@@ -62,13 +62,10 @@ async function voteBan(message, reasons, count) {
   const summary = votes.map((v) => `${v.persona} : ${v.verdict} (${v.avis})`).join('\n');
   if (result.outcome === 'adoptée') {
     await guild.members.ban(member, { reason: `MAGI, modération automatique : ${count} infractions, vote ${result.pour} contre ${result.contre}`, deleteMessageSeconds: 86_400 });
-    await report(guild, [`**Bannissement** de ${member} voté par MAGI (${result.pour} contre ${result.contre}).`, summary]);
+    report(guild, 'notice', [`bannissement de ${member} voté par MAGI (${result.pour} contre ${result.contre})`, summary]);
   } else {
     const operators = operatorRole(guild);
-    await logChannel(guild)?.send({
-      content: `${operators ?? ''} **Bannissement refusé** par MAGI pour ${member} (${result.outcome}). Il reste exclu 24 h, à examiner.\n${summary}`.slice(0, 2000),
-      allowedMentions: { parse: [], roles: operators ? [operators.id] : [] },
-    });
+    report(guild, 'warning', [`bannissement refusé par MAGI pour ${member} (${result.outcome}), exclu 24 h, à examiner`, summary], 'moderation', { roles: operators ? [operators.id] : [] });
   }
 }
 
@@ -78,8 +75,8 @@ async function trapped(message) {
   const banned = await guild.members
     .ban(member, { reason: 'MAGI : message dans le salon piège', deleteMessageSeconds: 86_400 })
     .then(() => true)
-    .catch((err) => report(guild, [`Bannissement de ${member} impossible après le salon piège : ${err.message}`]));
-  if (banned) await report(guild, [`**Salon piège** : ${member.user.tag} (${member.id}) a écrit dans ${message.channel}, banni et messages des dernières 24 h supprimés.`, `Message : ${message.content.slice(0, 500)}`]);
+    .catch((err) => report(guild, 'err', [`bannissement de ${member} impossible après le salon piège : ${err.message}`], 'honeypot'));
+  if (banned) report(guild, 'warning', [`${member.user.tag} (${member.id}) a écrit dans ${message.channel} : banni, messages des dernières 24 h supprimés`, `message : ${message.content.slice(0, 500)}`], 'honeypot');
 }
 
 export async function moderate(message) {
@@ -109,7 +106,7 @@ export async function moderate(message) {
     verdict = await classify(message, finding.reasons);
     if (verdict === 'ok') return false;
     if (!verdict) {
-      await report(guild, [`**À vérifier** (LLM injoignable) : ${member} dans ${message.channel} — ${finding.reasons.join(' ; ')}`, `> ${message.content.slice(0, 500)}`]);
+      report(guild, 'warning', [`à vérifier (LLM injoignable) : ${member} dans ${message.channel} : ${finding.reasons.join(' ; ')}`, `message : ${message.content.slice(0, 500)}`]);
       return false;
     }
   }
@@ -117,8 +114,8 @@ export async function moderate(message) {
   const observing = mode === 'observation';
   const count = observing ? activeInfractions(guild.id, member.id).length + 1 : addInfraction(guild.id, member.id, finding.reasons.join(' ; '));
   const action = decide(finding.level, count);
-  await report(guild, [
-    `**Modération${observing ? ' (observation : rien n’a été fait)' : ''}** — ${member} dans ${message.channel}`,
+  report(guild, 'notice', [
+    `${observing ? 'observation, rien n’a été fait : ' : ''}${member} dans ${message.channel}`,
     `Motifs : ${finding.reasons.join(' ; ')}${finding.level === 'suspect' ? ` (classé « ${verdict} » par le LLM)` : ''}`,
     `Infraction n°${count} sur 30 jours → ${observing ? 'aurait fait : ' : ''}${action.label}`,
     `Message : ${message.content.slice(0, 1200)}`,
@@ -127,10 +124,10 @@ export async function moderate(message) {
 
   const reason = `MAGI, modération automatique : ${finding.reasons.join(' ; ')}`;
   await message.delete().catch(() => {});
-  if (action.timeout) await member.timeout(action.timeout, reason).catch((err) => report(guild, [`Exclusion de ${member} impossible : ${err.message}`]));
+  if (action.timeout) await member.timeout(action.timeout, reason).catch((err) => report(guild, 'err', [`exclusion de ${member} impossible : ${err.message}`]));
   if (action.warn) {
     await speak(message.channel, 'balthasar', `<@${member.id}>, ton message a été retiré : ${finding.reasons[0]}. Premier avertissement, la prochaine fois ce sera une exclusion temporaire.`, { mentions: [member.id] }).catch(() => {});
   }
-  if (action.vote) await voteBan(message, finding.reasons, count).catch((err) => report(guild, [`Vote de bannissement impossible : ${err.message}`]));
+  if (action.vote) await voteBan(message, finding.reasons, count).catch((err) => report(guild, 'err', [`vote de bannissement impossible : ${err.message}`]));
   return true;
 }

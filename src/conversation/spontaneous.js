@@ -6,6 +6,7 @@ import { interventionsAllowed } from '../storage/interventions.js';
 import { activePersonas, moduleEnabled } from '../server/config.js';
 import { memoryContext } from './memory.js';
 import { addMessage, answered, openConversation } from './threads.js';
+import { log } from '../logging/log.js';
 
 const COOLDOWN = 30 * 60_000;
 const MIN_LENGTH = 15;
@@ -38,7 +39,7 @@ export async function maybeIntervene(message) {
   if (choice === 'ignorer') return;
 
   lastIntervention.set(channelId, Date.now());
-  console.log(`[${message.guild.name} #${message.channel.name}] intervention spontanée de ${choice}`);
+  log.info('conversation', `intervention spontanée de ${choice} après ${message.author.tag}`, { channel: message.channel });
   const { turns, participants, target } = await conversationFor(message, choice, message.content);
   const extra = [SPONTANEOUS, memoryContext(message.guild.id, participants)].filter(Boolean).join('\n');
   const { content } = await chat({ messages: buildMessages(choice, turns, 'courte', extra), options: { num_predict: MAX_TOKENS.courte }, ...forReply() });

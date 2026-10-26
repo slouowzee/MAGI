@@ -4,6 +4,7 @@ import { chat } from '../llm/client.js';
 import { factsAbout, saveSummary, summariesAbout } from '../storage/memory.js';
 import { expiredConversations } from './threads.js';
 import { moduleEnabled } from '../server/config.js';
+import { log } from '../logging/log.js';
 
 const MIN_LINES = 4;
 const SWEEP_EVERY = 60_000;
@@ -43,9 +44,9 @@ export async function summarizeConversation(client, conversation) {
       options: { num_predict: 150, temperature: 0.2 },
     });
     saveSummary(conversation.guildId, conversation.channelId, [...conversation.participants], content);
-    console.log(`  résumé de conversation enregistré (${conversation.participants.size} participant(s))`);
+    log.debug('memoire', `résumé de la conversation n°${conversation.id} enregistré (${conversation.participants.size} participant(s))`);
   } catch (err) {
-    console.error('résumé de conversation impossible :', err.message);
+    log.warning('memoire', `résumé de la conversation n°${conversation.id} impossible : ${err.message}`);
   }
 }
 

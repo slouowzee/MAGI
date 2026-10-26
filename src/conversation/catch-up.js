@@ -2,6 +2,7 @@ import { SnowflakeUtil } from 'discord.js';
 import { personaOf } from '../discord/webhooks.js';
 import { moderate } from '../moderation/index.js';
 import { handleMessage } from './handle-message.js';
+import { log } from '../logging/log.js';
 
 const WINDOW = 2 * 60_000;
 
@@ -19,9 +20,9 @@ export async function catchUp(client, now = Date.now()) {
         if (message.author.bot || message.webhookId) continue;
         handled++;
         if (await moderate(message).catch(() => false)) continue;
-        await handleMessage(message, { catchUp: true }).catch((err) => console.error('rattrapage :', err.message));
+        await handleMessage(message, { catchUp: true }).catch((err) => log.err('rattrapage', err.message, { channel }));
       }
     }
   }
-  if (handled) console.log(`Rattrapage : ${handled} message(s) envoyé(s) pendant le redémarrage`);
+  if (handled) log.notice('rattrapage', `${handled} message(s) envoyé(s) pendant le redémarrage`);
 }

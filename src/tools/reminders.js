@@ -1,5 +1,6 @@
 import { speak } from '../discord/webhooks.js';
 import { addReminder, cancelReminder, dueReminders, markDone, pendingReminders } from '../storage/reminders.js';
+import { log } from '../logging/log.js';
 
 const CHECK_EVERY = 30_000;
 const stamp = (ms) => `<t:${Math.floor(ms / 1000)}:F> (<t:${Math.floor(ms / 1000)}:R>)`;
@@ -53,9 +54,9 @@ export function startReminders(client) {
       markDone(reminder.id);
       const channel = await client.channels.fetch(reminder.channel_id).catch(() => null);
       if (!channel) continue;
-      await speak(channel, 'balthasar', `<@${reminder.user_id}> petit rappel : ${reminder.text}`, { mentions: [reminder.user_id] }).catch((err) =>
-        console.error(`rappel n°${reminder.id} non envoyé :`, err.message),
-      );
+      await speak(channel, 'balthasar', `<@${reminder.user_id}> petit rappel : ${reminder.text}`, { mentions: [reminder.user_id] })
+        .then(() => log.info('rappels', `rappel n°${reminder.id} envoyé à <@${reminder.user_id}>`, { channel }))
+        .catch((err) => log.err('rappels', `rappel n°${reminder.id} non envoyé : ${err.message}`, { channel }));
     }
   }, CHECK_EVERY);
 }

@@ -1,3 +1,5 @@
+import { log } from '../logging/log.js';
+
 export class LLMUnavailable extends Error {}
 export class ContentRefused extends Error {}
 
@@ -78,7 +80,7 @@ async function geminiWithMedia(args) {
   } catch (err) {
     const lighter = err.status === 400 && (hideMedia(args.messages, isVideo) || hideMedia(args.messages, isMedia));
     if (!lighter) throw err;
-    console.warn(`Gemini refuse un média (${err.message.replace(/\s+/g, ' ')}), nouvel essai sans`);
+    log.info('llm', `${args.model} refuse un média (${err.message.replace(/\s+/g, ' ')}), nouvel essai sans`);
     return geminiWithMedia({ ...args, messages: lighter });
   }
 }
@@ -107,7 +109,7 @@ export async function chat({ messages, format, options, tools, model, reasoning,
   for (const delay of [0, ...GEMINI_RETRY_DELAYS]) {
     if (delay) {
       if (Date.now() + delay >= deadline) break;
-      console.warn(`Gemini indisponible, nouvel essai dans ${delay / 1000} s`);
+      log.notice('llm', `Gemini indisponible, nouvel essai dans ${delay / 1000} s`);
       await Bun.sleep(delay);
     }
     const candidates = geminiModels(model);
@@ -123,7 +125,7 @@ export async function chat({ messages, format, options, tools, model, reasoning,
         if (err.timedOut || err.status === 429 || err.status >= 500) geminiPausedUntil.set(candidate, Date.now() + GEMINI_COOLDOWN);
         transient ||= !(err.status >= 400 && err.status < 500) || err.status === 429;
         failure = err;
-        console.warn(`Gemini ${candidate} indisponible (${err.message.replace(/\s+/g, ' ')})`);
+        log.info('llm', `${candidate} indisponible (${err.message.replace(/\s+/g, ' ')})`);
       }
     }
     if (!transient) break;

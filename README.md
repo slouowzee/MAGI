@@ -28,11 +28,17 @@ src/
   tools/                      outils que le LLM peut appeler
     index.js                  registre, droits d'accès, confirmation, journal
     installation.js           état et installation de MAGI
+  logging/
+    log.js                    logs au format syslog, niveaux, sortie serveur
+    discord.js                salons de logs Discord, lots colorés, niveau minimal
+    host.js                   journal du VPS reçu par tube nommé
   server/
-    installation.js           rôle Opérateur MAGI, #magi-logs, hiérarchie
+    installation.js           rôle Opérateur MAGI, catégorie et salons MAGI, hiérarchie
   storage/
     db.js                     base SQLite
 ```
+
+`ops/magi-journal.service` : service systemd du VPS qui transmet le journal système au bot.
 
 Les tests sont à côté du fichier qu'ils testent (`*.test.js`).
 

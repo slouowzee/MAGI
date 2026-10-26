@@ -1,11 +1,13 @@
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
 import { db } from '../storage/db.js';
+import { log } from '../logging/log.js';
+import { setSetting, setting } from '../storage/settings.js';
 import { atLeast } from './permissions.js';
 
 const OPERATOR_ROLE = 'Opérateur MAGI';
-const LOG_CHANNEL = 'magi-logs';
+const CATEGORY = 'MAGI';
+const LOG_CHANNELS = { logs: 'magi-logs', moderation: 'magi-modération', securite: 'magi-sécurité', systeme: 'magi-système' };
 const REASON = 'Installation de MAGI';
-const silent = { allowedMentions: { parse: [] } };
 
 const getConfig = db.query('SELECT operator_role_id, log_channel_id FROM guilds WHERE guild_id = ?');
 const saveConfig = db.query(`INSERT INTO guilds (guild_id, operator_role_id, log_channel_id) VALUES (?1, ?2, ?3)
@@ -19,6 +21,25 @@ export function operatorRole(guild) {
 export function logChannel(guild) {
   const id = getConfig.get(guild.id)?.log_channel_id;
   return id ? guild.channels.cache.get(id) ?? null : null;
+}
+
+const channelSetting = (guild, key) => guild.channels.cache.get(setting(guild.id, key)) ?? null;
+
+export function magiCategory(guild) {
+  return channelSetting(guild, 'category');
+}
+
+export function logChannels(guild) {
+  return {
+    logs: logChannel(guild),
+    moderation: channelSetting(guild, 'log_channel:moderation'),
+    securite: channelSetting(guild, 'log_channel:securite'),
+    systeme: channelSetting(guild, 'log_channel:systeme'),
+  };
+}
+
+export function magiChannelIds(guild) {
+  return [magiCategory(guild), ...Object.values(logChannels(guild)), channelSetting(guild, 'config_channel')].filter(Boolean).map((c) => c.id);
 }
 
 export function isOperator(member) {
@@ -43,22 +64,31 @@ export async function install(guild) {
     created.push(`rôle ${role}`);
   }
 
-  let channel = logChannel(guild);
-  if (!channel) {
-    channel = await guild.channels.create({
-      name: LOG_CHANNEL,
-      type: ChannelType.GuildText,
-      reason: REASON,
-      permissionOverwrites: [
-        { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-        { id: role.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory] },
-        { id: me.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks] },
-      ],
-    });
-    created.push(`salon ${channel}`);
+  const permissionOverwrites = [
+    { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+    { id: role.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory] },
+    { id: me.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks] },
+  ];
+  let category = magiCategory(guild);
+  if (!category) {
+    category = await guild.channels.create({ name: CATEGORY, type: ChannelType.GuildCategory, reason: REASON, permissionOverwrites });
+    setSetting(guild.id, 'category', category.id);
+    created.push(`catégorie ${category.name}`);
   }
 
-  saveConfig.run(guild.id, role.id, channel.id);
+  const existing = logChannels(guild);
+  for (const [source, name] of Object.entries(LOG_CHANNELS)) {
+    let channel = existing[source];
+    if (!channel) {
+      channel = await guild.channels.create({ name, type: ChannelType.GuildText, parent: category.id, reason: REASON, permissionOverwrites });
+      created.push(`salon ${channel}`);
+    } else if (channel.parentId !== category.id) {
+      await channel.setParent(category.id, { lockPermissions: false, reason: REASON });
+    }
+    if (source === 'logs') saveConfig.run(guild.id, role.id, channel.id);
+    else setSetting(guild.id, `log_channel:${source}`, channel.id);
+  }
+  const channel = logChannel(guild);
 
   const owner = await guild.fetchOwner();
   if (!owner.roles.cache.has(role.id) && role.position < me.roles.highest.position) {
@@ -89,7 +119,7 @@ export async function installStatus(guild) {
   return [
     { step: 'accorder à MAGI le niveau de permissions Gestion (gérer les rôles et les salons)', done: atLeast(guild.members.me.permissions, 'gestion'), manual: true, permissions: true },
     { step: 'rôle Opérateur MAGI créé', done: Boolean(role), manual: false },
-    { step: 'salon #magi-logs créé', done: Boolean(logChannel(guild)), manual: false },
+    { step: 'catégorie MAGI et salons de logs créés', done: Boolean(magiCategory(guild)) && Object.values(logChannels(guild)).every(Boolean), manual: false },
     { step: 'rôle Opérateur MAGI attribué au propriétaire', done: Boolean(role && owner.roles.cache.has(role.id)), manual: false },
     { step: 'glisser le rôle Opérateur MAGI au-dessus du rôle du bot MAGI, dans Paramètres du serveur → Rôles', done: adminEnabled(guild), manual: true },
   ];
@@ -111,18 +141,16 @@ export function statusReport(steps) {
 
 export async function installAndReport(guild) {
   if (!atLeast(guild.members.me.permissions, 'gestion')) {
-    console.log(`[${guild.name}] installation en attente du niveau de permissions Gestion`);
+    log.info('installation', 'en attente du niveau de permissions Gestion', { guild });
     return null;
   }
   try {
     const result = await install(guild);
-    if (result.created.length || !result.ok) {
-      await logChannel(guild)?.send({ content: installReport(result, guild), ...silent });
-    }
-    console.log(`[${guild.name}] installation : ${result.created.length ? result.created.join(', ') : 'rien à créer'}, admin ${result.ok ? 'activé' : 'désactivé'}`);
+    if (result.created.length || !result.ok) log.notice('installation', installReport(result, guild), { guild });
+    else log.info('installation', 'rien à créer, administration activée', { guild });
     return result;
   } catch (err) {
-    console.error(`[${guild.name}] installation impossible :`, err.message);
+    log.err('installation', `installation impossible : ${err.message}`, { guild });
     return null;
   }
 }

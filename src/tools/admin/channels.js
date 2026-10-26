@@ -1,5 +1,5 @@
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
-import { logChannel, operatorRole } from '../../server/installation.js';
+import { magiChannelIds, operatorRole } from '../../server/installation.js';
 import { findMember, findRole, PERMISSION_NAMES, permissionBits, targetChannel } from './resolve.js';
 
 const channelArg = { salon: { type: 'string', description: 'Mention, identifiant ou nom. Par défaut, le salon actuel.' } };
@@ -14,7 +14,7 @@ function category(guild, ref) {
 }
 
 function notLogs(guild, channel) {
-  if (channel.id === logChannel(guild)?.id) throw new Error('le salon #magi-logs ne peut pas être modifié par un outil');
+  if (magiChannelIds(guild).includes(channel.id)) throw new Error(`#${channel.name} appartient à MAGI et ne peut pas être modifié par un outil`);
   return channel;
 }
 

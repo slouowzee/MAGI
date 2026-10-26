@@ -1,5 +1,6 @@
 import { AuditLogEvent } from 'discord.js';
-import { logChannel, operatorRole } from '../server/installation.js';
+import { operatorRole } from '../server/installation.js';
+import { log } from '../logging/log.js';
 import { freezeBackups } from './backup.js';
 import { moduleEnabled } from '../server/config.js';
 
@@ -52,14 +53,13 @@ export async function watchAuditLog(entry, guild) {
     if (member.user.bot && member.kickable) await member.kick(reason).then(() => done.push('bot expulsé')).catch(() => {});
   }
   const operators = operatorRole(guild);
-  await logChannel(guild)
-    ?.send({
-      content: [
-        `<@${guild.ownerId}> ${operators ?? ''} **Alerte anti-nuke** : <@${entry.executorId}> a fait trop de ${kind} en moins d'une minute.`,
-        done.length ? `Mesures prises : ${done.join(' ; ')}.` : "Aucune mesure possible : son rôle est au-dessus de celui de MAGI. Retire-lui ses permissions à la main.",
-        "Sauvegardes automatiques gelées 7 jours pour garder l'état d'avant : demande à MAGI de restaurer la structure si besoin.",
-      ].join('\n'),
-      allowedMentions: { users: [guild.ownerId], roles: operators ? [operators.id] : [] },
-    })
-    .catch(() => {});
+  log.alert(
+    'antinuke',
+    [
+      `<@${entry.executorId}> a fait trop de ${kind} en moins d'une minute`,
+      done.length ? `mesures prises : ${done.join(' ; ')}` : 'aucune mesure possible : son rôle est au-dessus de celui de MAGI, retire-lui ses permissions à la main',
+      "sauvegardes automatiques gelées 7 jours pour garder l'état d'avant : demande à MAGI de restaurer la structure si besoin",
+    ].join('\n'),
+    { guild, mention: { users: [guild.ownerId], roles: operators ? [operators.id] : [] } },
+  );
 }

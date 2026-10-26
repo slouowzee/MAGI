@@ -1,0 +1,18 @@
+[Unit]
+Description=Journal du VPS transmis au bot MAGI
+After=systemd-journald.service
+
+[Service]
+Type=simple
+StateDirectory=magi-journal
+ExecStartPre=/bin/sh -c 'f=/home/slouowze/magi/data/host-journal.fifo; [ -p "$$f" ] || mkfifo -m 600 "$$f"; chown 1000:1000 "$$f"'
+ExecStart=/bin/sh -c 'trap "" PIPE; exec journalctl --follow --lines=0 --output=json --output-fields=PRIORITY,SYSLOG_IDENTIFIER,MESSAGE --cursor-file=/var/lib/magi-journal/cursor > /home/slouowze/magi/data/host-journal.fifo'
+Restart=always
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/home/slouowze/magi/data
+
+[Install]
+WantedBy=multi-user.target

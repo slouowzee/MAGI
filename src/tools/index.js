@@ -1,4 +1,5 @@
-import { adminEnabled, isOperator, logChannel } from '../server/installation.js';
+import { adminEnabled, isOperator } from '../server/installation.js';
+import { log } from '../logging/log.js';
 import { moduleEnabled } from '../server/config.js';
 import { refreshPanel } from '../server/panel.js';
 import { INSTALLATION_TOOLS } from './installation.js';
@@ -6,8 +7,6 @@ import { MEMORY_TOOLS } from './memory.js';
 import { CHANNEL_TOOLS } from './channel.js';
 import { REMINDER_TOOLS } from './reminders.js';
 import { ADMIN_TOOLS } from './admin/index.js';
-
-const silent = { allowedMentions: { parse: [] } };
 
 const inModule = (module, tools) => tools.map((tool) => ({ ...tool, module }));
 
@@ -35,20 +34,16 @@ export function schemas(tools) {
   return tools.map(({ name, description, parameters }) => ({ type: 'function', function: { name, description, parameters } }));
 }
 
-async function log(guild, text) {
-  await logChannel(guild)?.send({ content: text, ...silent }).catch(() => {});
-}
-
 async function execute(tool, args, { member, message, actions = [] }) {
   const reason = `MAGI, demandé par ${member.user.tag}`;
   const offer = (action) => actions.push(action);
   try {
     const output = await tool.run({ guild: member.guild, member, message, args, reason, offer });
     if (tool.panel) await refreshPanel(member.guild).catch(() => {});
-    await log(member.guild, `\`${tool.name}\` exécuté pour ${member} dans ${message.channel}.`);
+    log.notice('outils', `${tool.name} exécuté pour ${member.user.tag}`, { guild: member.guild, channel: message.channel });
     return output;
   } catch (err) {
-    await log(member.guild, `\`${tool.name}\` a échoué pour ${member} : ${err.message}`);
+    log.warning('outils', `${tool.name} a échoué pour ${member.user.tag} : ${err.message}`, { guild: member.guild, channel: message.channel });
     return `Échec de ${tool.name} : ${err.message}`;
   }
 }

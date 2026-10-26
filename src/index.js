@@ -11,10 +11,13 @@ import { db } from './storage/db.js';
 import { watchAuditLog } from './security/antinuke.js';
 import { startBackups } from './security/backup.js';
 import { catchUp } from './conversation/catch-up.js';
+import { log } from './logging/log.js';
+import { attachDiscord, flushAll } from './logging/discord.js';
+import { followHostJournal } from './logging/host.js';
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
-  console.error('DISCORD_TOKEN manquant (voir .env.example)');
+  log.emerg('magi', 'DISCORD_TOKEN manquant (voir .env.example)');
   process.exit(1);
 }
 
@@ -29,38 +32,43 @@ const client = new Client({
 });
 
 client.once(Events.ClientReady, async (c) => {
-  console.log(`MAGI prêt : connecté en tant que ${c.user.tag} sur ${c.guilds.cache.size} serveur(s)`);
+  await attachDiscord(c);
   for (const guild of c.guilds.cache.values()) await setupGuild(guild);
-  await catchUp(c).catch((err) => console.error('rattrapage impossible :', err.message));
+  log.notice('magi', `démarré : connecté en tant que ${c.user.tag} sur ${c.guilds.cache.size} serveur(s), Gemini ${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'} puis ${process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite'}`);
+  followHostJournal();
+  await catchUp(c).catch((err) => log.err('rattrapage', `rattrapage impossible : ${err.message}`));
   startReminders(c);
   startConversationSweeper(c);
   startBackups(c);
-  console.log(`LLM : Gemini (${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'}, puis ${process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite'} s'il est lent)`);
 });
 
 client.on(Events.GuildCreate, setupGuild);
-client.on(Events.GuildMemberAdd, (member) => welcome(member).catch((err) => console.error('bienvenue :', err.message)));
+client.on(Events.GuildMemberAdd, (member) => welcome(member).catch((err) => log.err('membres', `bienvenue : ${err.message}`, { guild: member.guild })));
 client.on(Events.GuildMemberRemove, (member) => farewell(member).catch(() => {}));
 client.on(Events.GuildRoleUpdate, (before, after) => {
   if (after.tags?.botId === client.user.id && before.permissions.bitfield !== after.permissions.bitfield) setupGuild(after.guild);
 });
-client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => watchAuditLog(entry, guild).catch((err) => console.error('anti-nuke :', err.message)));
+client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => watchAuditLog(entry, guild).catch((err) => log.err('antinuke', err.message, { guild })));
 client.on(Events.InteractionCreate, (interaction) => {
   const id = interaction.customId ?? '';
   const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : handleInteraction;
-  handler(interaction).catch((err) => console.error('interaction :', err.message));
+  handler(interaction).catch((err) => log.err('interaction', `${id} : ${err.message}`, { guild: interaction.guild, channel: interaction.channel }));
 });
 client.on(Events.MessageCreate, async (message) => {
-  if (await moderate(message).catch((err) => console.error('modération :', err.message))) return;
+  if (await moderate(message).catch((err) => log.err('moderation', err.message, { guild: message.guild, channel: message.channel }))) return;
   await handleMessage(message);
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {
+    log.notice('magi', `arrêt (${signal})`);
+    await flushAll();
     await client.destroy();
     db.close();
     process.exit(0);
   });
 }
+
+process.on('unhandledRejection', (err) => log.err('magi', `erreur non gérée : ${err?.stack ?? err}`));
 
 await client.login(token);
