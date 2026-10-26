@@ -49,8 +49,9 @@ function replyTarget(msg) {
 }
 
 function label({ author, speaker, replyTo, role, quoted }, persona) {
-  const name = speaker ? (speaker === persona ? `Toi, ${PERSONAS[persona].name}` : personaLabel(speaker)) : author;
-  const notes = [quoted && 'message cité', role, replyTo && (speaker ? `à ${replyTo}` : `en réponse à ${replyTo}`)].filter(Boolean);
+  const self = speaker === persona;
+  const name = speaker ? (self ? `Toi, ${PERSONAS[persona].name}` : PERSONAS[speaker].name) : author;
+  const notes = [speaker && !self && 'MAGI', quoted && 'message cité', role, replyTo && (speaker ? `à ${replyTo}` : `en réponse à ${replyTo}`)].filter(Boolean);
   return notes.length ? `${name} (${notes.join(', ')})` : name;
 }
 
