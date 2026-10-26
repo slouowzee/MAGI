@@ -6,7 +6,7 @@ const GEMINI_COOLDOWN = 60_000;
 
 const geminiPausedUntil = new Map();
 const defaultModel = () => process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
-export const forReply = () => ({ model: process.env.GEMINI_REPLY_MODEL || 'gemini-3.5-flash', reasoning: 'none' });
+export const forReply = () => (process.env.GEMINI_REPLY_MODEL ? { model: process.env.GEMINI_REPLY_MODEL, reasoning: 'none' } : {});
 let ollamaTail = Promise.resolve();
 
 function ollamaQueue(job) {
