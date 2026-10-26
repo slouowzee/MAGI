@@ -1,0 +1,282 @@
+import { afterAll, beforeEach, expect, setSystemTime, test } from 'bun:test';
+import { Collection } from 'discord.js';
+
+process.env.DB_PATH = ':memory:';
+process.env.GEMINI_API_KEY = 'test';
+process.env.GEMINI_MODEL = 'modele-scenarios';
+
+const requests = [];
+let route = null;
+let reply = 0;
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (url, init) => {
+  if (!String(url).startsWith('https://generativelanguage.googleapis.com')) return realFetch(url, init);
+  const body = JSON.parse(init.body);
+  const props = body.response_format?.json_schema?.schema?.properties ?? {};
+  const answer = (content) => Response.json({ choices: [{ finish_reason: 'stop', message: { role: 'assistant', content } }] });
+  if (props.choix) {
+    const choices = props.choix.enum;
+    return answer(JSON.stringify({ choix: route && choices.includes(route) ? route : choices.includes('rester') ? 'rester' : choices[0] }));
+  }
+  if (props.verdict) return answer(JSON.stringify({ avis: 'Je vote pour.', verdict: 'APPROUVÉ' }));
+  const system = body.messages[0].content;
+  requests.push({ persona: system.match(/Tu es (\w+),/)?.[1].toLowerCase(), context: body.messages.at(-1).content });
+  return answer(`Réponse ${++reply}.`);
+};
+afterAll(() => {
+  globalThis.fetch = realFetch;
+});
+
+const { handleMessage } = await import('./handle-message.js');
+const { setActivePersonas, setMutedChannels } = await import('../server/config.js');
+
+let clock = Date.parse('2026-10-26T12:00:00Z');
+let ids = 100000000000000000n;
+const nextId = () => String(++ids);
+const tick = () => setSystemTime((clock += 10_000));
+
+beforeEach(() => {
+  requests.length = 0;
+  route = null;
+});
+
+function world(name) {
+  const client = { user: { id: 'bot' }, application: { id: 'app' }, channels: { fetch: async () => channel } };
+  const guild = { id: `g-${name}`, name, ownerId: null, members: { cache: new Collection() } };
+  const store = [];
+  const webhooks = new Collection();
+  const users = {};
+  const posted = [];
+
+  const channel = {
+    id: `c-${name}`,
+    name,
+    guild,
+    client,
+    isThread: () => false,
+    sendTyping: async () => {},
+    messages: {
+      fetch: async ({ limit, before }) => new Collection(store.filter((m) => BigInt(m.id) < BigInt(before)).slice(-limit).reverse().map((m) => [m.id, m])),
+    },
+    fetchWebhooks: async () => webhooks,
+    createWebhook: async ({ name: hookName }) => {
+      const hook = { id: nextId(), name: hookName, owner: { id: 'bot' }, delete: async () => webhooks.delete(hook.id), send: async (payload) => post(payload) };
+      webhooks.set(hook.id, hook);
+      return hook;
+    },
+    send: async (payload) => post({ username: 'MAGI', content: payload.content, bot: true }),
+  };
+
+  function base(id, content) {
+    return {
+      id,
+      content,
+      channel,
+      guild,
+      client,
+      createdTimestamp: Date.now(),
+      attachments: new Collection(),
+      stickers: new Collection(),
+      inGuild: () => true,
+      url: `https://discord.com/channels/${guild.id}/${channel.id}/${id}`,
+    };
+  }
+
+  function post({ username, content, replyTo, bot }) {
+    const message = {
+      ...base(nextId(), content),
+      author: { id: bot ? 'bot' : `wh-${username}`, bot: true, username },
+      webhookId: bot ? null : 'webhook',
+      applicationId: bot ? null : 'app',
+      member: null,
+      mentions: { users: new Collection(), repliedUser: null },
+      reference: null,
+    };
+    store.push(message);
+    posted.push({ persona: username.toLowerCase(), content, replyTo });
+    return message;
+  }
+
+  function member(name) {
+    if (!users[name]) {
+      const id = nextId();
+      users[name] = { id, bot: false, username: name, globalName: null, tag: name };
+      guild.members.cache.set(id, { id, displayName: name, guild, roles: { cache: new Collection() } });
+    }
+    return users[name];
+  }
+  guild.ownerId = member('slou').id;
+
+  async function say(name, content, { replyTo, mentions = [] } = {}) {
+    tick();
+    const author = member(name);
+    const message = {
+      ...base(nextId(), content),
+      author,
+      member: guild.members.cache.get(author.id),
+      webhookId: null,
+      applicationId: null,
+      mentions: { users: new Collection(mentions.map((m) => [member(m).id, member(m)])), repliedUser: replyTo?.author ?? null },
+      reference: replyTo ? { messageId: replyTo.id } : null,
+      fetchReference: async () => replyTo,
+      reactions: [],
+      react: async (emoji) => message.reactions.push(emoji),
+    };
+    store.push(message);
+    const before = posted.length;
+    await handleMessage(message);
+    message.answers = posted.slice(before);
+    return message;
+  }
+
+  return { say, posted, store, guild, channel };
+}
+
+const lastContext = (persona) => requests.filter((r) => r.persona === persona).at(-1)?.context ?? '';
+
+test('deux conversations en parallèle ne se mélangent pas', async () => {
+  const w = world('paralleles');
+  await w.say('slou', "magi, on en est où de l'install ?");
+  await w.say('faceless', 'casper, t’es nulle en répartie');
+  await w.say('slou', 'melchior, et les rôles ?');
+  await w.say('faceless', 'dommage Casper');
+
+  const casper = lastContext('casper');
+  expect(casper).toContain('dommage Casper');
+  expect(casper).not.toContain('install');
+  expect(casper).not.toContain('rôles');
+  const melchior = lastContext('melchior');
+  expect(melchior).toContain('install');
+  expect(melchior).not.toContain('répartie');
+  expect(melchior).not.toContain('dommage');
+});
+
+test('la persona répond en citant le message, et se reconnaît dans le contexte', async () => {
+  const w = world('citation');
+  const question = await w.say('lea', 'balthasar, je dors mal en ce moment');
+  expect(question.answers).toHaveLength(1);
+  expect(question.answers[0]).toMatchObject({ persona: 'balthasar' });
+  expect(w.store.at(-1).content).toStartWith(`-# ↪ <@${question.author.id}>`);
+  await w.say('lea', 'balthasar, tu as une astuce ?');
+  expect(lastContext('balthasar')).toContain('Toi, Balthasar (à lea) : Réponse');
+});
+
+test('suite sans le nom : seulement pour la personne à qui la persona vient de répondre', async () => {
+  const w = world('suite');
+  await w.say('slou', 'melchior, combien font 2 + 2 ?');
+  const suite = await w.say('slou', 'et 3 + 3 ?');
+  expect(suite.answers.map((a) => a.persona)).toEqual(['melchior']);
+  const intrus = await w.say('faceless', 'et 4 + 4 ?');
+  expect(intrus.answers).toHaveLength(0);
+});
+
+test('chacun garde sa suite sans le nom dans le même salon', async () => {
+  const w = world('suites');
+  await w.say('slou', 'melchior, explique les vecteurs');
+  await w.say('lea', 'casper, pizza ou sushi ?');
+  const deSlou = await w.say('slou', 'et en dimension 3 ?');
+  const deLea = await w.say('lea', 'sérieux ? pourquoi ?');
+  expect(deSlou.answers.map((a) => a.persona)).toEqual(['melchior']);
+  expect(deLea.answers.map((a) => a.persona)).toEqual(['casper']);
+  expect(lastContext('casper')).not.toContain('vecteurs');
+});
+
+test('répondre au message de quelqu’un fait rejoindre sa conversation, sans que MAGI réponde', async () => {
+  const w = world('rejoindre');
+  const question = await w.say('slou', 'melchior, on code le bot en JS ou en Python ?');
+  const remarque = await w.say('lea', 'Python, clairement', { replyTo: question });
+  expect(remarque.answers).toHaveLength(0);
+  await w.say('lea', 'melchior, tu confirmes ?');
+  const context = lastContext('melchior');
+  expect(context).toContain('on code le bot en JS ou en Python');
+  expect(context).toContain('lea (en réponse à slou) : Python, clairement');
+});
+
+test('mentionner un participant fait aussi rejoindre sa conversation', async () => {
+  const w = world('mention');
+  await w.say('slou', 'casper, quel film ce soir ?');
+  await w.say('lea', '@slou prends un Miyazaki', { mentions: ['slou'] });
+  await w.say('slou', 'casper, Miyazaki alors ?');
+  expect(lastContext('casper')).toContain('lea : @slou prends un Miyazaki');
+});
+
+test('une autre persona appelée dans la conversation voit l’échange précédent', async () => {
+  const w = world('relais');
+  await w.say('slou', 'melchior, le café ça déshydrate ?');
+  await w.say('slou', 'balthasar, du coup j’en bois combien ?');
+  expect(lastContext('balthasar')).toContain('Melchior (MAGI, à slou) : Réponse');
+});
+
+test('un message ancien cité hors conversation est joint au contexte', async () => {
+  const w = world('ancien');
+  const ancien = await w.say('lea', 'je pars au Japon en avril');
+  await w.say('slou', 'casper, tu en penses quoi ?', { replyTo: ancien });
+  expect(lastContext('casper')).toContain('lea (message cité) : je pars au Japon en avril');
+});
+
+test('le propriétaire du serveur est signalé', async () => {
+  const w = world('roles');
+  await w.say('slou', 'melchior, statut ?');
+  expect(lastContext('melchior')).toContain('slou (propriétaire du serveur) : melchior, statut ?');
+});
+
+test('les gifs sont signalés avec leur auteur', async () => {
+  const w = world('gif');
+  await w.say('slou', 'casper, regarde https://tenor.com/view/chat-qui-danse-123');
+  expect(lastContext('casper')).toContain('slou (propriétaire du serveur) : casper, regarde [gif]');
+});
+
+test('vote entre deux personas nommées', async () => {
+  const w = world('vote');
+  await w.say('slou', 'balthasar et melchior, votez : on commande des pizzas ?');
+  expect(w.posted.filter((p) => p.persona !== 'magi').map((p) => p.persona)).toEqual(['balthasar', 'melchior']);
+  expect(w.posted.at(-1).content).toBe("**MAGI — Résolution adoptée à l'unanimité.**");
+});
+
+test('salon muet : aucune réponse', async () => {
+  const w = world('muet');
+  setMutedChannels(w.guild.id, [w.channel.id]);
+  const message = await w.say('slou', 'melchior, tu es là ?');
+  expect(message.answers).toHaveLength(0);
+});
+
+test('persona désactivée : une autre répond à sa place', async () => {
+  const w = world('desactivee');
+  setActivePersonas(w.guild.id, ['melchior', 'balthasar']);
+  const message = await w.say('slou', 'casper, une blague ?');
+  expect(message.answers).toHaveLength(1);
+  expect(message.answers[0].persona).not.toBe('casper');
+});
+
+test('réaction rapide sans appel au LLM', async () => {
+  const w = world('reaction');
+  await w.say('slou', 'melchior, merci pour le coup de main');
+  const merci = await w.say('slou', 'merci melchior');
+  expect(merci.reactions.length + merci.answers.length).toBeGreaterThan(0);
+});
+
+test('conversation à trois : chacun est nommé, la persona répond au bon interlocuteur', async () => {
+  const w = world('trio');
+  const question = await w.say('slou', 'casper, on se fait un jeu ce soir ?');
+  await w.say('lea', 'moi je suis chaude', { replyTo: question });
+  await w.say('faceless', '@lea pareil', { mentions: ['lea'] });
+  await w.say('faceless', 'casper, tu proposes quoi ?');
+  const context = lastContext('casper');
+  expect(context).toContain('slou (propriétaire du serveur) : casper, on se fait un jeu ce soir ?');
+  expect(context).toContain('lea (en réponse à slou) : moi je suis chaude');
+  expect(context).toContain('faceless : @lea pareil');
+  expect(context).toContain('Tu réponds maintenant à faceless');
+});
+
+test('changer de persona et de sujet ouvre une nouvelle conversation', async () => {
+  const w = world('ambigu');
+  await w.say('slou', 'melchior, parle-moi des trous noirs');
+  route = 'nouveau';
+  await w.say('slou', 'casper, ton plat préféré ?');
+  route = null;
+  await w.say('slou', 'casper, et en dessert ?');
+  expect(lastContext('casper')).not.toContain('trous noirs');
+  await w.say('slou', 'melchior, et leur température ?');
+  expect(lastContext('melchior')).toContain('trous noirs');
+  expect(lastContext('melchior')).not.toContain('dessert');
+});
