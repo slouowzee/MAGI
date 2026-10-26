@@ -42,11 +42,12 @@ function webhookFor(channel, persona) {
   return cache.get(key);
 }
 
-function payload(channel, persona, content, components, mentions = []) {
+function payload(channel, persona, content, { components, embeds, mentions = [] }) {
   const { name, avatar } = PERSONAS[persona];
   return {
     content,
     components,
+    embeds,
     withComponents: Boolean(components?.length),
     username: name,
     avatarURL: avatar,
@@ -67,6 +68,6 @@ async function withWebhook(channel, persona, action) {
   }
 }
 
-export function speak(channel, persona, content, components, mentions) {
-  return withWebhook(channel, persona, (wh) => wh.send(payload(channel, persona, content, components, mentions)));
+export function speak(channel, persona, content, options = {}) {
+  return withWebhook(channel, persona, (wh) => wh.send(payload(channel, persona, content, options)));
 }

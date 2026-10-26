@@ -53,7 +53,7 @@ export function startReminders(client) {
       markDone(reminder.id);
       const channel = await client.channels.fetch(reminder.channel_id).catch(() => null);
       if (!channel) continue;
-      await speak(channel, 'balthasar', `<@${reminder.user_id}> petit rappel : ${reminder.text}`, undefined, [reminder.user_id]).catch((err) =>
+      await speak(channel, 'balthasar', `<@${reminder.user_id}> petit rappel : ${reminder.text}`, { mentions: [reminder.user_id] }).catch((err) =>
         console.error(`rappel n°${reminder.id} non envoyé :`, err.message),
       );
     }

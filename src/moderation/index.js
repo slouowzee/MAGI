@@ -113,7 +113,7 @@ export async function moderate(message) {
   await message.delete().catch(() => {});
   if (action.timeout) await member.timeout(action.timeout, reason).catch((err) => report(guild, [`Exclusion de ${member} impossible : ${err.message}`]));
   if (action.warn) {
-    await speak(message.channel, 'balthasar', `<@${member.id}>, ton message a été retiré : ${finding.reasons[0]}. Premier avertissement, la prochaine fois ce sera une exclusion temporaire.`, undefined, [member.id]).catch(() => {});
+    await speak(message.channel, 'balthasar', `<@${member.id}>, ton message a été retiré : ${finding.reasons[0]}. Premier avertissement, la prochaine fois ce sera une exclusion temporaire.`, { mentions: [member.id] }).catch(() => {});
   }
   if (action.vote) await voteBan(message, finding.reasons, count).catch((err) => report(guild, [`Vote de bannissement impossible : ${err.message}`]));
   return true;

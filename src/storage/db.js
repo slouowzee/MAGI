@@ -53,3 +53,11 @@ db.exec(`CREATE TABLE IF NOT EXISTS interventions (
   channel_id TEXT PRIMARY KEY,
   guild_id TEXT NOT NULL
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS publications (
+  id INTEGER PRIMARY KEY,
+  guild_id TEXT NOT NULL,
+  channel_id TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+)`);

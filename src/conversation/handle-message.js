@@ -4,7 +4,7 @@ import { floodCheck, quickReaction } from './rules.js';
 import { runVote } from './vote.js';
 import { maybeIntervene } from './spontaneous.js';
 import { detect, wantsDetail } from './triggers.js';
-import { buttonsFor } from '../discord/buttons.js';
+import { buttonsFor, previewsFor } from '../discord/buttons.js';
 import { conversationFor } from '../discord/history.js';
 import { splitMessage } from '../discord/split.js';
 import { speak } from '../discord/webhooks.js';
@@ -75,7 +75,7 @@ export async function handleMessage(message) {
     const cleaned = cleanReply(reply);
     const parts = splitMessage(cleaned).filter(Boolean);
     for (const [i, part] of parts.entries()) {
-      await speak(message.channel, persona, part, i === parts.length - 1 ? buttonsFor(actions) : undefined);
+      await speak(message.channel, persona, part, i === parts.length - 1 ? { components: buttonsFor(actions), embeds: previewsFor(actions) } : {});
     }
     rememberPersona(channelId, persona, Date.now(), { followUserId: message.author.id, asked: cleaned.endsWith('?') });
   } catch (err) {

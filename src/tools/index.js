@@ -59,6 +59,7 @@ export async function runTool(call, ctx, tools = TOOLS) {
       allowed: (m) => m.id === member.id,
       refusal: `Seul ${member.displayName} peut confirmer.`,
       cleanup: tool.cleanup ? ctx.message : undefined,
+      preview: tool.preview?.({ guild: member.guild, args: call.args }),
       run: () => execute(tool, call.args, ctx),
     });
     return "Un bouton de confirmation sera affiché sous ta réponse : l'action ne sera faite que si la personne clique dessus. Dis-le-lui brièvement.";

@@ -24,6 +24,10 @@ export function buttonsFor(actions) {
   return [row];
 }
 
+export function previewsFor(actions) {
+  return actions.map((action) => action.preview).filter(Boolean).slice(0, 10);
+}
+
 export function takeAction(id, member, now = Date.now()) {
   const action = pending.get(id);
   if (!action || now - action.at > TTL) {
