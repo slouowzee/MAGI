@@ -1,4 +1,5 @@
 export class LLMUnavailable extends Error {}
+export class ContentRefused extends Error {}
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 const GEMINI_COOLDOWN = 60_000;
@@ -61,8 +62,10 @@ async function gemini({ messages, format, options = {}, tools, model, timeoutMs 
   if (format) body.response_format = { type: 'json_schema', json_schema: { name: 'reponse', schema: format } };
   if (tools?.length) body.tools = tools;
   const data = await post(GEMINI_URL, { Authorization: `Bearer ${process.env.GEMINI_API_KEY}` }, body, timeoutMs);
-  const message = data.choices?.[0]?.message;
-  if (!message || (typeof message.content !== 'string' && !message.tool_calls?.length)) throw new LLMUnavailable('réponse Gemini vide');
+  const choice = data.choices?.[0];
+  const message = choice?.message;
+  if (choice?.finish_reason === 'content_filter') throw new ContentRefused('réponse bloquée par le filtre de Gemini');
+  if (!message || (typeof message.content !== 'string' && !message.tool_calls?.length)) throw new LLMUnavailable(`réponse Gemini vide (${choice?.finish_reason ?? 'sans motif'})`);
   return { role: 'assistant', content: message.content ?? '', ...(message.tool_calls?.length ? { tool_calls: message.tool_calls } : {}) };
 }
 
@@ -109,6 +112,7 @@ export async function chat({ messages, format, options, tools, model, timeoutMs 
       try {
         return result(await gemini({ messages, format, options, tools, model: candidate, timeoutMs: Math.min(timeoutMs, 60_000) }), 'gemini');
       } catch (err) {
+        if (err instanceof ContentRefused) throw err;
         if (err.status === 429 || err.status >= 500) geminiPausedUntil.set(candidate, Date.now() + GEMINI_COOLDOWN);
         console.warn(`Gemini ${candidate} indisponible (${err.message.split('\n')[0]})`);
       }

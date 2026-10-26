@@ -123,3 +123,12 @@ test('un modèle Gemini saturé ne bloque pas le modèle par défaut', async () 
   assert.deepEqual(seen, ['gros-modele', 'modele-lite', 'modele-lite']);
   delete process.env.GEMINI_MODEL;
 });
+
+test('réponse bloquée par le filtre de Gemini : pas de bascule sur Ollama', async () => {
+  process.env.GEMINI_API_KEY = 'test';
+  const { ContentRefused } = await import('./client.js');
+  geminiResponse = () => Response.json({ choices: [{ finish_reason: 'content_filter', message: { role: 'assistant' } }] });
+  await assert.rejects(chat({ messages: [{ role: 'user', content: 'insulte' }], model: 'modele-filtre' }), ContentRefused);
+  assert.deepEqual(calls, ['gemini']);
+  geminiResponse = () => Response.json({ choices: [{ message: { content: 'gemini ok' } }] });
+});
