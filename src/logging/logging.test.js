@@ -54,7 +54,7 @@ test('sur Discord : mentions en clair, markdown retiré, texte blanc', async () 
   const { guild: g, sent } = fakeGuild('g-blanc');
   await deliver(g, { at: new Date('2026-10-26T13:24:01Z'), host: 'magi', level: 'err', component: 'llm', message: 'a\nb', guild: g, channel: null, mention: null });
   await flush('g-blanc-magi-système');
-  expect(sent['magi-système'][0].content).toBe('```ansi\n\u001b[37m14:24:01 llm: err: a\u001b[0m\n\u001b[37mb\u001b[0m\n```');
+  expect(sent['magi-système'][0].content).toBe('```\n14:24:01 llm: err: a\nb\n```');
 });
 
 test('sur Discord : regroupées par salon, répétitions comptées, sous le seuil ignorées', async () => {
@@ -67,7 +67,7 @@ test('sur Discord : regroupées par salon, répétitions comptées, sous le seui
   await flush(`g-lots-magi-logs`);
   await flush(`g-lots-magi-système`);
   expect(sent['magi-logs']).toHaveLength(1);
-  expect(sent['magi-logs'][0].content).toStartWith('```ansi\n');
+  expect(sent['magi-logs'][0].content).toStartWith('```\n');
   expect(sent['magi-logs'][0].content).toContain('#général personas → casper');
   expect(sent['magi-système'][0].content.match(/gemini lent/g)).toHaveLength(1);
   expect(sent['magi-système'][0].content).toContain('(×2)');
@@ -81,7 +81,7 @@ test('sur Discord : regroupées par salon, répétitions comptées, sous le seui
 test('sur Discord : une alerte avec mention part seule et notifie', async () => {
   const { guild, sent } = fakeGuild('g-alerte');
   await deliver(guild, { at: new Date(), host: 'magi', level: 'alert', component: 'antinuke', message: 'trop de suppressions', guild, channel: null, mention: { users: ['42'], roles: ['7'] } });
-  expect(sent['magi-sécurité'][0].content).toStartWith('<@42> <@&7>\n```ansi\n');
+  expect(sent['magi-sécurité'][0].content).toStartWith('<@42> <@&7>\n```\n');
   expect(sent['magi-sécurité'][0].allowedMentions).toEqual({ users: ['42'], roles: ['7'] });
 });
 

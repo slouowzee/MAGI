@@ -51,8 +51,7 @@ export function textLine(entry, guild) {
   return `${timestamp(entry.at).slice(11, 19)} ${host}${entry.component}: ${entry.level}: ${plain(place + entry.message, guild)}`;
 }
 
-const white = (line) => line.split('\n').map((l) => `\u001b[37m${l}\u001b[0m`).join('\n');
-const block = (lines) => `\`\`\`ansi\n${lines.map(white).join('\n')}\n\`\`\``;
+const block = (lines) => `\`\`\`\n${lines.join('\n')}\n\`\`\``;
 const clip = (line) => (line.length > LIMIT ? `${line.slice(0, LIMIT - 1)}…` : line);
 
 function send(channel, payload) {
