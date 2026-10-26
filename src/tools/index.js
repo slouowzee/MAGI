@@ -1,5 +1,6 @@
 import { adminEnabled, isOperator, logChannel } from '../server/installation.js';
 import { moduleEnabled } from '../server/config.js';
+import { refreshPanel } from '../server/panel.js';
 import { INSTALLATION_TOOLS } from './installation.js';
 import { MEMORY_TOOLS } from './memory.js';
 import { CHANNEL_TOOLS } from './channel.js';
@@ -43,6 +44,7 @@ async function execute(tool, args, { member, message, actions = [] }) {
   const offer = (action) => actions.push(action);
   try {
     const output = await tool.run({ guild: member.guild, member, message, args, reason, offer });
+    if (tool.panel) await refreshPanel(member.guild).catch(() => {});
     await log(member.guild, `\`${tool.name}\` exécuté pour ${member} dans ${message.channel}.`);
     return output;
   } catch (err) {

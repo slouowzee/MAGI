@@ -15,10 +15,12 @@ export function buttonsFor(actions) {
   if (!actions.length) return [];
   const row = new ActionRowBuilder().addComponents(
     actions.map((action) =>
-      new ButtonBuilder()
-        .setCustomId(PREFIX + registerAction(action))
-        .setLabel(action.label)
-        .setStyle(action.danger ? ButtonStyle.Danger : ButtonStyle.Primary),
+      action.url
+        ? new ButtonBuilder().setURL(action.url).setLabel(action.label).setStyle(ButtonStyle.Link)
+        : new ButtonBuilder()
+            .setCustomId(PREFIX + registerAction(action))
+            .setLabel(action.label)
+            .setStyle(action.danger ? ButtonStyle.Danger : ButtonStyle.Primary),
     ),
   );
   return [row];

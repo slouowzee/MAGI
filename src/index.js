@@ -5,7 +5,7 @@ import { handleInteraction } from './discord/buttons.js';
 import { handleRoleButton, isRoleButton } from './tools/admin/role-panels.js';
 import { warmupOllama } from './llm/client.js';
 import { warmupRequests } from './llm/prompts.js';
-import { installAndReport } from './server/installation.js';
+import { handlePanelInteraction, isPanelInteraction, setupGuild } from './server/panel.js';
 import { startReminders } from './tools/reminders.js';
 import { startConversationSweeper } from './conversation/memory.js';
 import { db } from './storage/db.js';
@@ -29,7 +29,7 @@ const client = new Client({
 
 client.once(Events.ClientReady, async (c) => {
   console.log(`MAGI prêt : connecté en tant que ${c.user.tag} sur ${c.guilds.cache.size} serveur(s)`);
-  for (const guild of c.guilds.cache.values()) await installAndReport(guild);
+  for (const guild of c.guilds.cache.values()) await setupGuild(guild);
   startReminders(c);
   startConversationSweeper(c);
   startBackups(c);
@@ -44,11 +44,16 @@ client.once(Events.ClientReady, async (c) => {
     .catch((err) => console.error('Préchauffage impossible :', err.message));
 });
 
-client.on(Events.GuildCreate, installAndReport);
+client.on(Events.GuildCreate, setupGuild);
+client.on(Events.GuildRoleUpdate, (before, after) => {
+  if (after.tags?.botId === client.user.id && before.permissions.bitfield !== after.permissions.bitfield) setupGuild(after.guild);
+});
 client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => watchAuditLog(entry, guild).catch((err) => console.error('anti-nuke :', err.message)));
-client.on(Events.InteractionCreate, (interaction) =>
-  interaction.isButton() && isRoleButton(interaction.customId) ? handleRoleButton(interaction) : handleInteraction(interaction),
-);
+client.on(Events.InteractionCreate, (interaction) => {
+  const id = interaction.customId ?? '';
+  const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : handleInteraction;
+  handler(interaction).catch((err) => console.error('interaction :', err.message));
+});
 client.on(Events.MessageCreate, async (message) => {
   if (await moderate(message).catch((err) => console.error('modération :', err.message))) return;
   await handleMessage(message);

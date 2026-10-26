@@ -13,6 +13,7 @@ export const MODERATION_TOOLS = [
     description: 'Affiche ou change le mode de la modération automatique : observation, active ou desactivee.',
     parameters: { type: 'object', properties: { mode: { type: 'string', enum: MODES, description: 'Vide pour seulement afficher le mode actuel.' } } },
     access: 'operator',
+    panel: true,
     async run({ guild, args }) {
       if (args.mode) setModerationMode(guild.id, args.mode);
       const { mode, since } = moderationMode(guild.id);

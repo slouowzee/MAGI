@@ -11,6 +11,7 @@ export const INTERVENTION_TOOLS = [
       required: ['actif'],
     },
     access: 'operator',
+    panel: true,
     async run({ guild, message, args }) {
       const channel = targetChannel(guild, args.salon, message.channel);
       setInterventions(guild.id, channel.id, Boolean(args.actif));

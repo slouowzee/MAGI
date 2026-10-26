@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Collection, PermissionFlagsBits, PermissionsBitField } from 'discord.js';
 
 process.env.DB_PATH = ':memory:';
-const { auditReport } = await import('./security.js');
+const { auditReport } = await import('./audit.js');
 
 const perms = (...flags) => new PermissionsBitField(flags);
 const role = (id, name, permissions, managed = false) => ({ id, name, permissions, managed, members: { size: 2 } });

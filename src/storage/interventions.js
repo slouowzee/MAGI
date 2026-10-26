@@ -17,3 +17,10 @@ export function interventionsAllowed(channelId) {
 export function interventionChannels(guildId) {
   return list.all(guildId).map((r) => r.channel_id);
 }
+
+const clear = db.query('DELETE FROM interventions WHERE guild_id = ?');
+
+export function replaceInterventions(guildId, channelIds) {
+  clear.run(guildId);
+  for (const id of channelIds) enable.run(id, guildId);
+}

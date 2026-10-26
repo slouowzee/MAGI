@@ -1,5 +1,6 @@
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
 import { db } from '../storage/db.js';
+import { atLeast } from './permissions.js';
 
 const OPERATOR_ROLE = 'Opérateur MAGI';
 const LOG_CHANNEL = 'magi-logs';
@@ -32,6 +33,7 @@ export function adminEnabled(guild) {
 }
 
 export async function install(guild) {
+  if (!atLeast(guild.members.me.permissions, 'gestion')) throw new Error("MAGI n'a pas encore le niveau de permissions Gestion");
   const me = guild.members.me;
   const created = [];
 
@@ -71,6 +73,7 @@ export function installReport({ created, role, ok }, guild) {
   const lines = [created.length ? `**Installation de MAGI** : ${created.join(', ')}.` : '**MAGI** est déjà installé.'];
   if (ok) {
     lines.push('Hiérarchie correcte : outils d\'administration **activés**.');
+    lines.push('Réglages de MAGI : salon #magi-config.');
   } else {
     lines.push(
       `Dernière étape, à faire à la main : **Paramètres du serveur → Rôles**, glisser ${role} au-dessus du rôle ${guild.members.me.roles.highest}.`,
@@ -84,6 +87,7 @@ export async function installStatus(guild) {
   const role = operatorRole(guild);
   const owner = await guild.fetchOwner();
   return [
+    { step: 'accorder à MAGI le niveau de permissions Gestion (gérer les rôles et les salons)', done: atLeast(guild.members.me.permissions, 'gestion'), manual: true, permissions: true },
     { step: 'rôle Opérateur MAGI créé', done: Boolean(role), manual: false },
     { step: 'salon #magi-logs créé', done: Boolean(logChannel(guild)), manual: false },
     { step: 'rôle Opérateur MAGI attribué au propriétaire', done: Boolean(role && owner.roles.cache.has(role.id)), manual: false },
@@ -97,13 +101,19 @@ export function statusReport(steps) {
   return [
     'État de l\'installation :',
     ...steps.map((s) => `- ${s.done ? 'fait' : 'manquant'} : ${s.step}${!s.done && s.manual ? ' (à faire à la main)' : ''}`),
-    missing.some((s) => !s.manual)
+    missing.some((s) => s.permissions)
+      ? 'Il faut d\'abord accorder ce niveau : un bouton-lien sera affiché sous ta réponse, la personne n\'a qu\'à cliquer et valider. L\'installation se termine ensuite toute seule.'
+      : missing.some((s) => !s.manual)
       ? 'Les étapes non manuelles peuvent être faites par l\'outil installer_magi, après accord de la personne.'
       : 'Il ne reste que l\'étape manuelle : outils d\'administration désactivés en attendant.',
   ].join('\n');
 }
 
 export async function installAndReport(guild) {
+  if (!atLeast(guild.members.me.permissions, 'gestion')) {
+    console.log(`[${guild.name}] installation en attente du niveau de permissions Gestion`);
+    return null;
+  }
   try {
     const result = await install(guild);
     if (result.created.length || !result.ok) {
