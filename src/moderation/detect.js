@@ -1,4 +1,5 @@
 const OFFICIAL = new Set(['discord.com', 'discord.gg', 'discordapp.com', 'discordapp.net', 'discord.gift', 'discord.media', 'discordstatus.com', 'steampowered.com', 'steamcommunity.com', 'steamstatic.com', 'discord.js.org', 'discordjs.guide', 'discord.dev', 'dis.gd']);
+const MEDIA = ['tenor.com', 'giphy.com', 'klipy.com', 'imgur.com', 'youtube.com', 'youtu.be'];
 const LURE = /\b(nitro|free|gratuit|gift|cadeau|giveaway|airdrop|claim|r[ée]cup[eè]re|steam)\b/i;
 const URL = /\bhttps?:\/\/([^\s/<>]+)[^\s<>]*/gi;
 const INVITE = /\b(?:discord(?:app)?\.com\/invite|discord\.gg)\/[\w-]+/i;
@@ -13,8 +14,10 @@ export function hosts(content) {
   return [...content.matchAll(URL)].map((m) => m[1].toLowerCase().replace(/^www\./, '').split(':')[0]);
 }
 
+const within = (host, domains) => domains.some((d) => host === d || host.endsWith(`.${d}`));
+
 function official(host) {
-  return [...OFFICIAL].some((d) => host === d || host.endsWith(`.${d}`));
+  return within(host, [...OFFICIAL]);
 }
 
 function distance(a, b) {
@@ -64,7 +67,7 @@ export function detect({ content, mentionCount = 0, everyoneAttempt = false, acc
   else if (mentionCount >= MENTIONS.suspect || everyoneAttempt) found.push({ level: 'suspect', reason: everyoneAttempt ? 'tentative de mentionner tout le monde' : `${mentionCount} mentions dans un message` });
   if (activity.burst >= BURST.count) found.push({ level: 'suspect', reason: `${activity.burst} messages en quelques secondes` });
   if (INVITE.test(content)) found.push({ level: 'suspect', reason: "lien d'invitation vers un autre serveur" });
-  if (links.length && (accountAge < NEW_ACCOUNT || memberAge < NEW_MEMBER)) found.push({ level: 'suspect', reason: 'lien posté par un compte ou un membre récent' });
+  if (links.some((h) => !official(h) && !within(h, MEDIA)) && (accountAge < NEW_ACCOUNT || memberAge < NEW_MEMBER)) found.push({ level: 'suspect', reason: 'lien posté par un compte ou un membre récent' });
   if (INSULT.test(content)) found.push({ level: 'suspect', reason: 'insulte ou propos grossier' });
   if (!found.length) return null;
   const flagrant = found.find((f) => f.level === 'flagrant');

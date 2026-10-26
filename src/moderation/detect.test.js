@@ -57,3 +57,10 @@ test('insultes fortes : suspect, le LLM juge selon le contexte', () => {
   assert.equal(detect({ content: 'tu peux me passer la photo de ta maison ?' }), null);
   assert.equal(detect({ content: 'il faut que je baisse le son' }), null);
 });
+
+test('membre récent : les liens Discord et les gifs ne sont pas suspects', () => {
+  const recent = { memberAge: 3_600_000 };
+  assert.equal(detect({ content: 'https://cdn.discordapp.com/attachments/1/2/ezgif.gif', ...recent }), null);
+  assert.equal(detect({ content: 'https://tenor.com/view/chat-123', ...recent }), null);
+  assert.equal(detect({ content: 'https://media.discordapp.net/x.png https://inconnu.example', ...recent }).level, 'suspect');
+});
