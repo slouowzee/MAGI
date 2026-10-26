@@ -72,6 +72,36 @@ async function gemini({ messages, format, options = {}, tools, model, reasoning,
   return { role: 'assistant', content: message.content ?? '', ...(message.tool_calls?.length ? { tool_calls: message.tool_calls } : {}) };
 }
 
+const isMedia = (p) => p.type === 'image_url';
+const isVideo = (p) => isMedia(p) && p.image_url.url.startsWith('data:video/');
+
+function hideMedia(messages, hidden) {
+  let found = false;
+  const out = messages.map((m) => {
+    if (!Array.isArray(m.content)) return m;
+    return {
+      ...m,
+      content: m.content.map((p) => {
+        if (!hidden(p)) return p;
+        found = true;
+        return { type: 'text', text: '(impossible à afficher, tu ne la vois pas)' };
+      }),
+    };
+  });
+  return found && out;
+}
+
+async function geminiWithMedia(args) {
+  try {
+    return await gemini(args);
+  } catch (err) {
+    const lighter = err.status === 400 && (hideMedia(args.messages, isVideo) || hideMedia(args.messages, isMedia));
+    if (!lighter) throw err;
+    console.warn(`Gemini refuse un média (${err.message.replace(/\s+/g, ' ')}), nouvel essai sans`);
+    return geminiWithMedia({ ...args, messages: lighter });
+  }
+}
+
 function ollama({ messages, format, options, tools, timeoutMs }) {
   return ollamaQueue(async () => {
     const url = `${process.env.OLLAMA_URL || 'http://localhost:11434'}/api/chat`;
@@ -113,11 +143,11 @@ export async function chat({ messages, format, options, tools, model, reasoning,
     for (const candidate of new Set([model ?? defaultModel(), defaultModel()])) {
       if (Date.now() < (geminiPausedUntil.get(candidate) ?? 0)) continue;
       try {
-        return result(await gemini({ messages, format, options, tools, model: candidate, reasoning: candidate === model ? reasoning : undefined, timeoutMs: Math.min(timeoutMs, 60_000) }), 'gemini');
+        return result(await geminiWithMedia({ messages, format, options, tools, model: candidate, reasoning: candidate === model ? reasoning : undefined, timeoutMs: Math.min(timeoutMs, 60_000) }), 'gemini');
       } catch (err) {
         if (err instanceof ContentRefused) throw err;
         if (err.status === 429 || err.status >= 500) geminiPausedUntil.set(candidate, Date.now() + GEMINI_COOLDOWN);
-        console.warn(`Gemini ${candidate} indisponible (${err.message.split('\n')[0]})`);
+        console.warn(`Gemini ${candidate} indisponible (${err.message.replace(/\s+/g, ' ')})`);
       }
     }
     console.warn('bascule sur Ollama');

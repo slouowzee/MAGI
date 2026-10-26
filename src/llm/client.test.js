@@ -132,3 +132,23 @@ test('réponse bloquée par le filtre de Gemini : pas de bascule sur Ollama', as
   assert.deepEqual(calls, ['gemini']);
   geminiResponse = () => Response.json({ choices: [{ message: { content: 'gemini ok' } }] });
 });
+
+test('média refusé par Gemini : nouvel essai sans les vidéos, puis sans aucun média', async () => {
+  process.env.GEMINI_API_KEY = 'test';
+  const seen = [];
+  geminiResponse = (body) => {
+    const media = body.messages.flatMap((m) => (Array.isArray(m.content) ? m.content : [])).filter((p) => p.type === 'image_url');
+    seen.push(media.map((p) => p.image_url.url.slice(5, 10)));
+    return media.length ? new Response('[{\n  "error": { "code": 400 } }]', { status: 400 }) : Response.json({ choices: [{ message: { content: 'vu' } }] });
+  };
+  const content = [
+    { type: 'text', text: 'regarde' },
+    { type: 'image_url', image_url: { url: 'data:video/mp4;base64,AAAA' } },
+    { type: 'image_url', image_url: { url: 'data:image/webp;base64,AAAA' } },
+  ];
+  const r = await chat({ messages: [{ role: 'user', content }], model: 'modele-media' });
+  assert.deepEqual([r.content, r.provider], ['vu', 'gemini']);
+  assert.deepEqual(seen, [['video', 'image'], ['image'], []]);
+  assert.ok(!calls.some((c) => c.startsWith('ollama')));
+  geminiResponse = () => Response.json({ choices: [{ message: { content: 'gemini ok' } }] });
+});
