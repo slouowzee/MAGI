@@ -4,9 +4,9 @@ import { memoryContext, summarizeConversation } from './memory.js';
 import { floodCheck, quickReaction } from './rules.js';
 import { runVote } from './vote.js';
 import { maybeIntervene } from './spontaneous.js';
-import { detect, wantsDetail } from './triggers.js';
+import { addressedPersonas, detect, VOTE_INTENT, wantsDetail } from './triggers.js';
 import { buttonsFor, previewsFor } from '../discord/buttons.js';
-import { conversationFor } from '../discord/history.js';
+import { conversationFor, rememberAnswer } from '../discord/history.js';
 import { splitMessage } from '../discord/split.js';
 import { speak } from '../discord/webhooks.js';
 import { LLMUnavailable } from '../llm/client.js';
@@ -52,6 +52,12 @@ export async function handleMessage(message) {
     return runVote(message, question);
   }
   const allowed = activePersonas(message.guild.id);
+  const group = addressedPersonas(message.content).filter((p) => allowed.includes(p));
+  if (voting && group.length >= 2 && VOTE_INTENT.test(message.content)) {
+    console.log(`  vote entre ${group.join(', ')}`);
+    rememberPersona(channelId, null);
+    return runVote(message, message.content, group);
+  }
   let persona = allowed.includes(trigger.persona) ? trigger.persona : null;
   if (!persona) {
     const pick = await pickPersona(question, activePersona(channelId), allowed);
@@ -67,7 +73,7 @@ export async function handleMessage(message) {
   const typing = setInterval(() => message.channel.sendTyping().catch(() => {}), 8_000);
   message.channel.sendTyping().catch(() => {});
   try {
-    const { turns, participants } = await conversationFor(message, persona, message.content);
+    const { turns, participants, target } = await conversationFor(message, persona, message.content);
     const { content: reply, provider, actions } = await respond({
       messages: buildMessages(persona, turns, length, memoryContext(message.guild.id, participants)),
       options: { num_predict: MAX_TOKENS[length], repeat_penalty: 1.1 },
@@ -79,7 +85,7 @@ export async function handleMessage(message) {
     const cleaned = cleanReply(reply);
     const parts = splitMessage(cleaned).filter(Boolean);
     for (const [i, part] of parts.entries()) {
-      await speak(message.channel, persona, part, i === parts.length - 1 ? { components: buttonsFor(actions), embeds: previewsFor(actions) } : {});
+      rememberAnswer(await speak(message.channel, persona, part, i === parts.length - 1 ? { components: buttonsFor(actions), embeds: previewsFor(actions) } : {}), target);
     }
     rememberPersona(channelId, persona, Date.now(), { followUserId: message.author.id, asked: cleaned.endsWith('?') });
   } catch (err) {

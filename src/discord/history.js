@@ -1,10 +1,12 @@
-import { personaLabel } from '../personas.js';
+import { PERSONAS, personaLabel } from '../personas.js';
 import { personaOf } from './webhooks.js';
 
 const MAX_MESSAGES = 12;
 const WINDOW = 30 * 60_000;
 const MAX_CHARS = 600;
+const MAX_REMEMBERED = 500;
 const GIF_LINK = /https?:\/\/(?:[\w-]+\.)*(?:tenor\.com|giphy\.com)\/\S+/gi;
+const answeredTo = new Map();
 
 function kind(attachment) {
   const type = attachment.contentType ?? '';
@@ -22,35 +24,50 @@ export function describe(msg, text = msg.content) {
   return parts.filter(Boolean).join(' ');
 }
 
-function nameOf(msg) {
+export function displayName(msg) {
   const persona = personaOf(msg);
   if (persona) return personaLabel(persona);
   return msg.member?.displayName ?? msg.author.globalName ?? msg.author.username;
 }
 
+export function rememberAnswer(sent, name) {
+  if (!sent?.id) return;
+  answeredTo.set(sent.id, name);
+  if (answeredTo.size > MAX_REMEMBERED) answeredTo.delete(answeredTo.keys().next().value);
+}
+
 function replyTarget(msg) {
+  if (answeredTo.has(msg.id)) return answeredTo.get(msg.id);
   const user = msg.mentions?.repliedUser;
   if (!user) return null;
   if (user.bot) return user.username;
   return msg.guild?.members.cache.get(user.id)?.displayName ?? user.globalName ?? user.username;
 }
 
-function header(author, replyTo) {
+function label({ author, speaker, replyTo }, persona) {
+  if (speaker) {
+    const name = speaker === persona ? `Toi, ${PERSONAS[persona].name}` : personaLabel(speaker);
+    return replyTo ? `${name} (à ${replyTo})` : name;
+  }
   return replyTo ? `${author} (en réponse à ${replyTo})` : author;
 }
 
-export function toConversation(records, persona) {
-  const turns = [];
-  for (const { author, speaker, content, replyTo } of records) {
-    const text = content.trim().slice(0, MAX_CHARS);
-    if (!text) continue;
-    const role = speaker === persona ? 'assistant' : 'user';
-    const line = role === 'assistant' ? text : `${header(speaker ? personaLabel(speaker) : author, replyTo)} : ${text}`;
-    const last = turns.at(-1);
-    if (last?.role === role) last.content += `\n${line}`;
-    else turns.push({ role, content: line });
-  }
-  return turns;
+export function toTranscript(records, persona) {
+  return records
+    .map((record) => {
+      const text = record.content.trim().slice(0, MAX_CHARS);
+      return text ? `${label(record, persona)} : ${text}` : null;
+    })
+    .filter(Boolean);
+}
+
+export function conversationPrompt(lines, target) {
+  return [
+    'Messages récents du salon, du plus ancien au plus récent :',
+    ...lines,
+    '',
+    `Tu réponds maintenant à ${target}, dont le message est le dernier ci-dessus. Les autres messages sont du contexte : chaque ligne est de la personne nommée au début, ne prête pas à ${target} ce qu'une autre personne a dit et ne réponds pas à sa place. Les lignes « Toi » sont tes propres messages, adressés à la personne indiquée.`,
+  ].join('\n');
 }
 
 function record(msg, botId) {
@@ -59,13 +76,14 @@ function record(msg, botId) {
     return speaker ? { speaker, content: msg.content, replyTo: replyTarget(msg) } : null;
   }
   if (msg.author.bot || msg.author.id === botId) return null;
-  return { userId: msg.author.id, author: nameOf(msg), content: describe(msg), replyTo: replyTarget(msg) };
+  return { userId: msg.author.id, author: displayName(msg), content: describe(msg), replyTo: replyTarget(msg) };
 }
 
 export function transcriptLine(msg) {
-  if (msg.webhookId && !personaOf(msg)) return null;
+  const speaker = personaOf(msg);
+  if (msg.webhookId && !speaker) return null;
   const text = describe(msg).slice(0, 400);
-  return text ? `${header(nameOf(msg), replyTarget(msg))} : ${text}` : null;
+  return text ? `${label({ author: displayName(msg), speaker, replyTo: replyTarget(msg) }, null)} : ${text}` : null;
 }
 
 export async function conversationFor(message, persona, text) {
@@ -76,7 +94,8 @@ export async function conversationFor(message, persona, text) {
     .reverse()
     .map((m) => record(m, message.client.user.id))
     .filter(Boolean);
-  records.push({ userId: message.author.id, author: nameOf(message), content: describe(message, text), replyTo: replyTarget(message) });
+  const target = displayName(message);
+  records.push({ userId: message.author.id, author: target, content: describe(message, text), replyTo: replyTarget(message) });
   const participants = [...new Map(records.filter((r) => r.userId).map((r) => [r.userId, { id: r.userId, name: r.author }])).values()];
-  return { turns: toConversation(records, persona), participants };
+  return { turns: [{ role: 'user', content: conversationPrompt(toTranscript(records, persona), target) }], participants, target };
 }

@@ -19,3 +19,9 @@ test("date et heure de Paris fournies au modèle", async () => {
   assert.equal(nowLine(new Date('2026-10-25T18:30:00Z')), 'Nous sommes le dimanche 25 octobre 2026 à 19:30, heure de Paris (UTC+01:00).');
   assert.match(nowLine(new Date('2026-07-14T10:00:00Z')), /12:00, heure de Paris \(UTC\+02:00\)/);
 });
+
+test("retire l'étiquette que le modèle recopierait du transcript", () => {
+  assert.equal(cleanReply('Toi, Casper (à Faceless) : Touchée.'), 'Touchée.');
+  assert.equal(cleanReply('Casper : Touchée.'), 'Touchée.');
+  assert.equal(cleanReply('Casper a raison : on vote.'), 'Casper a raison : on vote.');
+});

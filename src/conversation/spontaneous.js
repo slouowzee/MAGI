@@ -1,4 +1,4 @@
-import { transcriptLine, conversationFor } from '../discord/history.js';
+import { conversationFor, rememberAnswer, transcriptLine } from '../discord/history.js';
 import { speak } from '../discord/webhooks.js';
 import { chat, choose, forReply } from '../llm/client.js';
 import { buildMessages, cleanReply, MAX_TOKENS } from '../llm/prompts.js';
@@ -39,11 +39,11 @@ export async function maybeIntervene(message) {
 
   lastIntervention.set(channelId, Date.now());
   console.log(`[${message.guild.name} #${message.channel.name}] intervention spontanée de ${choice}`);
-  const { turns, participants } = await conversationFor(message, choice, message.content);
+  const { turns, participants, target } = await conversationFor(message, choice, message.content);
   const extra = [SPONTANEOUS, memoryContext(message.guild.id, participants)].filter(Boolean).join('\n');
   const { content } = await chat({ messages: buildMessages(choice, turns, 'courte', extra), options: { num_predict: MAX_TOKENS.courte }, ...forReply() });
   const reply = cleanReply(content);
   if (!reply) return;
-  await speak(message.channel, choice, reply.slice(0, 1900));
+  rememberAnswer(await speak(message.channel, choice, reply.slice(0, 1900)), target);
   rememberPersona(channelId, choice, Date.now(), { followUserId: message.author.id, asked: reply.endsWith('?') });
 }

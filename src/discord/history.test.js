@@ -1,44 +1,42 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { describe, toConversation } from './history.js';
+import { conversationPrompt, describe, toTranscript } from './history.js';
 
-test('les messages de la persona deviennent ses tours, les autres sont attribués', () => {
-  const turns = toConversation(
+test('chaque ligne porte son auteur, la persona se reconnaît et voit à qui elle répondait', () => {
+  const lines = toTranscript(
     [
-      { author: 'Slou', content: 'magi, pizza ou sushi ?' },
-      { speaker: 'casper', content: 'Sushi, évidemment.' },
-      { author: 'Léa', content: 'moi je dis pizza' },
+      { author: 'starf__', content: 'Encule ta pote' },
+      { speaker: 'casper', content: 'Original.', replyTo: 'starf__' },
+      { author: 'Faceless', content: "t'es nulle en répartie" },
       { speaker: 'melchior', content: 'Les deux se valent.' },
-      { author: 'Slou', content: 'et toi casper, pourquoi ?' },
+      { author: 'Faceless', content: 'prouve-le', replyTo: 'Casper' },
     ],
     'casper',
   );
-  assert.deepEqual(turns, [
-    { role: 'user', content: 'Slou : magi, pizza ou sushi ?' },
-    { role: 'assistant', content: 'Sushi, évidemment.' },
-    { role: 'user', content: 'Léa : moi je dis pizza\nMelchior (MAGI) : Les deux se valent.\nSlou : et toi casper, pourquoi ?' },
+  assert.deepEqual(lines, [
+    'starf__ : Encule ta pote',
+    'Toi, Casper (à starf__) : Original.',
+    "Faceless : t'es nulle en répartie",
+    'Melchior (MAGI) : Les deux se valent.',
+    'Faceless (en réponse à Casper) : prouve-le',
   ]);
 });
 
-test('ignore les messages vides et tronque les longs', () => {
-  const turns = toConversation([{ author: 'A', content: '   ' }, { author: 'B', content: 'x'.repeat(1000) }], 'melchior');
-  assert.equal(turns.length, 1);
-  assert.equal(turns[0].content, `B : ${'x'.repeat(600)}`);
+test('la consigne finale désigne la personne à qui répondre', () => {
+  const prompt = conversationPrompt(['Slou : magi, on en est où ?', 'Faceless : dommage Casper'], 'Faceless');
+  assert.match(prompt, /Faceless : dommage Casper\n\nTu réponds maintenant à Faceless/);
 });
 
-test('gifs et pièces jointes signalés, destinataire des réponses indiqué', () => {
+test('ignore les messages vides et tronque les longs', () => {
+  const lines = toTranscript([{ author: 'A', content: '   ' }, { author: 'B', content: 'x'.repeat(1000) }], 'melchior');
+  assert.deepEqual(lines, [`B : ${'x'.repeat(600)}`]);
+});
+
+test('gifs et pièces jointes signalés', () => {
   const msg = {
     content: 'regarde https://tenor.com/view/edaters-when-discord-is-down-123',
     attachments: new Map([['1', { contentType: 'image/png' }]]),
     stickers: new Map(),
   };
   assert.equal(describe(msg), 'regarde [gif] [image]');
-  const turns = toConversation(
-    [
-      { author: 'Slou', content: '[gif]' },
-      { author: 'Faceless', content: 'prouve-le', replyTo: 'Casper' },
-    ],
-    'casper',
-  );
-  assert.equal(turns[0].content, 'Slou : [gif]\nFaceless (en réponse à Casper) : prouve-le');
 });
