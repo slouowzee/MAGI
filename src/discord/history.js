@@ -1,7 +1,9 @@
 import { PERSONAS, personaLabel } from '../personas.js';
 import { personaOf, REPLY_HEADER } from './webhooks.js';
+import { isOperator } from '../server/installation.js';
 
 const MAX_MESSAGES = 12;
+const MAX_CONTEXT = 20;
 const WINDOW = 30 * 60_000;
 const MAX_CHARS = 600;
 const MAX_REMEMBERED = 500;
@@ -46,12 +48,15 @@ function replyTarget(msg) {
   return msg.guild?.members.cache.get(user.id)?.displayName ?? user.globalName ?? user.username;
 }
 
-function label({ author, speaker, replyTo }, persona) {
-  if (speaker) {
-    const name = speaker === persona ? `Toi, ${PERSONAS[persona].name}` : personaLabel(speaker);
-    return replyTo ? `${name} (à ${replyTo})` : name;
-  }
-  return replyTo ? `${author} (en réponse à ${replyTo})` : author;
+function label({ author, speaker, replyTo, role, quoted }, persona) {
+  const name = speaker ? (speaker === persona ? `Toi, ${PERSONAS[persona].name}` : personaLabel(speaker)) : author;
+  const notes = [quoted && 'message cité', role, replyTo && (speaker ? `à ${replyTo}` : `en réponse à ${replyTo}`)].filter(Boolean);
+  return notes.length ? `${name} (${notes.join(', ')})` : name;
+}
+
+function roleOf(msg) {
+  if (msg.author.id === msg.guild?.ownerId) return 'propriétaire du serveur';
+  return msg.member && isOperator(msg.member) ? 'opérateur MAGI' : null;
 }
 
 export function toTranscript(records, persona) {
@@ -75,10 +80,10 @@ export function conversationPrompt(lines, target) {
 function record(msg, botId) {
   if (msg.webhookId) {
     const speaker = personaOf(msg);
-    return speaker ? { speaker, content: describe(msg), replyTo: replyTarget(msg) } : null;
+    return speaker ? { id: msg.id, speaker, content: describe(msg), replyTo: replyTarget(msg) } : null;
   }
   if (msg.author.bot || msg.author.id === botId) return null;
-  return { userId: msg.author.id, author: displayName(msg), content: describe(msg), replyTo: replyTarget(msg) };
+  return { id: msg.id, userId: msg.author.id, author: displayName(msg), role: roleOf(msg), content: describe(msg), replyTo: replyTarget(msg) };
 }
 
 export function transcriptLine(msg) {
@@ -88,16 +93,23 @@ export function transcriptLine(msg) {
   return text ? `${label({ author: displayName(msg), speaker, replyTo: replyTarget(msg) }, null)} : ${text}` : null;
 }
 
-export async function conversationFor(message, persona, text) {
+export async function conversationFor(message, persona, text, conversation = null) {
   const now = message.createdTimestamp;
-  const fetched = await message.channel.messages.fetch({ limit: MAX_MESSAGES, before: message.id }).catch(() => null);
+  const botId = message.client.user.id;
+  const fetched = await message.channel.messages.fetch({ limit: conversation ? 50 : MAX_MESSAGES, before: message.id }).catch(() => null);
   const records = [...(fetched?.values() ?? [])]
-    .filter((m) => now - m.createdTimestamp <= WINDOW)
+    .filter((m) => (conversation ? conversation.messages.includes(m.id) : now - m.createdTimestamp <= WINDOW))
     .reverse()
-    .map((m) => record(m, message.client.user.id))
-    .filter(Boolean);
+    .map((m) => record(m, botId))
+    .filter(Boolean)
+    .slice(-MAX_CONTEXT);
+  const referenceId = message.reference?.messageId;
+  if (referenceId && !records.some((r) => r.id === referenceId)) {
+    const quoted = await message.fetchReference().then((m) => record(m, botId)).catch(() => null);
+    if (quoted) records.unshift({ ...quoted, quoted: true });
+  }
   const target = displayName(message);
-  records.push({ userId: message.author.id, author: target, content: describe(message, text), replyTo: replyTarget(message) });
+  records.push({ id: message.id, userId: message.author.id, author: target, role: roleOf(message), content: describe(message, text), replyTo: replyTarget(message) });
   const participants = [...new Map(records.filter((r) => r.userId).map((r) => [r.userId, { id: r.userId, name: r.author }])).values()];
   return { turns: [{ role: 'user', content: conversationPrompt(toTranscript(records, persona), target) }], participants, target };
 }

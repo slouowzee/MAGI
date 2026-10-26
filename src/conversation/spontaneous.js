@@ -5,7 +5,7 @@ import { buildMessages, cleanReply, MAX_TOKENS } from '../llm/prompts.js';
 import { interventionsAllowed } from '../storage/interventions.js';
 import { activePersonas, moduleEnabled } from '../server/config.js';
 import { memoryContext } from './memory.js';
-import { rememberPersona } from './router.js';
+import { addMessage, answered, openConversation } from './threads.js';
 
 const COOLDOWN = 30 * 60_000;
 const MIN_LENGTH = 15;
@@ -44,6 +44,9 @@ export async function maybeIntervene(message) {
   const { content } = await chat({ messages: buildMessages(choice, turns, 'courte', extra), options: { num_predict: MAX_TOKENS.courte }, ...forReply() });
   const reply = cleanReply(content);
   if (!reply) return;
-  rememberAnswer(await speak(message.channel, choice, reply.slice(0, 1800), { replyTo: message }), target);
-  rememberPersona(channelId, choice, Date.now(), { followUserId: message.author.id, asked: reply.endsWith('?') });
+  const posted = await speak(message.channel, choice, reply.slice(0, 1800), { replyTo: message });
+  rememberAnswer(posted, target);
+  const conversation = openConversation({ channelId, guildId: message.guild.id });
+  addMessage(conversation, message.id, message.author.id);
+  answered(conversation, { persona: choice, messageIds: [posted.id], userId: message.author.id, asked: reply.endsWith('?') });
 }

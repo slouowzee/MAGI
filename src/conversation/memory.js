@@ -2,7 +2,7 @@ import { SnowflakeUtil } from 'discord.js';
 import { transcriptLine } from '../discord/history.js';
 import { chat } from '../llm/client.js';
 import { factsAbout, saveSummary, summariesAbout } from '../storage/memory.js';
-import { expiredConversations } from './router.js';
+import { expiredConversations } from './threads.js';
 import { moduleEnabled } from '../server/config.js';
 
 const MIN_LINES = 4;
@@ -28,7 +28,11 @@ export async function summarizeConversation(client, conversation) {
   if (!channel) return;
   const after = SnowflakeUtil.generate({ timestamp: conversation.startedAt - 1_000 }).toString();
   const fetched = await channel.messages.fetch({ limit: 50, after }).catch(() => null);
-  const lines = [...(fetched?.values() ?? [])].reverse().map(transcriptLine).filter(Boolean);
+  const lines = [...(fetched?.values() ?? [])]
+    .filter((m) => !conversation.messages || conversation.messages.includes(m.id))
+    .reverse()
+    .map(transcriptLine)
+    .filter(Boolean);
   if (lines.length < MIN_LINES) return;
   try {
     const { content } = await chat({
