@@ -68,11 +68,11 @@ function world(name) {
     },
     sendTyping: async () => {},
     messages: {
-      fetch: async ({ limit, before, after }) =>
-        new Collection(
+      fetch: async (query) =>
+        typeof query === 'string' ? store.find((m) => m.id === query) : new Collection(
           store
-            .filter((m) => (!before || BigInt(m.id) < BigInt(before)) && (!after || BigInt(m.id) > BigInt(after)))
-            .slice(-limit)
+            .filter((m) => (!query.before || BigInt(m.id) < BigInt(query.before)) && (!query.after || BigInt(m.id) > BigInt(query.after)))
+            .slice(-query.limit)
             .reverse()
             .map((m) => [m.id, m]),
         ),
@@ -243,6 +243,17 @@ test('un message ancien cité hors conversation est joint au contexte', async ()
   const ancien = await w.say('lea', 'je pars au Japon en avril');
   await w.say('slou', 'casper, tu en penses quoi ?', { replyTo: ancien });
   expect(lastContext('casper')).toContain('lea (message cité) : je pars au Japon en avril');
+});
+
+test('réponse à une ancienne réplique de MAGI : toute la chaîne citée est jointe', async () => {
+  const w = world('chaine');
+  await w.say('slou', 'balthasar, je te teste');
+  setSystemTime((clock += 11 * 60_000));
+  await w.say('slou', 'et casper, elle en pense quoi ?', { replyTo: w.store.at(-1) });
+  const context = lastContext('casper');
+  expect(context).toContain('slou (message cité, propriétaire du serveur) : balthasar, je te teste');
+  expect(context).toContain('Balthasar (MAGI, message cité, à slou) : ');
+  expect(context.indexOf('je te teste')).toBeLessThan(context.indexOf('Balthasar (MAGI'));
 });
 
 test('le propriétaire du serveur est signalé', async () => {

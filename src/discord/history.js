@@ -8,6 +8,7 @@ const MAX_CONTEXT = 20;
 const WINDOW = 30 * 60_000;
 const MAX_CHARS = 600;
 const MAX_MEDIA = 3;
+const MAX_QUOTED = 3;
 const LEAD_IN = 2 * 60_000;
 const CUSTOM_EMOJI = /<a?:(\w+):\d+>/g;
 const MAX_REMEMBERED = 500;
@@ -84,6 +85,11 @@ export function conversationPrompt(lines, target) {
   ].join('\n');
 }
 
+function quotedId(msg) {
+  if (msg.webhookId) return msg.content.match(REPLY_HEADER)?.[0].match(/\/(\d+)\)\s*$/)?.[1] ?? null;
+  return msg.reference?.messageId ?? null;
+}
+
 function record(msg, botId) {
   if (msg.webhookId) {
     const speaker = personaOf(msg);
@@ -130,10 +136,13 @@ export async function conversationFor(message, persona, text, conversation = nul
     .map((m) => record(m, botId))
     .filter(Boolean)
     .slice(-MAX_CONTEXT);
-  const referenceId = message.reference?.messageId;
-  if (referenceId && !records.some((r) => r.id === referenceId)) {
-    const quoted = await message.fetchReference().then((m) => record(m, botId)).catch(() => null);
-    if (quoted) records.unshift({ ...quoted, quoted: true });
+  let quotedRef = message.reference?.messageId;
+  for (let depth = 0; quotedRef && depth < MAX_QUOTED && !records.some((r) => r.id === quotedRef); depth++) {
+    const m = await message.channel.messages.fetch(quotedRef).catch(() => null);
+    const quoted = m && record(m, botId);
+    if (!quoted) break;
+    records.unshift({ ...quoted, quoted: true });
+    quotedRef = quotedId(m);
   }
   const target = displayName(message);
   const unfurled = mediaOf(message).length || !HAS_GIF_LINK.test(message.content) ? message : await Bun.sleep(1_500).then(() => message.channel.messages.fetch(message.id)).catch(() => message);
