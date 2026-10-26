@@ -1,4 +1,6 @@
 import { randomPersona } from '../conversation/router.js';
+import { addMessage, answered, openConversation } from '../conversation/threads.js';
+import { rememberAnswer } from '../discord/history.js';
 import { speak } from '../discord/webhooks.js';
 import { chat, forReply } from '../llm/client.js';
 import { cleanReply, systemPrompt } from '../llm/prompts.js';
@@ -34,7 +36,12 @@ export async function welcome(member) {
     });
     text = cleanReply(content) || text;
   } catch {}
-  await speak(channel, persona, `<@${member.id}> ${text}`, { mentions: [member.id] }).catch((err) => console.error('bienvenue :', err.message));
+  const posted = await speak(channel, persona, `<@${member.id}> ${text}`, { mentions: [member.id] }).catch((err) => console.error('bienvenue :', err.message));
+  if (!posted) return;
+  rememberAnswer(posted, member.displayName);
+  const conversation = openConversation({ channelId: channel.id, guildId: guild.id });
+  addMessage(conversation, posted.id, member.id);
+  answered(conversation, { persona, messageIds: [posted.id], userId: member.id, asked: true, text });
 }
 
 export async function farewell(member) {

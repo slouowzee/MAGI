@@ -28,7 +28,8 @@ afterAll(() => {
 });
 
 const { handleMessage } = await import('./handle-message.js');
-const { setActivePersonas, setMutedChannels } = await import('../server/config.js');
+const { setActivePersonas, setModules, setMutedChannels } = await import('../server/config.js');
+const { welcome } = await import('../server/welcome.js');
 
 let clock = Date.parse('2026-10-26T12:00:00Z');
 let ids = 100000000000000000n;
@@ -106,6 +107,14 @@ function world(name) {
     return users[name];
   }
   guild.ownerId = member('slou').id;
+  guild.channels = { cache: new Collection([[channel.id, channel]]) };
+  guild.systemChannel = channel;
+
+  async function join(name) {
+    tick();
+    const user = member(name);
+    await welcome({ ...guild.members.cache.get(user.id), user, guild });
+  }
 
   async function say(name, content, { replyTo, mentions = [] } = {}) {
     tick();
@@ -129,7 +138,7 @@ function world(name) {
     return message;
   }
 
-  return { say, posted, store, guild, channel };
+  return { say, join, posted, store, guild, channel };
 }
 
 const lastContext = (persona) => requests.filter((r) => r.persona === persona).at(-1)?.context ?? '';
@@ -279,4 +288,14 @@ test('changer de persona et de sujet ouvre une nouvelle conversation', async () 
   await w.say('slou', 'melchior, et leur température ?');
   expect(lastContext('melchior')).toContain('trous noirs');
   expect(lastContext('melchior')).not.toContain('dessert');
+});
+
+test("après l'accueil, le nouveau membre répond sans nommer personne et la persona qui l'a accueilli enchaîne", async () => {
+  const w = world('accueil');
+  setModules(w.guild.id, ['bienvenue', 'memoire', 'vote']);
+  await w.join('nesskuik');
+  expect(w.posted.at(-1).persona).toBe('balthasar');
+  const reponse = await w.say('nesskuik', "salut, j'arrive pour parler de dev");
+  expect(reponse.answers.map((a) => a.persona)).toEqual(['balthasar']);
+  expect(lastContext('balthasar')).toContain("nesskuik : salut, j'arrive pour parler de dev");
 });
