@@ -199,12 +199,14 @@ export async function refreshPanel(guild, { repost = false } = {}) {
 
 export async function setupGuild(guild) {
   await installAndReport(guild);
-  await refreshPanel(guild).catch((err) => log.err('config', `panneau de config impossible : ${err.message}`, { guild }));
+  await refreshPanel(guild).catch((err) => log.err('config', `échec panneau : ${err.message}`, { guild }));
 }
 
 export function isPanelInteraction(customId) {
   return customId.startsWith(PREFIX);
 }
+
+const FIELD_LABELS = { modules: 'modules', personas: 'personas', moderation: 'modération', muted: 'salons muets', interventions: 'salons des interventions', welcome: 'salon de bienvenue', log_level: 'niveau des logs' };
 
 const APPLY = {
   modules: { section: 'modules', apply: (guild, values) => setModules(guild.id, values) },
@@ -221,13 +223,14 @@ export async function handlePanelInteraction(interaction) {
   const field = interaction.customId.slice(PREFIX.length);
   const ephemeral = (content) => interaction.reply({ content: content.slice(0, 2000), flags: MessageFlags.Ephemeral, ...silent });
   if (!isOperator(member)) return ephemeral('Ce panneau est réservé aux opérateurs MAGI.');
-  const changed = (text) => log.notice('config', `${text} (par ${member.user.tag})`, { guild });
+  const changed = (text) => log.notice('config', `${text} par ${member.user.tag}`, { guild });
 
   if (APPLY[field]) {
     const { section, apply } = APPLY[field];
     apply(guild, interaction.values ?? []);
     await interaction.update(panelSection(guild, section));
-    return changed(`${field} → ${(interaction.values ?? []).join(', ') || 'aucun'}`);
+    const values = (interaction.values ?? []).map((v) => (interaction.isChannelSelectMenu?.() ? `<#${v}>` : v));
+    return changed(`${FIELD_LABELS[field] ?? field} = ${values.join(', ') || 'aucun'}`);
   }
   if (field === 'audit') return ephemeral(auditReport(guild));
   if (field === 'backup') {

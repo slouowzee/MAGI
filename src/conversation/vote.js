@@ -80,7 +80,7 @@ export async function runVote(message, question, personas = Object.keys(PERSONAS
     const votes = await Promise.all(personas.map((persona) => castVote(persona, question)));
     for (const [i, vote] of votes.entries()) await speak(message.channel, vote.persona, formatVote(vote), { replyTo: i === 0 ? message : undefined });
     const result = tally(votes);
-    log.info('vote', `${votes.map((v) => `${v.persona}=${v.verdict}`).join(', ')} → résolution ${result.outcome}`, { channel: message.channel });
+    log.info('vote', `${votes.map((v) => `${v.persona}=${v.verdict}`).join(' ')} → ${result.outcome}`, { channel: message.channel });
     await message.channel.send({ content: announcement(result), allowedMentions: { parse: [] } });
     for (const persona of result.minority) {
       const line = await minorityOpinion(persona, question, result);

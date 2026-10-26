@@ -141,16 +141,17 @@ export function statusReport(steps) {
 
 export async function installAndReport(guild) {
   if (!atLeast(guild.members.me.permissions, 'gestion')) {
-    log.info('installation', 'en attente du niveau de permissions Gestion', { guild });
+    log.info('installation', 'en attente du niveau Gestion', { guild });
     return null;
   }
   try {
     const result = await install(guild);
-    if (result.created.length || !result.ok) log.notice('installation', installReport(result, guild), { guild });
-    else log.info('installation', 'rien à créer, administration activée', { guild });
+    const admin = result.ok ? 'administration activée' : `administration désactivée : placer ${result.role} au-dessus de ${guild.members.me.roles.highest} (Paramètres → Rôles)`;
+    if (result.created.length || !result.ok) log.notice('installation', `${result.created.length ? `créé : ${result.created.join(', ')}` : 'à jour'}, ${admin}`, { guild });
+    else log.info('installation', `à jour, ${admin}`, { guild });
     return result;
   } catch (err) {
-    log.err('installation', `installation impossible : ${err.message}`, { guild });
+    log.err('installation', `échec : ${err.message}`, { guild });
     return null;
   }
 }

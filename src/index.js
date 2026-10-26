@@ -17,7 +17,7 @@ import { followHostJournal } from './logging/host.js';
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
-  log.emerg('bot', 'DISCORD_TOKEN manquant (voir .env.example)');
+  log.emerg('bot', 'DISCORD_TOKEN manquant');
   process.exit(1);
 }
 
@@ -34,16 +34,16 @@ const client = new Client({
 client.once(Events.ClientReady, async (c) => {
   await attachDiscord(c);
   for (const guild of c.guilds.cache.values()) await setupGuild(guild);
-  log.notice('bot', `démarré : connecté en tant que ${c.user.tag} sur ${c.guilds.cache.size} serveur(s), Gemini ${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'} puis ${process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite'}`);
+  log.notice('bot', `démarré : ${c.user.tag}, ${c.guilds.cache.size} serveur(s), ${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'} + ${process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite'}`);
   followHostJournal();
-  await catchUp(c).catch((err) => log.err('rattrapage', `rattrapage impossible : ${err.message}`));
+  await catchUp(c).catch((err) => log.err('rattrapage', `échec : ${err.message}`));
   startReminders(c);
   startConversationSweeper(c);
   startBackups(c);
 });
 
 client.on(Events.GuildCreate, setupGuild);
-client.on(Events.GuildMemberAdd, (member) => welcome(member).catch((err) => log.err('membres', `bienvenue : ${err.message}`, { guild: member.guild })));
+client.on(Events.GuildMemberAdd, (member) => welcome(member).catch((err) => log.err('membres', `échec bienvenue : ${err.message}`, { guild: member.guild })));
 client.on(Events.GuildMemberRemove, (member) => farewell(member).catch(() => {}));
 client.on(Events.GuildRoleUpdate, (before, after) => {
   if (after.tags?.botId === client.user.id && before.permissions.bitfield !== after.permissions.bitfield) setupGuild(after.guild);
@@ -69,6 +69,6 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   });
 }
 
-process.on('unhandledRejection', (err) => log.err('bot', `erreur non gérée : ${err?.stack ?? err}`));
+process.on('unhandledRejection', (err) => log.err('bot', `rejet non géré : ${err?.stack ?? err}`));
 
 await client.login(token);

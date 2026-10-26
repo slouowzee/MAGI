@@ -49,16 +49,16 @@ export async function watchAuditLog(entry, guild) {
   const done = [];
   if (member) {
     const removable = member.roles.cache.filter((r) => r.id !== guild.id && !r.managed && r.editable);
-    if (removable.size) await member.roles.remove(removable, reason).then(() => done.push(`rôles retirés : ${removable.map((r) => r.name).join(', ')}`)).catch(() => {});
+    if (removable.size) await member.roles.remove(removable, reason).then(() => done.push(`rôles retirés (${removable.map((r) => r.name).join(', ')})`)).catch(() => {});
     if (member.user.bot && member.kickable) await member.kick(reason).then(() => done.push('bot expulsé')).catch(() => {});
   }
   const operators = operatorRole(guild);
   log.alert(
     'antinuke',
     [
-      `<@${entry.executorId}> a fait trop de ${kind} en moins d'une minute`,
-      done.length ? `mesures prises : ${done.join(' ; ')}` : 'aucune mesure possible : son rôle est au-dessus de celui de MAGI, retire-lui ses permissions à la main',
-      "sauvegardes automatiques gelées 7 jours pour garder l'état d'avant : demande à MAGI de restaurer la structure si besoin",
+      `${kind} en masse par <@${entry.executorId}> en moins d'1 min`,
+      `mesures : ${done.length ? done.join(', ') : 'aucune, rôle au-dessus de MAGI'}`,
+      'sauvegardes gelées 7 j',
     ].join('\n'),
     { guild, mention: { users: [guild.ownerId], roles: operators ? [operators.id] : [] } },
   );

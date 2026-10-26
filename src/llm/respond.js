@@ -19,11 +19,11 @@ export async function respond({ messages, options, member, message }) {
       const key = `${call.name} ${JSON.stringify(call.args)}`;
       const repeated = done.has(key);
       done.add(key);
-      log.info('outils', `outil demandé par le modèle : ${call.name} ${JSON.stringify(call.args)}${repeated ? ' (répété, ignoré)' : ''}`, { channel: message?.channel });
+      log.info('outils', `appel ${call.name} ${JSON.stringify(call.args)}${repeated ? ' (doublon ignoré)' : ''}`, { channel: message?.channel });
       const output = repeated ? 'Cet appel identique a déjà été fait : ne le refais pas, passe à la suite ou réponds.' : await runTool(call, { member, message, actions });
       messages.push({ role: 'tool', tool_call_id: call.id, name: call.name, content: String(output) });
     }
   }
-  log.warning('outils', `limite de sécurité de ${SAFETY_ROUNDS} allers-retours atteinte`, { channel: message?.channel });
+  log.warning('outils', `limite de ${SAFETY_ROUNDS} allers-retours atteinte`, { channel: message?.channel });
   return { ...(await chat({ messages, options, ...forReply() })), actions };
 }

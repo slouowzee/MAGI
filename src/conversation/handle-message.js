@@ -46,7 +46,7 @@ export async function handleMessage(message, { catchUp = false } = {}) {
   let { conversation } = found;
   if (!trigger) {
     if (conversation) addMessage(conversation, message.id, message.author.id, now, line);
-    else if (!catchUp) await maybeIntervene(message).catch((err) => log.err('conversation', `intervention spontanée impossible : ${err.message}`, { channel: message.channel }));
+    else if (!catchUp) await maybeIntervene(message).catch((err) => log.err('conversation', `échec intervention : ${err.message}`, { channel: message.channel }));
     return;
   }
 
@@ -72,13 +72,13 @@ export async function handleMessage(message, { catchUp = false } = {}) {
   const allowed = activePersonas(message.guild.id);
   const group = addressedPersonas(message.content).filter((p) => allowed.includes(p));
   if (voting && group.length >= 2 && VOTE_INTENT.test(message.content)) {
-    log.info('vote', `vote entre ${group.join(', ')} demandé par ${message.author.tag}`, where);
+    log.info('vote', `demandé par ${message.author.tag} : ${group.join(', ')}`, where);
     return runVote(message, message.content, group);
   }
 
   const switching = found.by === 'author' && allowed.includes(trigger.persona) && !conversation.personas.has(trigger.persona);
   if (switching && (await startsNewTopic(conversation.lines, message.content))) {
-    log.debug('conversation', `nouveau sujet pour ${message.author.tag}, nouvelle conversation`, where);
+    log.debug('conversation', `nouveau sujet, conversation ouverte pour ${message.author.tag}`, where);
     conversation = null;
   }
   const current = conversation ?? openConversation({ channelId, guildId: message.guild.id }, now);
@@ -87,11 +87,11 @@ export async function handleMessage(message, { catchUp = false } = {}) {
   if (!persona) {
     const pick = await pickPersona(question, current.persona, allowed);
     if (pick.vote && voting) {
-      log.info('vote', `vote détecté dans le message de ${message.author.tag}`, where);
+      log.info('vote', `détecté chez ${message.author.tag}`, where);
       return runVote(message, question);
     }
     persona = pick.persona ?? randomPersona(Math.random, allowed);
-    log.debug('conversation', `persona choisie : ${persona} (${pick.reason})`, where);
+    log.debug('conversation', `routage : ${persona} (${pick.reason})`, where);
   }
   const length = wantsDetail(trigger.text) ? 'detaillee' : 'courte';
   const typing = setInterval(() => message.channel.sendTyping().catch(() => {}), 8_000);
@@ -106,7 +106,7 @@ export async function handleMessage(message, { catchUp = false } = {}) {
       message,
     });
     clearInterval(typing);
-    log.info('conversation', `${message.author.tag} → ${persona}, conversation n°${current.id} (${current.participants.size} participant(s)), ${model}, ${((Date.now() - started) / 1000).toFixed(1)} s`, where);
+    log.info('conversation', `${message.author.tag} → ${persona}, conv ${current.id}, ${model}, ${((Date.now() - started) / 1000).toFixed(1)} s`, where);
     const cleaned = cleanReply(reply);
     const parts = splitMessage(cleaned).filter(Boolean);
     const sent = [];
@@ -118,7 +118,7 @@ export async function handleMessage(message, { catchUp = false } = {}) {
     }
     answered(current, { persona, messageIds: sent, userId: message.author.id, asked: cleaned.endsWith('?'), text: cleaned });
   } catch (err) {
-    log.err('conversation', `réponse de ${persona} à ${message.author.tag} impossible : ${err.message}`, where);
+    log.err('conversation', `échec ${persona} → ${message.author.tag} : ${err.message}`, where);
     if (err instanceof LLMUnavailable) await speak(message.channel, 'melchior', 'Unité hors ligne.').catch(() => {});
   } finally {
     clearInterval(typing);

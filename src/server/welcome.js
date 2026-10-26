@@ -15,7 +15,7 @@ function welcomeChannel(guild) {
 
 export async function welcome(member) {
   const { guild } = member;
-  log.notice('membres', `arrivée de ${member.user.tag} (${member.id}), compte créé le <t:${Math.floor(member.user.createdTimestamp / 1000)}>`, { guild });
+  log.notice('membres', `arrivée ${member.user.tag} (${member.id}), compte du <t:${Math.floor(member.user.createdTimestamp / 1000)}>`, { guild });
   if (member.user.bot || !moduleEnabled(guild.id, 'bienvenue')) return;
   const channel = welcomeChannel(guild);
   if (!channel) return;
@@ -35,7 +35,7 @@ export async function welcome(member) {
     });
     text = cleanReply(content) || text;
   } catch {}
-  const posted = await speak(channel, persona, `<@${member.id}> ${text}`, { mentions: [member.id] }).catch((err) => log.err('membres', `message de bienvenue impossible : ${err.message}`, { guild, channel }));
+  const posted = await speak(channel, persona, `<@${member.id}> ${text}`, { mentions: [member.id] }).catch((err) => log.err('membres', `échec bienvenue : ${err.message}`, { guild, channel }));
   if (!posted) return;
   rememberAnswer(posted, member.displayName);
   const conversation = openConversation({ channelId: channel.id, guildId: guild.id });
@@ -45,6 +45,6 @@ export async function welcome(member) {
 
 export async function farewell(member) {
   const { guild } = member;
-  const since = member.joinedTimestamp ? `, arrivé le <t:${Math.floor(member.joinedTimestamp / 1000)}>` : '';
-  log.notice('membres', `départ de ${member.user.tag} (${member.id})${since}`, { guild });
+  const since = member.joinedTimestamp ? `, membre depuis le <t:${Math.floor(member.joinedTimestamp / 1000)}>` : '';
+  log.notice('membres', `départ ${member.user.tag} (${member.id})${since}`, { guild });
 }

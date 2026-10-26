@@ -41,7 +41,7 @@ export function reportFailures() {
   const [ip, count] = [...failures].sort((a, b) => b[1] - a[1])[0];
   const addresses = failures.size;
   failures.clear();
-  return log.warning('sshd', `${total} échec(s) de connexion SSH en 10 min depuis ${addresses} adresse(s), dont ${count} depuis ${ip}`, { host: 'vps' });
+  return log.warning('sshd', `${total} échec(s) d'authentification en 10 min, ${addresses} IP, max ${ip} (${count})`, { host: 'vps' });
 }
 
 export function handleLine(line) {
@@ -67,13 +67,13 @@ export function handleLine(line) {
 }
 
 export function followHostJournal(path = PATH) {
-  if (!existsSync(path)) return log.info('journal', `journal du VPS absent (${path}), non suivi`);
-  log.info('journal', `suivi du journal du VPS (${path})`);
+  if (!existsSync(path)) return log.info('journal', `${path} absent, journal du VPS non suivi`);
+  log.info('journal', `suivi de ${path}`);
   const open = async () => {
     try {
       for await (const line of createInterface({ input: createReadStream(path), crlfDelay: Infinity })) handleLine(line);
     } catch (err) {
-      log.warning('journal', `lecture du journal du VPS interrompue : ${err.message}`);
+      log.warning('journal', `lecture interrompue : ${err.message}`);
     }
     setTimeout(open, 5_000);
   };

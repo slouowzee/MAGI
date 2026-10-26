@@ -43,7 +43,7 @@ test('extraction des domaines', () => {
 test('barème : avertissement, exclusion 1 h, puis exclusion 24 h et vote ; flagrant = exclusion immédiate', async () => {
   process.env.DB_PATH = ':memory:';
   const { decide } = await import('./index.js');
-  assert.deepEqual(decide('suspect', 1), { label: 'suppression et avertissement', warn: true });
+  assert.deepEqual(decide('suspect', 1), { label: 'suppression + avertissement', warn: true });
   assert.equal(decide('suspect', 2).timeout, 3_600_000);
   assert.equal(decide('suspect', 3).vote, true);
   assert.equal(decide('suspect', 3).timeout, 24 * 3_600_000);

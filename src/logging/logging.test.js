@@ -108,7 +108,7 @@ test('journal du VPS : doublons ignorés, échecs SSH résumés', () => {
   ]);
   const summary = reportFailures();
   expect(summary.level).toBe('warning');
-  expect(summary.message).toBe('3 échec(s) de connexion SSH en 10 min depuis 2 adresse(s), dont 2 depuis 5.6.7.8');
+  expect(summary.message).toBe("3 échec(s) d'authentification en 10 min, 2 IP, max 5.6.7.8 (2)");
   expect(reportFailures()).toBeNull();
 });
 

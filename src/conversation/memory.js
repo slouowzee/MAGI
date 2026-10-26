@@ -44,9 +44,9 @@ export async function summarizeConversation(client, conversation) {
       options: { num_predict: 150, temperature: 0.2 },
     });
     saveSummary(conversation.guildId, conversation.channelId, [...conversation.participants], content);
-    log.debug('memoire', `résumé de la conversation n°${conversation.id} enregistré (${conversation.participants.size} participant(s))`);
+    log.debug('memoire', `résumé conv ${conversation.id} enregistré`);
   } catch (err) {
-    log.warning('memoire', `résumé de la conversation n°${conversation.id} impossible : ${err.message}`);
+    log.warning('memoire', `échec résumé conv ${conversation.id} : ${err.message}`);
   }
 }
 

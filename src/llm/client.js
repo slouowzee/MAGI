@@ -23,10 +23,16 @@ async function post(url, headers, body, timeoutMs) {
     });
   } catch (err) {
     const timedOut = err.name === 'TimeoutError';
-    throw Object.assign(new LLMUnavailable(timedOut ? `pas de réponse en ${timeoutMs / 1000} s` : err.message), { timedOut });
+    throw Object.assign(new LLMUnavailable(timedOut ? `délai de ${Math.round(timeoutMs / 100) / 10} s dépassé` : err.message), { timedOut });
   }
   if (!res.ok) {
-    const error = new LLMUnavailable(`HTTP ${res.status} : ${(await res.text()).slice(0, 200)}`);
+    const body = await res.text();
+    let detail;
+    try {
+      const parsed = JSON.parse(body);
+      detail = (Array.isArray(parsed) ? parsed[0] : parsed)?.error?.status;
+    } catch {}
+    const error = new LLMUnavailable(`HTTP ${res.status} ${detail ?? body.replace(/\s+/g, ' ').slice(0, 120)}`);
     error.status = res.status;
     throw error;
   }
@@ -80,7 +86,7 @@ async function geminiWithMedia(args) {
   } catch (err) {
     const lighter = err.status === 400 && (hideMedia(args.messages, isVideo) || hideMedia(args.messages, isMedia));
     if (!lighter) throw err;
-    log.info('llm', `${args.model} refuse un média (${err.message.replace(/\s+/g, ' ')}), nouvel essai sans`);
+    log.info('llm', `${args.model} : média refusé (${err.message}), renvoi sans`);
     return geminiWithMedia({ ...args, messages: lighter });
   }
 }
@@ -109,7 +115,7 @@ export async function chat({ messages, format, options, tools, model, reasoning,
   for (const delay of [0, ...GEMINI_RETRY_DELAYS]) {
     if (delay) {
       if (Date.now() + delay >= deadline) break;
-      log.notice('llm', `Gemini indisponible, nouvel essai dans ${delay / 1000} s`);
+      log.notice('llm', `aucun modèle disponible, nouvel essai dans ${delay / 1000} s`);
       await Bun.sleep(delay);
     }
     const candidates = geminiModels(model);
@@ -125,7 +131,7 @@ export async function chat({ messages, format, options, tools, model, reasoning,
         if (err.timedOut || err.status === 429 || err.status >= 500) geminiPausedUntil.set(candidate, Date.now() + GEMINI_COOLDOWN);
         transient ||= !(err.status >= 400 && err.status < 500) || err.status === 429;
         failure = err;
-        log.info('llm', `${candidate} indisponible (${err.message.replace(/\s+/g, ' ')})`);
+        log.info('llm', `${candidate} : ${err.message}`);
       }
     }
     if (!transient) break;

@@ -24,5 +24,5 @@ export async function catchUp(client, now = Date.now()) {
       }
     }
   }
-  if (handled) log.notice('rattrapage', `${handled} message(s) envoyé(s) pendant le redémarrage`);
+  if (handled) log.notice('rattrapage', `${handled} message(s) reçu(s) pendant le redémarrage`);
 }
