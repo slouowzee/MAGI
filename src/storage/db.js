@@ -67,3 +67,9 @@ db.exec(`CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL,
   PRIMARY KEY (guild_id, key)
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS backups (
+  id INTEGER PRIMARY KEY,
+  guild_id TEXT NOT NULL,
+  data TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+)`);

@@ -9,6 +9,8 @@ import { installAndReport } from './server/installation.js';
 import { startReminders } from './tools/reminders.js';
 import { startConversationSweeper } from './conversation/memory.js';
 import { db } from './storage/db.js';
+import { watchAuditLog } from './security/antinuke.js';
+import { startBackups } from './security/backup.js';
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -21,6 +23,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildModeration,
   ],
 });
 
@@ -29,6 +32,7 @@ client.once(Events.ClientReady, async (c) => {
   for (const guild of c.guilds.cache.values()) await installAndReport(guild);
   startReminders(c);
   startConversationSweeper(c);
+  startBackups(c);
   if (process.env.GEMINI_API_KEY) {
     console.log(`LLM : Gemini (${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'}), Ollama en secours`);
     return;
@@ -41,6 +45,7 @@ client.once(Events.ClientReady, async (c) => {
 });
 
 client.on(Events.GuildCreate, installAndReport);
+client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => watchAuditLog(entry, guild).catch((err) => console.error('anti-nuke :', err.message)));
 client.on(Events.InteractionCreate, (interaction) =>
   interaction.isButton() && isRoleButton(interaction.customId) ? handleRoleButton(interaction) : handleInteraction(interaction),
 );
