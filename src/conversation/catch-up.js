@@ -18,6 +18,8 @@ export async function catchUp(client, now = Date.now()) {
       const lastAnswer = messages.findLastIndex((m) => personaOf(m) || m.author.id === client.user.id);
       for (const message of messages.slice(lastAnswer + 1)) {
         if (message.author.bot || message.webhookId) continue;
+        if (!message.member) await guild.members.fetch(message.author.id).catch(() => null);
+        if (!message.member) continue;
         handled++;
         if (await moderate(message).catch(() => false)) continue;
         await handleMessage(message, { catchUp: true }).catch((err) => log.err('rattrapage', err.message, { channel }));
