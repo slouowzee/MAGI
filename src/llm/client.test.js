@@ -10,7 +10,15 @@ beforeEach(() => {
 let geminiResponse = () => Response.json({ choices: [{ message: { content: 'gemini ok' } }] });
 const realFetch = globalThis.fetch;
 const ok = (content) => Response.json({ choices: [{ message: { content } }] });
+const others = [];
+let otherResponse = (url) => ok(String(url).includes('mistral') ? 'mistral ok' : 'groq ok');
 globalThis.fetch = (url, init) => {
+  if (/api\.(mistral\.ai|groq\.com)/.test(String(url))) {
+    const body = JSON.parse(init.body);
+    others.push({ url: String(url), body });
+    calls.push(String(url).includes('mistral') ? 'mistral' : 'groq');
+    return Promise.resolve(otherResponse(url, body));
+  }
   if (String(url).startsWith('https://generativelanguage.googleapis.com')) {
     calls.push('gemini');
     return new Promise((resolve, reject) => {
@@ -165,5 +173,41 @@ test('un modèle qui échoue encore est mis en pause plus longtemps', async () =
   assert.deepEqual(seen, ['sature-a', 'stable-b', 'sature-a', 'stable-b', 'stable-b', 'sature-a', 'stable-b']);
   delete process.env.GEMINI_MODEL;
   delete process.env.GEMINI_BACKUP_MODEL;
+  geminiResponse = () => ok('gemini ok');
+});
+
+test('Gemini saturé : Mistral puis Groq prennent le relais, chacun avec ce qu’il sait lire', async () => {
+  process.env.GEMINI_API_KEY = 'test';
+  process.env.GEMINI_MODEL = 'plein-a';
+  process.env.GEMINI_BACKUP_MODEL = 'plein-b';
+  process.env.MISTRAL_API_KEY = 'test';
+  process.env.GROQ_API_KEY = 'test';
+  others.length = 0;
+  geminiResponse = () => new Response('high demand', { status: 503 });
+  const content = [
+    { type: 'text', text: 'regarde' },
+    { type: 'image_url', image_url: { url: 'data:video/mp4;base64,AAAA' } },
+    { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } },
+  ];
+  const history = [
+    { role: 'user', content },
+    { role: 'assistant', content: '', tool_calls: [{ id: 'call_tres_long_1', type: 'function', function: { name: 'x', arguments: '{}' }, extra_content: { google: { thought_signature: 's' } } }] },
+    { role: 'tool', tool_call_id: 'call_tres_long_1', name: 'x', content: 'fait' },
+  ];
+  const r = await chat({ messages: history, options: { num_predict: 200 } });
+  assert.deepEqual([r.content, r.model], ['mistral ok', 'mistral-small-latest']);
+  const mistral = others[0].body;
+  assert.deepEqual(mistral.messages[0].content.map((p) => p.type), ['text', 'text', 'image_url']);
+  assert.equal(mistral.messages[1].tool_calls[0].extra_content, undefined);
+  assert.match(mistral.messages[1].tool_calls[0].id, /^[0-9a-z]{9}$/);
+  assert.equal(mistral.messages[2].tool_call_id, mistral.messages[1].tool_calls[0].id);
+  otherResponse = (url) => (String(url).includes('mistral') ? new Response('limite', { status: 429 }) : ok('groq ok'));
+  const g = await chat({ messages: [{ role: 'user', content }], options: { num_predict: 200 } });
+  assert.deepEqual([g.content, g.model], ['groq ok', 'openai/gpt-oss-120b']);
+  const groq = others.at(-1).body;
+  assert.deepEqual(groq.messages[0].content.map((p) => p.type), ['text', 'text', 'text']);
+  assert.deepEqual([groq.reasoning_effort, groq.include_reasoning, groq.max_tokens], ['low', false, 1224]);
+  for (const key of ['GEMINI_MODEL', 'GEMINI_BACKUP_MODEL', 'MISTRAL_API_KEY', 'GROQ_API_KEY']) delete process.env[key];
+  otherResponse = (url) => ok(String(url).includes('mistral') ? 'mistral ok' : 'groq ok');
   geminiResponse = () => ok('gemini ok');
 });

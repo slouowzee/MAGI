@@ -3,23 +3,47 @@ import { log } from '../logging/log.js';
 export class LLMUnavailable extends Error {}
 export class ContentRefused extends Error {}
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
-const GEMINI_COOLDOWN = 60_000;
-const GEMINI_PATIENCE = 12_000;
-const GEMINI_RETRY_DELAYS = [2_000, 5_000];
-
-const geminiPausedUntil = new Map();
-const geminiStrikes = new Map();
+const COOLDOWN = 60_000;
 const MAX_COOLDOWN = 30 * 60_000;
+const PATIENCE = 12_000;
+const RETRY_DELAYS = [2_000, 5_000];
 
-function pause(model) {
-  const strikes = (geminiStrikes.get(model) ?? 0) + 1;
-  geminiStrikes.set(model, strikes);
-  geminiPausedUntil.set(model, Date.now() + Math.min(GEMINI_COOLDOWN * 2 ** (strikes - 1), MAX_COOLDOWN));
+const PROVIDERS = {
+  gemini: {
+    url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    key: 'GEMINI_API_KEY',
+    models: () => [process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite', process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite'],
+    media: 'video',
+  },
+  mistral: {
+    url: 'https://api.mistral.ai/v1/chat/completions',
+    key: 'MISTRAL_API_KEY',
+    models: () => [process.env.MISTRAL_MODEL || 'mistral-small-latest'],
+    media: 'image',
+    shortToolIds: true,
+  },
+  groq: {
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    key: 'GROQ_API_KEY',
+    models: () => [process.env.GROQ_MODEL || 'openai/gpt-oss-120b'],
+    media: 'none',
+    thinking: (model) => (model.includes('gpt-oss') ? { body: { reasoning_effort: 'low', include_reasoning: false }, tokens: 1024 } : null),
+  },
+};
+
+const pausedUntil = new Map();
+const strikes = new Map();
+
+function pause(id) {
+  const count = (strikes.get(id) ?? 0) + 1;
+  strikes.set(id, count);
+  pausedUntil.set(id, Date.now() + Math.min(COOLDOWN * 2 ** (count - 1), MAX_COOLDOWN));
 }
-const defaultModel = () => process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
-const backupModel = () => process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite';
+
 export const forReply = () => (process.env.GEMINI_REPLY_MODEL ? { model: process.env.GEMINI_REPLY_MODEL, reasoning: 'none' } : {});
+export const activeProviders = () => Object.keys(PROVIDERS).filter((name) => process.env[PROVIDERS[name].key]);
+export const llmChain = () => activeProviders().map((name) => `${name} (${PROVIDERS[name].models().join(', ')})`).join(' → ');
+
 async function post(url, headers, body, timeoutMs) {
   let res;
   try {
@@ -47,28 +71,6 @@ async function post(url, headers, body, timeoutMs) {
   return res.json();
 }
 
-function forGemini(messages) {
-  return messages.map(({ name, ...m }) => m);
-}
-
-async function gemini({ messages, format, options = {}, tools, model, reasoning, timeoutMs }) {
-  const body = {
-    model,
-    messages: forGemini(messages),
-    max_tokens: options.num_predict,
-    temperature: options.temperature,
-  };
-  if (format) body.response_format = { type: 'json_schema', json_schema: { name: 'reponse', schema: format } };
-  if (reasoning) body.reasoning_effort = reasoning;
-  if (tools?.length) body.tools = tools;
-  const data = await post(GEMINI_URL, { Authorization: `Bearer ${process.env.GEMINI_API_KEY}` }, body, timeoutMs);
-  const choice = data.choices?.[0];
-  const message = choice?.message;
-  if (choice?.finish_reason === 'content_filter') throw new ContentRefused('réponse bloquée par le filtre de Gemini');
-  if (!message || (typeof message.content !== 'string' && !message.tool_calls?.length)) throw new LLMUnavailable(`réponse Gemini vide (${choice?.finish_reason ?? 'sans motif'})`);
-  return { role: 'assistant', content: message.content ?? '', ...(message.tool_calls?.length ? { tool_calls: message.tool_calls } : {}) };
-}
-
 const isMedia = (p) => p.type === 'image_url';
 const isVideo = (p) => isMedia(p) && p.image_url.url.startsWith('data:video/');
 
@@ -88,14 +90,50 @@ function hideMedia(messages, hidden) {
   return found && out;
 }
 
-async function geminiWithMedia(args) {
+const shortId = (id) => Bun.hash(String(id)).toString(36).padStart(9, '0').slice(-9);
+
+function forProvider(provider, messages) {
+  let out = messages.map(({ name, ...m }) => (m.tool_calls ? { ...m, tool_calls: m.tool_calls.map(({ extra_content, ...c }) => (provider.media === 'video' ? { ...c, extra_content } : c)) } : m));
+  if (provider.media === 'image') out = hideMedia(out, isVideo) || out;
+  if (provider.media === 'none') out = hideMedia(out, isMedia) || out;
+  if (provider.shortToolIds) {
+    out = out.map((m) => {
+      if (m.tool_calls) return { ...m, tool_calls: m.tool_calls.map((c) => ({ ...c, id: shortId(c.id) })) };
+      return m.role === 'tool' ? { ...m, tool_call_id: shortId(m.tool_call_id) } : m;
+    });
+  }
+  return out;
+}
+
+async function complete(name, { messages, format, options = {}, tools, model, reasoning, timeoutMs }) {
+  const provider = PROVIDERS[name];
+  const thinking = provider.thinking?.(model);
+  const body = {
+    model,
+    messages: forProvider(provider, messages),
+    max_tokens: options.num_predict ? options.num_predict + (thinking?.tokens ?? 0) : undefined,
+    temperature: options.temperature,
+    ...thinking?.body,
+  };
+  if (format) body.response_format = { type: 'json_schema', json_schema: { name: 'reponse', schema: format } };
+  if (reasoning && name === 'gemini') body.reasoning_effort = reasoning;
+  if (tools?.length) body.tools = tools;
+  const data = await post(provider.url, { Authorization: `Bearer ${process.env[provider.key]}` }, body, timeoutMs);
+  const choice = data.choices?.[0];
+  const message = choice?.message;
+  if (choice?.finish_reason === 'content_filter') throw new ContentRefused(`réponse bloquée par le filtre de ${name}`);
+  if (!message || (typeof message.content !== 'string' && !message.tool_calls?.length)) throw new LLMUnavailable(`réponse vide (${choice?.finish_reason ?? 'sans motif'})`);
+  return { role: 'assistant', content: message.content ?? '', ...(message.tool_calls?.length ? { tool_calls: message.tool_calls } : {}) };
+}
+
+async function withMedia(name, args) {
   try {
-    return await gemini(args);
+    return await complete(name, args);
   } catch (err) {
     const lighter = err.status === 400 && (hideMedia(args.messages, isVideo) || hideMedia(args.messages, isMedia));
     if (!lighter) throw err;
     log.info('llm', `${args.model} : média refusé (${err.message}), renvoi sans`);
-    return geminiWithMedia({ ...args, messages: lighter });
+    return withMedia(name, { ...args, messages: lighter });
   }
 }
 
@@ -110,38 +148,42 @@ function result(message, model) {
   return { content: message.content, toolCalls, message, model };
 }
 
-function geminiModels(model) {
-  const all = [...new Set([model ?? defaultModel(), defaultModel(), backupModel()])];
-  const awake = all.filter((c) => Date.now() >= (geminiPausedUntil.get(c) ?? 0));
+function candidates(model) {
+  const all = [];
+  for (const name of activeProviders()) {
+    const models = name === 'gemini' && model ? [model, ...PROVIDERS.gemini.models()] : PROVIDERS[name].models();
+    for (const m of new Set(models)) all.push({ provider: name, model: m, id: `${name}/${m}` });
+  }
+  const awake = all.filter((c) => Date.now() >= (pausedUntil.get(c.id) ?? 0));
   return awake.length ? awake : all;
 }
 
 export async function chat({ messages, format, options, tools, model, reasoning, timeoutMs = 90_000 }) {
-  if (!process.env.GEMINI_API_KEY) throw new LLMUnavailable('GEMINI_API_KEY manquante');
+  if (!activeProviders().length) throw new LLMUnavailable('aucune clé de LLM configurée');
   const deadline = Date.now() + timeoutMs;
-  let failure = new LLMUnavailable('Gemini indisponible');
-  for (const delay of [0, ...GEMINI_RETRY_DELAYS]) {
+  let failure = new LLMUnavailable('aucun modèle disponible');
+  for (const delay of [0, ...RETRY_DELAYS]) {
     if (delay) {
       if (Date.now() + delay >= deadline) break;
       log.notice('llm', `aucun modèle disponible, nouvel essai dans ${delay / 1000} s`);
       await Bun.sleep(delay);
     }
-    const candidates = geminiModels(model);
+    const list = candidates(model);
     let transient = false;
-    for (const [i, candidate] of candidates.entries()) {
+    for (const [i, candidate] of list.entries()) {
       const left = deadline - Date.now();
       if (left <= 0) break;
-      const patience = i < candidates.length - 1 ? Math.min(GEMINI_PATIENCE, timeoutMs / 3) : 60_000;
+      const patience = i < list.length - 1 ? Math.min(PATIENCE, timeoutMs / 3) : 60_000;
       try {
-        const answer = await geminiWithMedia({ messages, format, options, tools, model: candidate, reasoning: candidate === model ? reasoning : undefined, timeoutMs: Math.min(left, patience) });
-        geminiStrikes.delete(candidate);
-        return result(answer, candidate);
+        const answer = await withMedia(candidate.provider, { messages, format, options, tools, model: candidate.model, reasoning: candidate.model === model ? reasoning : undefined, timeoutMs: Math.min(left, patience) });
+        strikes.delete(candidate.id);
+        return result(answer, candidate.model);
       } catch (err) {
         if (err instanceof ContentRefused) throw err;
-        if (err.timedOut || err.status === 429 || err.status >= 500) pause(candidate);
+        if (err.timedOut || err.status === 429 || err.status >= 500) pause(candidate.id);
         transient ||= !(err.status >= 400 && err.status < 500) || err.status === 429;
         failure = err;
-        log.info('llm', `${candidate} : ${err.message}`);
+        log.info('llm', `${candidate.model} : ${err.message}`);
       }
     }
     if (!transient) break;

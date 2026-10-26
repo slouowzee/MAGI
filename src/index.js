@@ -12,6 +12,7 @@ import { watchAuditLog } from './security/antinuke.js';
 import { startBackups } from './security/backup.js';
 import { catchUp } from './conversation/catch-up.js';
 import { log } from './logging/log.js';
+import { llmChain } from './llm/client.js';
 import { attachDiscord, flushAll } from './logging/discord.js';
 import { followHostJournal } from './logging/host.js';
 
@@ -34,7 +35,7 @@ const client = new Client({
 client.once(Events.ClientReady, async (c) => {
   await attachDiscord(c);
   for (const guild of c.guilds.cache.values()) await setupGuild(guild);
-  log.notice('bot', `démarré : ${c.user.tag}, ${c.guilds.cache.size} serveur(s), ${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'} + ${process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite'}`);
+  log.notice('bot', `démarré : ${c.user.tag}, ${c.guilds.cache.size} serveur(s), LLM ${llmChain() || 'aucun'}`);
   followHostJournal();
   await catchUp(c).catch((err) => log.err('rattrapage', `échec : ${err.message}`));
   startReminders(c);
