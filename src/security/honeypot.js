@@ -4,7 +4,8 @@ import { setSetting, setting } from '../storage/settings.js';
 const NAME = '🍯・honeypot';
 const OLD_NAMES = ['ne-pas-écrire-ici', '⛔・ne-pas-écrire'];
 const TOPIC = '🍯 Piège à bots : tout message envoyé ici entraîne un bannissement automatique.';
-const VERSION = '5';
+const VERSION = '6';
+const SEPARATOR = '────────────────────────';
 
 export function warning(guild) {
   const count = Number(setting(guild.id, 'honeypot_count') ?? 0);
@@ -13,7 +14,9 @@ export function warning(guild) {
     .setDescription(
       [
         "# N'écrivez rien ici",
+        SEPARATOR,
         '### Ce salon est un piège à bots. Tout message posté ici entraîne un bannissement immédiat et la suppression des messages des dernières 24 heures.',
+        SEPARATOR,
         `## Déclenché ${count} fois`,
       ].join('\n'),
     );
