@@ -1,5 +1,5 @@
 import { PERSONAS } from '../personas.js';
-import { chat } from '../llm/client.js';
+import { chat, forReply } from '../llm/client.js';
 import { cleanReply, systemPrompt } from '../llm/prompts.js';
 import { speak } from '../discord/webhooks.js';
 
@@ -43,6 +43,7 @@ export async function castVote(persona, question) {
       ],
       format: VOTE_FORMAT,
       options: { num_predict: 200 },
+      ...forReply(),
     });
     const { avis, verdict } = JSON.parse(content);
     return { persona, avis: cleanReply(avis), verdict: VERDICTS.includes(verdict) ? verdict : 'ABSTENTION' };
@@ -59,6 +60,7 @@ export async function minorityOpinion(persona, question, result) {
         { role: 'user', content: `La résolution « ${question} » a été ${result.outcome} contre ton avis. Ajoute une seule phrase d'avis minoritaire, avec ta voix.` },
       ],
       options: { num_predict: 80 },
+      ...forReply(),
     });
     return cleanReply(content);
   } catch {

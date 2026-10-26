@@ -6,6 +6,7 @@ const GEMINI_COOLDOWN = 60_000;
 
 const geminiPausedUntil = new Map();
 const defaultModel = () => process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+export const forReply = () => ({ model: process.env.GEMINI_REPLY_MODEL || 'gemini-3.5-flash', reasoning: 'none' });
 let ollamaTail = Promise.resolve();
 
 function ollamaQueue(job) {
@@ -52,7 +53,7 @@ function forOllama(messages) {
   });
 }
 
-async function gemini({ messages, format, options = {}, tools, model, timeoutMs }) {
+async function gemini({ messages, format, options = {}, tools, model, reasoning, timeoutMs }) {
   const body = {
     model,
     messages: forGemini(messages),
@@ -60,6 +61,7 @@ async function gemini({ messages, format, options = {}, tools, model, timeoutMs 
     temperature: options.temperature,
   };
   if (format) body.response_format = { type: 'json_schema', json_schema: { name: 'reponse', schema: format } };
+  if (reasoning) body.reasoning_effort = reasoning;
   if (tools?.length) body.tools = tools;
   const data = await post(GEMINI_URL, { Authorization: `Bearer ${process.env.GEMINI_API_KEY}` }, body, timeoutMs);
   const choice = data.choices?.[0];
@@ -105,12 +107,12 @@ function result(message, provider) {
   return { content: message.content, toolCalls, message, provider };
 }
 
-export async function chat({ messages, format, options, tools, model, timeoutMs = 180_000 }) {
+export async function chat({ messages, format, options, tools, model, reasoning, timeoutMs = 180_000 }) {
   if (process.env.GEMINI_API_KEY) {
     for (const candidate of new Set([model ?? defaultModel(), defaultModel()])) {
       if (Date.now() < (geminiPausedUntil.get(candidate) ?? 0)) continue;
       try {
-        return result(await gemini({ messages, format, options, tools, model: candidate, timeoutMs: Math.min(timeoutMs, 60_000) }), 'gemini');
+        return result(await gemini({ messages, format, options, tools, model: candidate, reasoning: candidate === model ? reasoning : undefined, timeoutMs: Math.min(timeoutMs, 60_000) }), 'gemini');
       } catch (err) {
         if (err instanceof ContentRefused) throw err;
         if (err.status === 429 || err.status >= 500) geminiPausedUntil.set(candidate, Date.now() + GEMINI_COOLDOWN);

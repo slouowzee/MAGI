@@ -1,4 +1,4 @@
-import { chat } from './client.js';
+import { chat, forReply } from './client.js';
 import { runTool, schemas, toolsFor } from '../tools/index.js';
 
 const SAFETY_ROUNDS = 30;
@@ -11,7 +11,7 @@ export async function respond({ messages, options, member, message }) {
   const actions = [];
   const done = new Set();
   for (let round = 0; round < SAFETY_ROUNDS; round++) {
-    const last = await chat({ messages, options, tools: declared });
+    const last = await chat({ messages, options, tools: declared, ...forReply() });
     if (!last.toolCalls.length) return { ...last, actions };
     messages.push(last.message);
     for (const call of last.toolCalls) {
@@ -24,5 +24,5 @@ export async function respond({ messages, options, member, message }) {
     }
   }
   console.warn(`  limite de sécurité de ${SAFETY_ROUNDS} allers-retours atteinte`);
-  return { ...(await chat({ messages, options })), actions };
+  return { ...(await chat({ messages, options, ...forReply() })), actions };
 }

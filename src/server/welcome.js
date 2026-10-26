@@ -1,6 +1,6 @@
 import { randomPersona } from '../conversation/router.js';
 import { speak } from '../discord/webhooks.js';
-import { chat } from '../llm/client.js';
+import { chat, forReply } from '../llm/client.js';
 import { cleanReply, systemPrompt } from '../llm/prompts.js';
 import { findPublication } from '../storage/publications.js';
 import { setting } from '../storage/settings.js';
@@ -30,6 +30,7 @@ export async function welcome(member) {
         { role: 'user', content: `${member.displayName} vient d'arriver sur le serveur ${guild.name}. Souhaite la bienvenue à cette personne en une ou deux phrases, avec ta voix, sans citer son pseudo (il sera mentionné avant ton message).${hint}` },
       ],
       options: { num_predict: 120 },
+      ...forReply(),
     });
     text = cleanReply(content) || text;
   } catch {}
