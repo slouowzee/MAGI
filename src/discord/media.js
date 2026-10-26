@@ -11,8 +11,9 @@ export function mediaOf(msg) {
     if (SUPPORTED.test(attachment.contentType ?? '') && (attachment.size ?? 0) <= MAX_BYTES) items.push({ url: attachment.url, mime: attachment.contentType });
   }
   for (const embed of msg.embeds ?? []) {
-    const animated = embed.data?.type === 'gifv' || /tenor|giphy/i.test(embed.provider?.name ?? '');
-    if (animated && embed.video?.url) items.push({ url: embed.video.url, mime: 'video/mp4' });
+    const animated = embed.data?.type === 'gifv';
+    if (animated && embed.thumbnail?.url) items.push({ url: embed.thumbnail.url });
+    else if (animated && embed.video?.url) items.push({ url: embed.video.url, mime: 'video/mp4' });
     else if (embed.image?.url) items.push({ url: embed.image.url });
     else if (embed.data?.type === 'image' && embed.thumbnail?.url) items.push({ url: embed.thumbnail.url });
   }
