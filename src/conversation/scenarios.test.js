@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, expect, setSystemTime, test } from 'bun:test';
-import { Collection } from 'discord.js';
+import { Collection, SnowflakeUtil } from 'discord.js';
 
 process.env.DB_PATH = ':memory:';
 process.env.GEMINI_API_KEY = 'test';
@@ -37,10 +37,10 @@ afterAll(() => {
 const { handleMessage } = await import('./handle-message.js');
 const { setActivePersonas, setModules, setMutedChannels } = await import('../server/config.js');
 const { welcome } = await import('../server/welcome.js');
+const { catchUp } = await import('./catch-up.js');
 
 let clock = Date.parse('2026-10-26T12:00:00Z');
-let ids = 100000000000000000n;
-const nextId = () => String(++ids);
+const nextId = () => SnowflakeUtil.generate({ timestamp: clock }).toString();
 const tick = () => setSystemTime((clock += 10_000));
 
 beforeEach(() => {
@@ -49,7 +49,7 @@ beforeEach(() => {
 });
 
 function world(name) {
-  const client = { user: { id: 'bot' }, application: { id: 'app' }, channels: { fetch: async () => channel } };
+  const client = { user: { id: 'bot' }, application: { id: 'app' }, channels: { fetch: async () => channel }, guilds: { cache: new Collection() } };
   const guild = { id: `g-${name}`, name, ownerId: null, members: { cache: new Collection() } };
   const store = [];
   const webhooks = new Collection();
@@ -62,9 +62,20 @@ function world(name) {
     guild,
     client,
     isThread: () => false,
+    isTextBased: () => true,
+    get lastMessageId() {
+      return store.at(-1)?.id ?? null;
+    },
     sendTyping: async () => {},
     messages: {
-      fetch: async ({ limit, before }) => new Collection(store.filter((m) => BigInt(m.id) < BigInt(before)).slice(-limit).reverse().map((m) => [m.id, m])),
+      fetch: async ({ limit, before, after }) =>
+        new Collection(
+          store
+            .filter((m) => (!before || BigInt(m.id) < BigInt(before)) && (!after || BigInt(m.id) > BigInt(after)))
+            .slice(-limit)
+            .reverse()
+            .map((m) => [m.id, m]),
+        ),
     },
     fetchWebhooks: async () => webhooks,
     createWebhook: async ({ name: hookName }) => {
@@ -116,6 +127,7 @@ function world(name) {
   guild.ownerId = member('slou').id;
   guild.channels = { cache: new Collection([[channel.id, channel]]) };
   guild.systemChannel = channel;
+  client.guilds.cache.set(guild.id, guild);
 
   async function join(name) {
     tick();
@@ -123,7 +135,7 @@ function world(name) {
     await welcome({ ...guild.members.cache.get(user.id), user, guild });
   }
 
-  async function say(name, content, { replyTo, mentions = [], attachments = [] } = {}) {
+  async function say(name, content, { replyTo, mentions = [], attachments = [], offline = false } = {}) {
     tick();
     const author = member(name);
     const message = {
@@ -141,13 +153,14 @@ function world(name) {
       react: async (emoji) => message.reactions.push(emoji),
     };
     store.push(message);
+    if (offline) return message;
     const before = posted.length;
     await handleMessage(message);
     message.answers = posted.slice(before);
     return message;
   }
 
-  return { say, join, posted, store, guild, channel };
+  return { say, join, posted, store, guild, channel, client };
 }
 
 const lastContext = (persona) => requests.filter((r) => r.persona === persona).at(-1)?.context ?? '';
@@ -316,4 +329,15 @@ test('les gifs postés sont joints au modèle, numérotés dans la conversation'
   const request = requests.filter((r) => r.persona === 'casper').at(-1);
   expect(request.context).toContain('lea : regardez ça [gif] [pièce jointe n°1]');
   expect(request.media).toEqual(['data:image/gif;base64,R0lGODlh']);
+});
+
+test('au redémarrage, les messages restés sans réponse sont rattrapés, pas les autres', async () => {
+  const w = world('rattrapage');
+  await w.say('slou', 'melchior, déjà répondu ?');
+  await w.say('lea', 'casper, tu es là ?', { offline: true });
+  await w.say('lea', 'il dort ou quoi', { offline: true });
+  const before = w.posted.length;
+  await catchUp(w.client, Date.now());
+  expect(w.posted.slice(before).map((p) => p.persona)).toEqual(['casper']);
+  expect(lastContext('casper')).toContain('casper, tu es là ?');
 });

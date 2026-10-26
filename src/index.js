@@ -12,6 +12,7 @@ import { startConversationSweeper } from './conversation/memory.js';
 import { db } from './storage/db.js';
 import { watchAuditLog } from './security/antinuke.js';
 import { startBackups } from './security/backup.js';
+import { catchUp } from './conversation/catch-up.js';
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -32,6 +33,7 @@ const client = new Client({
 client.once(Events.ClientReady, async (c) => {
   console.log(`MAGI prêt : connecté en tant que ${c.user.tag} sur ${c.guilds.cache.size} serveur(s)`);
   for (const guild of c.guilds.cache.values()) await setupGuild(guild);
+  await catchUp(c).catch((err) => console.error('rattrapage impossible :', err.message));
   startReminders(c);
   startConversationSweeper(c);
   startBackups(c);

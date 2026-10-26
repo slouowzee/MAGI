@@ -33,19 +33,19 @@ function locate(message, persona, now) {
   );
 }
 
-export async function handleMessage(message) {
+export async function handleMessage(message, { catchUp = false } = {}) {
   if (!message.inGuild() || message.author.bot || message.webhookId || isMuted(message.channel)) return;
   const now = Date.now();
   const channelId = message.channel.id;
   const detected = await detect(message, message.client);
-  const following = detected || addressesSomeoneElse(message) ? null : followUpConversation(channelId, message.author.id, now);
+  const following = detected || catchUp || addressesSomeoneElse(message) ? null : followUpConversation(channelId, message.author.id, now);
   const trigger = detected ?? (following ? { persona: 'auto', vote: false, text: message.content } : null);
   const line = `${message.member?.displayName ?? message.author.username} : ${message.content}`;
   const found = following ? { conversation: following, by: 'suite' } : locate(message, trigger?.persona, now);
   let { conversation } = found;
   if (!trigger) {
     if (conversation) addMessage(conversation, message.id, message.author.id, now, line);
-    else await maybeIntervene(message).catch((err) => console.error('intervention spontanée :', err.message));
+    else if (!catchUp) await maybeIntervene(message).catch((err) => console.error('intervention spontanée :', err.message));
     return;
   }
 
@@ -58,7 +58,7 @@ export async function handleMessage(message) {
     return;
   }
 
-  const flood = floodCheck(message.author.id);
+  const flood = floodCheck(message.author.id, message.createdTimestamp);
   if (flood !== 'ok') {
     if (flood === 'warn') await speak(message.channel, 'balthasar', 'Doucement. Une question à la fois, je ne vais nulle part.').catch(() => {});
     return;
