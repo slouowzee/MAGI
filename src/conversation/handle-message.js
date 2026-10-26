@@ -80,7 +80,7 @@ export async function handleMessage(message, { catchUp = false } = {}) {
   }
   const current = conversation ?? openConversation({ channelId, guildId: message.guild.id }, now);
   addMessage(current, message.id, message.author.id, now, line);
-  let persona = allowed.includes(trigger.persona) ? trigger.persona : null;
+  let persona = allowed.includes(trigger.persona) ? trigger.persona : following && allowed.includes(following.persona) ? following.persona : null;
   if (!persona) {
     const pick = await pickPersona(question, current.persona, allowed);
     if (pick.vote && voting) {
