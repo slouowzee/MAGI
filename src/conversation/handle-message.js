@@ -1,5 +1,5 @@
-import { pickPersona, randomPersona } from './router.js';
-import { addMessage, answered, awaitingAnswer, closeConversation, findConversation, followUpConversation, openConversation } from './threads.js';
+import { pickPersona, randomPersona, startsNewTopic } from './router.js';
+import { addMessage, answered, awaitingAnswer, closeConversation, followUpConversation, locateConversation, openConversation } from './threads.js';
 import { activePersonas, isMuted, moduleEnabled } from '../server/config.js';
 import { memoryContext, summarizeConversation } from './memory.js';
 import { floodCheck, quickReaction } from './rules.js';
@@ -21,7 +21,7 @@ function addressesSomeoneElse(message) {
 }
 
 function locate(message, persona, now) {
-  return findConversation(
+  return locateConversation(
     {
       channelId: message.channel.id,
       authorId: message.author.id,
@@ -37,11 +37,14 @@ export async function handleMessage(message) {
   if (!message.inGuild() || message.author.bot || message.webhookId || isMuted(message.channel)) return;
   const now = Date.now();
   const channelId = message.channel.id;
-  const following = addressesSomeoneElse(message) ? null : followUpConversation(channelId, message.author.id, now);
-  const trigger = (await detect(message, message.client)) ?? (following ? { persona: 'auto', vote: false, text: message.content } : null);
-  const conversation = following ?? locate(message, trigger?.persona, now);
+  const detected = await detect(message, message.client);
+  const following = detected || addressesSomeoneElse(message) ? null : followUpConversation(channelId, message.author.id, now);
+  const trigger = detected ?? (following ? { persona: 'auto', vote: false, text: message.content } : null);
+  const line = `${message.member?.displayName ?? message.author.username} : ${message.content}`;
+  const found = following ? { conversation: following, by: 'suite' } : locate(message, trigger?.persona, now);
+  let { conversation } = found;
   if (!trigger) {
-    if (conversation) addMessage(conversation, message.id, message.author.id, now);
+    if (conversation) addMessage(conversation, message.id, message.author.id, now, line);
     else await maybeIntervene(message).catch((err) => console.error('intervention spontanée :', err.message));
     return;
   }
@@ -49,7 +52,7 @@ export async function handleMessage(message) {
   console.log(`[${message.guild.name} #${message.channel.name}] ${message.author.tag} →`, trigger);
   const quick = quickReaction(message.content);
   if (quick && !awaitingAnswer(conversation, message.author.id, now)) {
-    if (conversation) addMessage(conversation, message.id, message.author.id, now);
+    if (conversation) addMessage(conversation, message.id, message.author.id, now, line);
     await message.react(quick.emoji).catch(() => {});
     if (quick.ends) summarizeConversation(message.client, closeConversation(conversation));
     return;
@@ -70,8 +73,13 @@ export async function handleMessage(message) {
     return runVote(message, message.content, group);
   }
 
+  const switching = found.by === 'author' && allowed.includes(trigger.persona) && !conversation.personas.has(trigger.persona);
+  if (switching && (await startsNewTopic(conversation.lines, message.content))) {
+    console.log('  nouveau sujet, nouvelle conversation');
+    conversation = null;
+  }
   const current = conversation ?? openConversation({ channelId, guildId: message.guild.id }, now);
-  addMessage(current, message.id, message.author.id, now);
+  addMessage(current, message.id, message.author.id, now, line);
   let persona = allowed.includes(trigger.persona) ? trigger.persona : null;
   if (!persona) {
     const pick = await pickPersona(question, current.persona, allowed);
@@ -105,7 +113,7 @@ export async function handleMessage(message) {
       rememberAnswer(posted, target);
       sent.push(posted.id);
     }
-    answered(current, { persona, messageIds: sent, userId: message.author.id, asked: cleaned.endsWith('?') });
+    answered(current, { persona, messageIds: sent, userId: message.author.id, asked: cleaned.endsWith('?'), text: cleaned });
   } catch (err) {
     console.error(`[${message.guild.name} #${message.channel.name}] réponse impossible :`, err.message);
     if (err instanceof LLMUnavailable) await speak(message.channel, 'melchior', 'Unité hors ligne.').catch(() => {});
