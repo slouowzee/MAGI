@@ -26,7 +26,7 @@ export function where({ guild, channel }) {
 
 export function serverLine(entry) {
   const place = where(entry);
-  return `${timestamp(entry.at)} ${entry.host} ${entry.component}: ${entry.level}: ${place ? `[${place}] ` : ''}${entry.message}`;
+  return `${timestamp(entry.at)} ${entry.host} ${entry.component}: ${entry.level}: ${place ? `[${place}] ` : ''}${entry.message.replace(/\s*\n\s*/g, ' ')}`;
 }
 
 function serverThreshold() {

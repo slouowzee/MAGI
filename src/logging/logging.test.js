@@ -39,6 +39,7 @@ test('ligne serveur au format syslog, heure de Paris', () => {
   expect(timestamp(new Date('2026-07-14T10:00:00Z'))).toBe('2026-07-14T12:00:00+02:00');
   const line = serverLine({ at, host: 'magi', component: 'conversation', level: 'info', guild: { name: 'Slou' }, channel: { name: 'général' }, message: 'slou → casper' });
   expect(line).toBe('2026-10-26T14:24:01+01:00 magi conversation: info: [Slou #général] slou → casper');
+  expect(serverLine({ at, host: 'magi', component: 'llm', level: 'err', message: 'HTTP 503 : [{\n  "code": 503\n}]' })).toEndWith('llm: err: HTTP 503 : [{ "code": 503 }]');
 });
 
 test('les sources Discord suivent le composant', () => {
