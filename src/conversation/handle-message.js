@@ -1,4 +1,5 @@
-import { activePersona, awaitingAnswer, canFollowUp, forgetPersona, joinConversation, pickPersona, rememberPersona } from './router.js';
+import { activePersona, awaitingAnswer, canFollowUp, forgetPersona, joinConversation, pickPersona, randomPersona, rememberPersona } from './router.js';
+import { activePersonas, isMuted, moduleEnabled } from '../server/config.js';
 import { memoryContext, summarizeConversation } from './memory.js';
 import { floodCheck, quickReaction } from './rules.js';
 import { runVote } from './vote.js';
@@ -19,6 +20,7 @@ function addressesSomeoneElse(message) {
 }
 
 export async function handleMessage(message) {
+  if (message.inGuild() && isMuted(message.channel)) return;
   const answering =
     message.inGuild() && !message.author.bot && canFollowUp(message.channel.id, message.author.id) && !addressesSomeoneElse(message);
   const trigger = (await detect(message, message.client)) ?? (answering ? { persona: 'auto', vote: false, text: message.content } : null);
@@ -44,18 +46,20 @@ export async function handleMessage(message) {
     return;
   }
   const question = trigger.text || message.content;
-  if (trigger.vote) {
+  const voting = moduleEnabled(message.guild.id, 'vote');
+  if (trigger.vote && voting) {
     rememberPersona(channelId, null);
     return runVote(message, question);
   }
-  let persona = trigger.persona === 'auto' ? null : trigger.persona;
+  const allowed = activePersonas(message.guild.id);
+  let persona = allowed.includes(trigger.persona) ? trigger.persona : null;
   if (!persona) {
-    const pick = await pickPersona(question, activePersona(channelId));
-    if (pick.vote) {
+    const pick = await pickPersona(question, activePersona(channelId), allowed);
+    if (pick.vote && voting) {
       console.log('  vote détecté');
       return runVote(message, question);
     }
-    persona = pick.persona;
+    persona = pick.persona ?? randomPersona(Math.random, allowed);
     console.log(`  persona choisie : ${persona} (${pick.reason})`);
   }
   rememberPersona(channelId, persona);

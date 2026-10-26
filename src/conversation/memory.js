@@ -3,11 +3,13 @@ import { transcriptLine } from '../discord/history.js';
 import { chat } from '../llm/client.js';
 import { factsAbout, saveSummary, summariesAbout } from '../storage/memory.js';
 import { expiredConversations } from './router.js';
+import { moduleEnabled } from '../server/config.js';
 
 const MIN_LINES = 4;
 const SWEEP_EVERY = 60_000;
 
 export function memoryContext(guildId, participants) {
+  if (!moduleEnabled(guildId, 'memoire')) return '';
   const lines = [];
   const summaries = new Map();
   for (const { id, name } of participants) {
@@ -21,7 +23,7 @@ export function memoryContext(guildId, participants) {
 }
 
 export async function summarizeConversation(client, conversation) {
-  if (!conversation?.guildId || !conversation.participants?.size) return;
+  if (!conversation?.guildId || !conversation.participants?.size || !moduleEnabled(conversation.guildId, 'memoire')) return;
   const channel = await client.channels.fetch(conversation.channelId).catch(() => null);
   if (!channel) return;
   const after = SnowflakeUtil.generate({ timestamp: conversation.startedAt - 1_000 }).toString();

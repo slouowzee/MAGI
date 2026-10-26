@@ -1,6 +1,7 @@
 import { ChannelType, OverwriteType } from 'discord.js';
 import { latestBackup, saveBackup } from '../storage/backups.js';
 import { setSetting, setting } from '../storage/settings.js';
+import { moduleEnabled } from '../server/config.js';
 
 const DAY = 24 * 3600_000;
 const RESTORABLE = new Set([ChannelType.GuildCategory, ChannelType.GuildText, ChannelType.GuildVoice, ChannelType.GuildAnnouncement, ChannelType.GuildForum, ChannelType.GuildStageVoice]);
@@ -47,7 +48,7 @@ export function startBackups(client) {
     for (const guild of client.guilds.cache.values()) {
       const last = latestBackup(guild.id);
       const frozen = Date.now() < Number(setting(guild.id, 'backup_frozen_until'));
-      if (!frozen && (!last || Date.now() - last.createdAt >= DAY)) backupGuild(guild);
+      if (!frozen && moduleEnabled(guild.id, 'sauvegardes') && (!last || Date.now() - last.createdAt >= DAY)) backupGuild(guild);
     }
   };
   run();

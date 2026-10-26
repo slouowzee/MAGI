@@ -1,4 +1,5 @@
 import { adminEnabled, isOperator, logChannel } from '../server/installation.js';
+import { moduleEnabled } from '../server/config.js';
 import { INSTALLATION_TOOLS } from './installation.js';
 import { MEMORY_TOOLS } from './memory.js';
 import { CHANNEL_TOOLS } from './channel.js';
@@ -7,9 +8,18 @@ import { ADMIN_TOOLS } from './admin/index.js';
 
 const silent = { allowedMentions: { parse: [] } };
 
-export const TOOLS = [...INSTALLATION_TOOLS, ...MEMORY_TOOLS, ...CHANNEL_TOOLS, ...REMINDER_TOOLS, ...ADMIN_TOOLS];
+const inModule = (module, tools) => tools.map((tool) => ({ ...tool, module }));
+
+export const TOOLS = [
+  ...INSTALLATION_TOOLS,
+  ...inModule('memoire', MEMORY_TOOLS),
+  ...CHANNEL_TOOLS,
+  ...inModule('rappels', REMINDER_TOOLS),
+  ...inModule('administration', ADMIN_TOOLS),
+];
 
 export function canUse(tool, member) {
+  if (tool.module && !moduleEnabled(member.guild.id, tool.module)) return false;
   if (tool.access === 'everyone') return true;
   if (tool.access === 'owner') return member.id === member.guild.ownerId;
   if (tool.access === 'operator') return isOperator(member) && adminEnabled(member.guild);

@@ -1,6 +1,7 @@
 import { AuditLogEvent } from 'discord.js';
 import { logChannel, operatorRole } from '../server/installation.js';
 import { freezeBackups } from './backup.js';
+import { moduleEnabled } from '../server/config.js';
 
 const WINDOW = 60_000;
 const KINDS = {
@@ -38,6 +39,7 @@ export function nukeSuspected(entry, guild, now = Date.now()) {
 }
 
 export async function watchAuditLog(entry, guild) {
+  if (!moduleEnabled(guild.id, 'antinuke')) return;
   const kind = nukeSuspected(entry, guild);
   if (!kind) return;
   const reason = `MAGI anti-nuke : ${kind} en masse`;

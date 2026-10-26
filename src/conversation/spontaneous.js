@@ -3,6 +3,7 @@ import { speak } from '../discord/webhooks.js';
 import { chat, choose } from '../llm/client.js';
 import { buildMessages, cleanReply, MAX_TOKENS } from '../llm/prompts.js';
 import { interventionsAllowed } from '../storage/interventions.js';
+import { activePersonas, moduleEnabled } from '../server/config.js';
 import { memoryContext } from './memory.js';
 import { rememberPersona } from './router.js';
 
@@ -23,7 +24,7 @@ export function canIntervene(channelId, now = Date.now()) {
 
 export async function maybeIntervene(message) {
   const channelId = message.channel.id;
-  if (message.content.trim().length < MIN_LENGTH || !interventionsAllowed(channelId) || !canIntervene(channelId)) return;
+  if (message.content.trim().length < MIN_LENGTH || !moduleEnabled(message.guild.id, 'interventions') || !interventionsAllowed(channelId) || !canIntervene(channelId)) return;
   const fetched = await message.channel.messages.fetch({ limit: 8, before: message.id }).catch(() => null);
   const lines = [...(fetched?.values() ?? [])].reverse().map(transcriptLine).filter(Boolean);
   lines.push(transcriptLine(message));
@@ -32,7 +33,7 @@ export async function maybeIntervene(message) {
       { role: 'system', content: JUDGE },
       { role: 'user', content: `<discussion>\n${lines.join('\n')}\n</discussion>` },
     ],
-    choices: ['ignorer', 'melchior', 'balthasar', 'casper'],
+    choices: ['ignorer', ...activePersonas(message.guild.id)],
   }).catch(() => 'ignorer');
   if (choice === 'ignorer') return;
 
