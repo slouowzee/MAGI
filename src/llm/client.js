@@ -9,6 +9,14 @@ const GEMINI_PATIENCE = 12_000;
 const GEMINI_RETRY_DELAYS = [2_000, 5_000];
 
 const geminiPausedUntil = new Map();
+const geminiStrikes = new Map();
+const MAX_COOLDOWN = 30 * 60_000;
+
+function pause(model) {
+  const strikes = (geminiStrikes.get(model) ?? 0) + 1;
+  geminiStrikes.set(model, strikes);
+  geminiPausedUntil.set(model, Date.now() + Math.min(GEMINI_COOLDOWN * 2 ** (strikes - 1), MAX_COOLDOWN));
+}
 const defaultModel = () => process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 const backupModel = () => process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite';
 export const forReply = () => (process.env.GEMINI_REPLY_MODEL ? { model: process.env.GEMINI_REPLY_MODEL, reasoning: 'none' } : {});
@@ -125,10 +133,12 @@ export async function chat({ messages, format, options, tools, model, reasoning,
       if (left <= 0) break;
       const patience = i < candidates.length - 1 ? Math.min(GEMINI_PATIENCE, timeoutMs / 3) : 60_000;
       try {
-        return result(await geminiWithMedia({ messages, format, options, tools, model: candidate, reasoning: candidate === model ? reasoning : undefined, timeoutMs: Math.min(left, patience) }), candidate);
+        const answer = await geminiWithMedia({ messages, format, options, tools, model: candidate, reasoning: candidate === model ? reasoning : undefined, timeoutMs: Math.min(left, patience) });
+        geminiStrikes.delete(candidate);
+        return result(answer, candidate);
       } catch (err) {
         if (err instanceof ContentRefused) throw err;
-        if (err.timedOut || err.status === 429 || err.status >= 500) geminiPausedUntil.set(candidate, Date.now() + GEMINI_COOLDOWN);
+        if (err.timedOut || err.status === 429 || err.status >= 500) pause(candidate);
         transient ||= !(err.status >= 400 && err.status < 500) || err.status === 429;
         failure = err;
         log.info('llm', `${candidate} : ${err.message}`);

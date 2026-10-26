@@ -1,4 +1,4 @@
-import { test, beforeEach } from 'bun:test';
+import { test, beforeEach, setSystemTime } from 'bun:test';
 import assert from 'node:assert/strict';
 
 const calls = [];
@@ -145,4 +145,25 @@ test('sans clé Gemini : LLMUnavailable', async () => {
   delete process.env.GEMINI_API_KEY;
   await assert.rejects(chat({ messages: [{ role: 'user', content: 'x' }] }), LLMUnavailable);
   assert.deepEqual(calls, []);
+});
+
+test('un modèle qui échoue encore est mis en pause plus longtemps', async () => {
+  process.env.GEMINI_API_KEY = 'test';
+  process.env.GEMINI_MODEL = 'sature-a';
+  process.env.GEMINI_BACKUP_MODEL = 'stable-b';
+  const seen = [];
+  geminiResponse = (body) => {
+    seen.push(body.model);
+    return body.model === 'sature-a' ? new Response('high demand', { status: 503 }) : ok('b');
+  };
+  let now = Date.parse('2026-10-26T12:00:00Z');
+  for (const step of [0, 61_000, 61_000, 70_000]) {
+    setSystemTime((now += step));
+    await chat({ messages: [{ role: 'user', content: 'x' }] });
+  }
+  setSystemTime();
+  assert.deepEqual(seen, ['sature-a', 'stable-b', 'sature-a', 'stable-b', 'stable-b', 'sature-a', 'stable-b']);
+  delete process.env.GEMINI_MODEL;
+  delete process.env.GEMINI_BACKUP_MODEL;
+  geminiResponse = () => ok('gemini ok');
 });
