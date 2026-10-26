@@ -86,12 +86,6 @@ export function systemPrompt(persona, length, now = new Date()) {
   return `${COMMON}\n${CHARACTER[persona]}\n${VOICE}\n${STYLE[length]}\n${FACTS}\n${nowLine(now)}`;
 }
 
-export function warmupRequests() {
-  return Object.keys(CHARACTER).flatMap((persona) =>
-    Object.keys(STYLE).map((length) => buildMessages(persona, [{ role: 'user', content: '.' }], length)),
-  );
-}
-
 export function buildMessages(persona, conversation, length, extra = '') {
   if (!PERSONAS[persona]) throw new Error(`Persona inconnue : ${persona}`);
   return [{ role: 'system', content: `${systemPrompt(persona, length)}${extra ? `\n${extra}` : ''}` }, ...conversation];

@@ -97,14 +97,14 @@ export async function handleMessage(message, { catchUp = false } = {}) {
   try {
     const { turns, participants, target, included } = await conversationFor(message, persona, message.content, current, (id) => isClaimed(channelId, id));
     for (const id of included) addMessage(current, id, null, Date.now());
-    const { content: reply, provider, actions } = await respond({
+    const { content: reply, model, actions } = await respond({
       messages: buildMessages(persona, turns, length, memoryContext(message.guild.id, participants)),
-      options: { num_predict: MAX_TOKENS[length], repeat_penalty: 1.1 },
+      options: { num_predict: MAX_TOKENS[length] },
       member: message.member,
       message,
     });
     clearInterval(typing);
-    console.log(`  réponse ${persona} via ${provider}`);
+    console.log(`  réponse ${persona} via ${model}`);
     const cleaned = cleanReply(reply);
     const parts = splitMessage(cleaned).filter(Boolean);
     const sent = [];

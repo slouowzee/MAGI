@@ -1,28 +1,7 @@
-import { test, beforeAll, afterAll, beforeEach } from 'bun:test';
+import { test, beforeEach } from 'bun:test';
 import assert from 'node:assert/strict';
 
-let ollamaServer;
-let lastOllamaBody;
 const calls = [];
-
-beforeAll(() => {
-  ollamaServer = Bun.serve({
-    port: 0,
-    async fetch(req) {
-      const body = await req.json();
-      const last = body.messages.at(-1).content;
-      if (last === 'lent') await Bun.sleep(300);
-      calls.push(`ollama:${last}`);
-      lastOllamaBody = body;
-      if (last === 'outil') return Response.json({ message: { content: '', tool_calls: [{ function: { name: 'installer_magi', arguments: {} } }] } });
-      if (body.format) return Response.json({ message: { content: JSON.stringify({ choix: 'casper' }) } });
-      return Response.json({ message: { content: `ollama ${last}` } });
-    },
-  });
-  process.env.OLLAMA_URL = `http://localhost:${ollamaServer.port}`;
-});
-
-afterAll(() => ollamaServer.stop());
 
 beforeEach(() => {
   calls.length = 0;
@@ -30,6 +9,7 @@ beforeEach(() => {
 
 let geminiResponse = () => Response.json({ choices: [{ message: { content: 'gemini ok' } }] });
 const realFetch = globalThis.fetch;
+const ok = (content) => Response.json({ choices: [{ message: { content } }] });
 globalThis.fetch = (url, init) => {
   if (String(url).startsWith('https://generativelanguage.googleapis.com')) {
     calls.push('gemini');
@@ -46,7 +26,7 @@ const { chat, choose, LLMUnavailable } = await import('./client.js');
 test('Gemini répond en priorité quand une clé est configurée', async () => {
   process.env.GEMINI_API_KEY = 'test';
   const r = await chat({ messages: [{ role: 'user', content: 'a' }] });
-  assert.deepEqual([r.content, r.provider, r.toolCalls], ['gemini ok', 'gemini', []]);
+  assert.deepEqual([r.content, r.model, r.toolCalls], ['gemini ok', 'gemini-3.5-flash-lite', []]);
   assert.deepEqual(calls, ['gemini']);
 });
 
@@ -70,48 +50,6 @@ test('sortie imposée transmise à Gemini en json_schema', async () => {
   assert.deepEqual(sent.response_format.json_schema.schema.properties.choix.enum, ['melchior', 'balthasar']);
 });
 
-test('quota Gemini épuisé : bascule sur Ollama, puis Gemini mis en pause', async () => {
-  process.env.GEMINI_API_KEY = 'test';
-  geminiResponse = () => new Response('quota', { status: 429 });
-  const c = await chat({ messages: [{ role: 'user', content: 'c' }] });
-  const d = await chat({ messages: [{ role: 'user', content: 'd' }] });
-  assert.deepEqual([c.content, c.provider, d.content, d.provider], ['ollama c', 'ollama', 'ollama d', 'ollama']);
-  assert.deepEqual(calls, ['gemini', 'gemini', 'ollama:c', 'ollama:d']);
-});
-
-test('sans clé Gemini : Ollama seul, appels en file', async () => {
-  delete process.env.GEMINI_API_KEY;
-  await Promise.all([
-    chat({ messages: [{ role: 'user', content: 'lent' }] }),
-    chat({ messages: [{ role: 'user', content: 'rapide' }] }),
-  ]);
-  assert.deepEqual(calls, ['ollama:lent', 'ollama:rapide']);
-});
-
-test('tout est injoignable : LLMUnavailable', async () => {
-  delete process.env.GEMINI_API_KEY;
-  const url = process.env.OLLAMA_URL;
-  process.env.OLLAMA_URL = 'http://localhost:1';
-  await assert.rejects(chat({ messages: [{ role: 'user', content: 'x' }] }), LLMUnavailable);
-  process.env.OLLAMA_URL = url;
-  await assert.rejects(chat({ messages: [{ role: 'user', content: 'lent' }], timeoutMs: 50 }), LLMUnavailable);
-});
-
-test('appel d’outil par Ollama : formats convertis dans les deux sens', async () => {
-  delete process.env.GEMINI_API_KEY;
-  const r = await chat({
-    messages: [
-      { role: 'assistant', content: '', tool_calls: [{ id: 'x', type: 'function', function: { name: 'installer_magi', arguments: '{"a":1}' } }] },
-      { role: 'tool', tool_call_id: 'x', name: 'installer_magi', content: 'fait' },
-      { role: 'user', content: 'outil' },
-    ],
-  });
-  assert.deepEqual(lastOllamaBody.messages[0].tool_calls, [{ function: { name: 'installer_magi', arguments: { a: 1 } } }]);
-  assert.deepEqual(lastOllamaBody.messages[1], { role: 'tool', content: 'fait', tool_name: 'installer_magi' });
-  assert.equal(r.toolCalls[0].name, 'installer_magi');
-  assert.equal(r.message.tool_calls[0].function.arguments, '{}');
-});
-
 test('un modèle Gemini saturé ne bloque pas le modèle par défaut', async () => {
   process.env.GEMINI_API_KEY = 'test';
   const seen = [];
@@ -121,13 +59,13 @@ test('un modèle Gemini saturé ne bloque pas le modèle par défaut', async () 
   };
   process.env.GEMINI_MODEL = 'modele-lite';
   const r = await chat({ messages: [{ role: 'user', content: 'p' }], model: 'gros-modele' });
-  assert.deepEqual([r.content, r.provider], ['lite ok', 'gemini']);
+  assert.deepEqual([r.content, r.model], ['lite ok', 'modele-lite']);
   await chat({ messages: [{ role: 'user', content: 'q' }], model: 'gros-modele' });
   assert.deepEqual(seen, ['gros-modele', 'modele-lite', 'modele-lite']);
   delete process.env.GEMINI_MODEL;
 });
 
-test('réponse bloquée par le filtre de Gemini : pas de bascule sur Ollama', async () => {
+test('réponse bloquée par le filtre de Gemini : pas de nouvel essai', async () => {
   process.env.GEMINI_API_KEY = 'test';
   const { ContentRefused } = await import('./client.js');
   geminiResponse = () => Response.json({ choices: [{ finish_reason: 'content_filter', message: { role: 'assistant' } }] });
@@ -150,9 +88,8 @@ test('média refusé par Gemini : nouvel essai sans les vidéos, puis sans aucun
     { type: 'image_url', image_url: { url: 'data:image/webp;base64,AAAA' } },
   ];
   const r = await chat({ messages: [{ role: 'user', content }], model: 'modele-media' });
-  assert.deepEqual([r.content, r.provider], ['vu', 'gemini']);
+  assert.deepEqual([r.content, r.model], ['vu', 'modele-media']);
   assert.deepEqual(seen, [['video', 'image'], ['image'], []]);
-  assert.ok(!calls.some((c) => c.startsWith('ollama')));
   geminiResponse = () => Response.json({ choices: [{ message: { content: 'gemini ok' } }] });
 });
 
@@ -166,11 +103,46 @@ test('modèle Gemini trop lent : le modèle de secours répond, puis prend le re
     if (body.model === 'modele-lent') await Bun.sleep(300);
     return Response.json({ choices: [{ message: { content: body.model } }] });
   };
-  const a = await chat({ messages: [{ role: 'user', content: 'a' }], timeoutMs: 100 });
-  const b = await chat({ messages: [{ role: 'user', content: 'b' }], timeoutMs: 100 });
-  assert.deepEqual([a.content, a.provider, b.content], ['modele-secours', 'gemini', 'modele-secours']);
+  const a = await chat({ messages: [{ role: 'user', content: 'a' }], timeoutMs: 600 });
+  const b = await chat({ messages: [{ role: 'user', content: 'b' }], timeoutMs: 600 });
+  assert.deepEqual([a.content, b.content], ['modele-secours', 'modele-secours']);
   assert.deepEqual(seen, ['modele-lent', 'modele-secours', 'modele-secours']);
   delete process.env.GEMINI_MODEL;
   delete process.env.GEMINI_BACKUP_MODEL;
   geminiResponse = () => Response.json({ choices: [{ message: { content: 'gemini ok' } }] });
+});
+
+test('surcharge passagère de Gemini : nouvel essai quelques secondes plus tard', async () => {
+  process.env.GEMINI_API_KEY = 'test';
+  process.env.GEMINI_MODEL = 'surcharge-a';
+  process.env.GEMINI_BACKUP_MODEL = 'surcharge-b';
+  const seen = [];
+  geminiResponse = (body) => {
+    seen.push(body.model);
+    return seen.length <= 2 ? new Response('high demand', { status: 503 }) : ok('enfin');
+  };
+  const r = await chat({ messages: [{ role: 'user', content: 'r' }] });
+  assert.deepEqual([r.content, r.model], ['enfin', 'surcharge-a']);
+  assert.deepEqual(seen, ['surcharge-a', 'surcharge-b', 'surcharge-a']);
+  delete process.env.GEMINI_MODEL;
+  delete process.env.GEMINI_BACKUP_MODEL;
+  geminiResponse = () => ok('gemini ok');
+});
+
+test('quota épuisé sur tous les modèles : LLMUnavailable une fois le délai écoulé', async () => {
+  process.env.GEMINI_API_KEY = 'test';
+  process.env.GEMINI_MODEL = 'quota-a';
+  process.env.GEMINI_BACKUP_MODEL = 'quota-b';
+  geminiResponse = () => new Response('quota', { status: 429 });
+  await assert.rejects(chat({ messages: [{ role: 'user', content: 'q' }], timeoutMs: 1_000 }), LLMUnavailable);
+  assert.deepEqual(calls, ['gemini', 'gemini']);
+  delete process.env.GEMINI_MODEL;
+  delete process.env.GEMINI_BACKUP_MODEL;
+  geminiResponse = () => ok('gemini ok');
+});
+
+test('sans clé Gemini : LLMUnavailable', async () => {
+  delete process.env.GEMINI_API_KEY;
+  await assert.rejects(chat({ messages: [{ role: 'user', content: 'x' }] }), LLMUnavailable);
+  assert.deepEqual(calls, []);
 });

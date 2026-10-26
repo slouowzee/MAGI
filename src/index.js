@@ -3,8 +3,6 @@ import { handleMessage } from './conversation/handle-message.js';
 import { moderate } from './moderation/index.js';
 import { handleInteraction } from './discord/buttons.js';
 import { handleRoleButton, isRoleButton } from './tools/admin/role-panels.js';
-import { warmupOllama } from './llm/client.js';
-import { warmupRequests } from './llm/prompts.js';
 import { handlePanelInteraction, isPanelInteraction, setupGuild } from './server/panel.js';
 import { farewell, welcome } from './server/welcome.js';
 import { startReminders } from './tools/reminders.js';
@@ -37,15 +35,7 @@ client.once(Events.ClientReady, async (c) => {
   startReminders(c);
   startConversationSweeper(c);
   startBackups(c);
-  if (process.env.GEMINI_API_KEY) {
-    console.log(`LLM : Gemini (${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'}, puis ${process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite'} s'il est lent), Ollama en secours`);
-    return;
-  }
-  console.log('LLM : Ollama seul (pas de GEMINI_API_KEY)');
-  const started = Date.now();
-  await Promise.all(warmupRequests().map(warmupOllama))
-    .then(() => console.log(`Personas préchauffées sur Ollama en ${Math.round((Date.now() - started) / 1000)} s`))
-    .catch((err) => console.error('Préchauffage impossible :', err.message));
+  console.log(`LLM : Gemini (${process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'}, puis ${process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite'} s'il est lent)`);
 });
 
 client.on(Events.GuildCreate, setupGuild);

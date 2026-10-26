@@ -22,7 +22,7 @@ src/
     history.js                derniers messages du salon pour le contexte
     split.js                  découpe sous la limite de 2000 caractères
   llm/                        modèles de langage
-    client.js                 Gemini en priorité, Ollama en secours
+    client.js                 Gemini, modèle de secours et nouveaux essais
     prompts.js                prompts système des personas, nettoyage des réponses
     respond.js                boucle d'appel d'outils
   tools/                      outils que le LLM peut appeler

@@ -4,19 +4,12 @@ export class ContentRefused extends Error {}
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 const GEMINI_COOLDOWN = 60_000;
 const GEMINI_PATIENCE = 12_000;
+const GEMINI_RETRY_DELAYS = [2_000, 5_000];
 
 const geminiPausedUntil = new Map();
 const defaultModel = () => process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 const backupModel = () => process.env.GEMINI_BACKUP_MODEL || 'gemini-3.1-flash-lite';
 export const forReply = () => (process.env.GEMINI_REPLY_MODEL ? { model: process.env.GEMINI_REPLY_MODEL, reasoning: 'none' } : {});
-let ollamaTail = Promise.resolve();
-
-function ollamaQueue(job) {
-  const run = ollamaTail.then(job);
-  ollamaTail = run.catch(() => {});
-  return run;
-}
-
 async function post(url, headers, body, timeoutMs) {
   let res;
   try {
@@ -40,21 +33,6 @@ async function post(url, headers, body, timeoutMs) {
 
 function forGemini(messages) {
   return messages.map(({ name, ...m }) => m);
-}
-
-function forOllama(messages) {
-  return messages.map((m) => {
-    if (Array.isArray(m.content)) return { ...m, content: m.content.filter((p) => p.type === 'text').map((p) => p.text).join('\n') };
-    if (m.role === 'assistant' && m.tool_calls) {
-      return {
-        role: 'assistant',
-        content: m.content ?? '',
-        tool_calls: m.tool_calls.map((c) => ({ function: { name: c.function.name, arguments: JSON.parse(c.function.arguments || '{}') } })),
-      };
-    }
-    if (m.role === 'tool') return { role: 'tool', content: m.content, tool_name: m.name };
-    return m;
-  });
 }
 
 async function gemini({ messages, format, options = {}, tools, model, reasoning, timeoutMs }) {
@@ -105,32 +83,7 @@ async function geminiWithMedia(args) {
   }
 }
 
-function ollama({ messages, format, options, tools, timeoutMs }) {
-  return ollamaQueue(async () => {
-    const url = `${process.env.OLLAMA_URL || 'http://localhost:11434'}/api/chat`;
-    const body = {
-      model: process.env.OLLAMA_MODEL || 'qwen3:4b-instruct',
-      messages: forOllama(messages),
-      format,
-      options: { num_ctx: Number(process.env.OLLAMA_NUM_CTX) || 8192, ...options },
-      stream: false,
-    };
-    if (tools?.length) body.tools = tools;
-    const { message } = await post(url, {}, body, timeoutMs);
-    const calls = (message.tool_calls ?? []).map((c, i) => ({
-      id: `ollama_${Date.now()}_${i}`,
-      type: 'function',
-      function: { name: c.function.name, arguments: JSON.stringify(c.function.arguments ?? {}) },
-    }));
-    return { role: 'assistant', content: message.content ?? '', ...(calls.length ? { tool_calls: calls } : {}) };
-  });
-}
-
-export function warmupOllama(messages) {
-  return ollama({ messages, options: { num_predict: 1 }, timeoutMs: 180_000 });
-}
-
-function result(message, provider) {
+function result(message, model) {
   const toolCalls = (message.tool_calls ?? []).map((c) => {
     let args = {};
     try {
@@ -138,25 +91,44 @@ function result(message, provider) {
     } catch {}
     return { id: c.id, name: c.function.name, args };
   });
-  return { content: message.content, toolCalls, message, provider };
+  return { content: message.content, toolCalls, message, model };
 }
 
-export async function chat({ messages, format, options, tools, model, reasoning, timeoutMs = 180_000 }) {
-  if (process.env.GEMINI_API_KEY) {
-    const candidates = [...new Set([model ?? defaultModel(), defaultModel(), backupModel()])].filter((c) => Date.now() >= (geminiPausedUntil.get(c) ?? 0));
+function geminiModels(model) {
+  const all = [...new Set([model ?? defaultModel(), defaultModel(), backupModel()])];
+  const awake = all.filter((c) => Date.now() >= (geminiPausedUntil.get(c) ?? 0));
+  return awake.length ? awake : all;
+}
+
+export async function chat({ messages, format, options, tools, model, reasoning, timeoutMs = 90_000 }) {
+  if (!process.env.GEMINI_API_KEY) throw new LLMUnavailable('GEMINI_API_KEY manquante');
+  const deadline = Date.now() + timeoutMs;
+  let failure = new LLMUnavailable('Gemini indisponible');
+  for (const delay of [0, ...GEMINI_RETRY_DELAYS]) {
+    if (delay) {
+      if (Date.now() + delay >= deadline) break;
+      console.warn(`Gemini indisponible, nouvel essai dans ${delay / 1000} s`);
+      await Bun.sleep(delay);
+    }
+    const candidates = geminiModels(model);
+    let transient = false;
     for (const [i, candidate] of candidates.entries()) {
-      const patience = i < candidates.length - 1 ? GEMINI_PATIENCE : 60_000;
+      const left = deadline - Date.now();
+      if (left <= 0) break;
+      const patience = i < candidates.length - 1 ? Math.min(GEMINI_PATIENCE, timeoutMs / 3) : 60_000;
       try {
-        return result(await geminiWithMedia({ messages, format, options, tools, model: candidate, reasoning: candidate === model ? reasoning : undefined, timeoutMs: Math.min(timeoutMs, patience) }), 'gemini');
+        return result(await geminiWithMedia({ messages, format, options, tools, model: candidate, reasoning: candidate === model ? reasoning : undefined, timeoutMs: Math.min(left, patience) }), candidate);
       } catch (err) {
         if (err instanceof ContentRefused) throw err;
         if (err.timedOut || err.status === 429 || err.status >= 500) geminiPausedUntil.set(candidate, Date.now() + GEMINI_COOLDOWN);
+        transient ||= !(err.status >= 400 && err.status < 500) || err.status === 429;
+        failure = err;
         console.warn(`Gemini ${candidate} indisponible (${err.message.replace(/\s+/g, ' ')})`);
       }
     }
-    console.warn('bascule sur Ollama');
+    if (!transient) break;
   }
-  return result(await ollama({ messages, format, options, tools, timeoutMs }), 'ollama');
+  throw failure;
 }
 
 export async function choose({ messages, choices, timeoutMs = 60_000 }) {
