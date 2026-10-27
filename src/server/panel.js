@@ -91,7 +91,7 @@ function modulesSection(guild) {
 const LOG_PURPOSES = {
   logs: 'outils, configuration, installation, arrivées et départs, rappels',
   moderation: 'décisions de la modération automatique',
-  securite: 'anti-nuke, salon piège, SSH et sudo du VPS',
+  securite: 'anti-nuke, honeypot, SSH et sudo du VPS',
   systeme: 'démarrage, Gemini, erreurs, journal du VPS',
 };
 
@@ -145,7 +145,7 @@ function securitySection(guild) {
   const trap = honeypotOf(guild);
   const backup = latestBackup(guild.id);
   const description = [
-    `Salon piège : ${trap ? `${trap}` : 'aucun'}`,
+    `Honeypot : ${trap ? `${trap}` : 'aucun'}`,
     `Dernière sauvegarde de la structure : ${backup ? `<t:${Math.floor(backup.createdAt / 1000)}:R>` : 'aucune'}`,
     `Anti-nuke : ${enabledModules(guild.id).includes('antinuke') ? 'actif' : 'coupé'}`,
   ].join('\n');
@@ -156,8 +156,8 @@ function securitySection(guild) {
         new ButtonBuilder().setCustomId(id('audit')).setLabel('Lancer l’audit').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId(id('backup')).setLabel('Sauvegarder maintenant').setStyle(ButtonStyle.Secondary),
         trap
-          ? new ButtonBuilder().setCustomId(id('honeypot')).setLabel('Supprimer le salon piège').setStyle(ButtonStyle.Danger)
-          : new ButtonBuilder().setCustomId(id('honeypot')).setLabel('Créer le salon piège').setStyle(ButtonStyle.Secondary),
+          ? new ButtonBuilder().setCustomId(id('honeypot')).setLabel('Supprimer le honeypot').setStyle(ButtonStyle.Danger)
+          : new ButtonBuilder().setCustomId(id('honeypot')).setLabel('Créer le honeypot').setStyle(ButtonStyle.Secondary),
       ]),
     ],
   };
@@ -241,7 +241,7 @@ export async function refreshPanel(guild, { repost = false } = {}) {
 export async function setupGuild(guild) {
   await installAndReport(guild);
   await refreshPanel(guild).catch((err) => log.err('config', `échec panneau : ${err.message}`, { guild }));
-  await refreshHoneypot(guild).catch((err) => log.err('piege', `échec mise à jour du salon piège : ${err.message}`, { guild }));
+  await refreshHoneypot(guild).catch((err) => log.err('honeypot', `échec mise à jour du honeypot : ${err.message}`, { guild }));
   await restylePublications(guild)
     .then((count) => count && log.notice('publications', `${count} publication(s) remise(s) en forme`, { guild }))
     .catch((err) => log.err('publications', `échec remise en forme : ${err.message}`, { guild }));
@@ -296,7 +296,7 @@ export async function handlePanelInteraction(interaction) {
     if (existed) await disableHoneypot(guild, reason);
     else await enableHoneypot(guild, reason);
     await interaction.update(panelPage(guild, 'securite'));
-    return changed(existed ? 'salon piège supprimé' : 'salon piège créé');
+    return changed(existed ? 'honeypot supprimé' : 'honeypot créé');
   }
   return ephemeral('Réglage inconnu.');
 }

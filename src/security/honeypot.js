@@ -46,7 +46,7 @@ export async function enableHoneypot(guild, reason) {
 export async function refreshHoneypot(guild) {
   const channel = honeypotOf(guild);
   if (!channel) return;
-  if (OLD_NAMES.includes(channel.name)) await channel.edit({ name: NAME, topic: TOPIC, reason: 'MAGI : nouveau nom du salon piège' });
+  if (OLD_NAMES.includes(channel.name)) await channel.edit({ name: NAME, topic: TOPIC, reason: 'MAGI : nouveau nom du honeypot' });
   if (setting(guild.id, 'honeypot_version') === VERSION) return;
   const recent = await channel.messages.fetch({ limit: 20 }).catch(() => null);
   for (const message of recent?.values() ?? []) if (message.author.id === guild.client.user.id) await message.delete().catch(() => {});

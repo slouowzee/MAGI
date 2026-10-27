@@ -5,25 +5,25 @@ import { latestBackup } from '../../storage/backups.js';
 
 export const SECURITY_TOOLS = [
   {
-    name: 'salon_piege',
+    name: 'honeypot',
     description:
-      "Active ou désactive le salon piège à bots : un salon visible de tous, en haut de la liste, où personne ne doit écrire. Les comptes de spam écrivent partout et tombent dedans : bannissement et suppression de leurs messages des dernières 24 h. Opérateurs et modérateurs exemptés. Demande une confirmation.",
+      "Active ou désactive le honeypot, un salon piège à bots : un salon visible de tous, en haut de la liste, où personne ne doit écrire. Les comptes de spam écrivent partout et tombent dedans : bannissement et suppression de leurs messages des dernières 24 h. Opérateurs et modérateurs exemptés. Demande une confirmation.",
     parameters: { type: 'object', properties: { actif: { type: 'boolean' } }, required: ['actif'] },
     access: 'operator',
     panel: true,
     confirm({ guild, args }) {
       const current = honeypotOf(guild);
-      if (args.actif && current) throw new Error(`le salon piège existe déjà : #${current.name}`);
-      if (!args.actif && !current) throw new Error("il n'y a pas de salon piège");
-      return args.actif ? 'Créer le salon piège' : `Supprimer #${current.name}`;
+      if (args.actif && current) throw new Error(`le honeypot existe déjà : #${current.name}`);
+      if (!args.actif && !current) throw new Error("il n'y a pas de honeypot");
+      return args.actif ? 'Créer le honeypot' : `Supprimer #${current.name}`;
     },
     async run({ guild, args, reason }) {
       if (!args.actif) {
         await disableHoneypot(guild, reason);
-        return 'Salon piège supprimé.';
+        return 'Honeypot supprimé.';
       }
       const channel = await enableHoneypot(guild, reason);
-      return `Salon piège actif : ${channel}. Tout message d'un membre sans rôle de modération y entraîne un bannissement.`;
+      return `Honeypot actif : ${channel}. Tout message d'un membre sans rôle de modération y entraîne un bannissement.`;
     },
   },
   {
