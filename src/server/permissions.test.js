@@ -15,5 +15,9 @@ test('le niveau courant est le plus haut dont toutes les permissions sont accord
 test("le lien d'autorisation cible le serveur et le niveau", () => {
   const url = new URL(inviteUrl('123', '456', 'discussion'));
   assert.equal(url.searchParams.get('guild_id'), '456');
-  assert.equal(BigInt(url.searchParams.get('permissions')), new PermissionsBitField(LEVELS.discussion.perms).bitfield);
+  const granted = new PermissionsBitField(BigInt(url.searchParams.get('permissions')));
+  assert.ok(granted.has(LEVELS.discussion.perms));
+  assert.ok(granted.has(PermissionFlagsBits.SendPolls));
+  assert.ok(!granted.has(PermissionFlagsBits.ManageEvents));
+  assert.ok(new PermissionsBitField(BigInt(new URL(inviteUrl('123', '456', 'gestion')).searchParams.get('permissions'))).has([PermissionFlagsBits.ManageEvents, PermissionFlagsBits.MoveMembers, PermissionFlagsBits.SendPolls]));
 });

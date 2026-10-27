@@ -10,10 +10,49 @@ export const MODULES = {
   bienvenue: 'Bienvenue et départs',
   antinuke: 'Anti-nuke',
   sauvegardes: 'Sauvegardes automatiques',
+  commandes: 'Clic droit et /chuchoter',
+  vocaux: 'Écoute des messages vocaux',
+  debat: 'Débats entre unités',
+  etoiles: 'Mur des étoiles',
+  sondages: 'Sondages',
+  evenements: 'Événements',
+  anniversaires: 'Anniversaires',
+  synchro: 'Taux de synchronisation',
+  vocal_temporaire: 'Salons vocaux temporaires',
+  tickets: 'Tickets',
+  filtre_arrivee: "Filtre à l'arrivée",
+  anti_raid: 'Anti-raid',
+  statut: 'Statut dynamique',
 };
-const OFF_BY_DEFAULT = new Set(['bienvenue']);
+const OFF_BY_DEFAULT = new Set(['bienvenue', 'etoiles', 'anniversaires', 'synchro', 'vocal_temporaire', 'tickets', 'filtre_arrivee']);
+
+export const OPTIONS = {
+  stars_threshold: { default: '5', values: ['3', '5', '7', '10', '15'] },
+  gate_min_age: { default: '7', values: ['0', '1', '3', '7', '30'] },
+  raid_threshold: { default: '10', values: ['5', '10', '20', '30'] },
+};
 
 const list = (guildId, key) => setting(guildId, key)?.split(',').filter(Boolean) ?? [];
+
+export const settingList = list;
+
+export function setSettingList(guildId, key, ids) {
+  setSetting(guildId, key, ids.join(',') || null);
+}
+
+export function option(guildId, key) {
+  const value = setting(guildId, key);
+  return OPTIONS[key].values.includes(value) ? value : OPTIONS[key].default;
+}
+
+export function channelSetting(guild, key) {
+  return guild.channels.cache.get(setting(guild.id, key)) ?? null;
+}
+
+export function personaForChannel(channel) {
+  const id = channel.isThread?.() ? channel.parentId : channel.id;
+  return Object.keys(PERSONAS).find((p) => list(channel.guild.id, `persona_channels:${p}`).includes(id)) ?? null;
+}
 
 export function moduleEnabled(guildId, name) {
   const value = setting(guildId, `module:${name}`);
