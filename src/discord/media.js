@@ -1,15 +1,18 @@
 import { StickerFormatType } from 'discord.js';
+import { moduleEnabled } from '../server/config.js';
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const MAX_CACHED = 30;
 const MIN_VIDEO_SECONDS = 0.5;
-const SUPPORTED = /^(?:image\/(?:png|jpeg|webp|gif)|video\/(?:mp4|webm|quicktime))$/;
+const SUPPORTED = /^(?:image\/(?:png|jpeg|webp|gif)|video\/(?:mp4|webm|quicktime)|audio\/(?:ogg|mpeg|mp3|wav|x-wav|mp4|aac|webm))$/;
 const cache = new Map();
 
 export function mediaOf(msg) {
   const items = [];
   for (const attachment of msg.attachments?.values() ?? []) {
-    if (SUPPORTED.test(attachment.contentType ?? '') && (attachment.size ?? 0) <= MAX_BYTES) items.push({ url: attachment.url, mime: attachment.contentType });
+    const type = attachment.contentType ?? '';
+    if (type.startsWith('audio/') && !(msg.guild && moduleEnabled(msg.guild.id, 'vocaux'))) continue;
+    if (SUPPORTED.test(type) && (attachment.size ?? 0) <= MAX_BYTES) items.push({ url: attachment.url, mime: type });
   }
   for (const embed of msg.embeds ?? []) {
     const animated = embed.data?.type === 'gifv';

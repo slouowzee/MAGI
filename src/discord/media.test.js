@@ -26,3 +26,11 @@ test('gif animé : la vidéo entière, sauf si elle est trop courte pour Gemini'
   const [court] = mediaOf(gifv('https://gif.test/court.mp4'));
   expect(await inline(court)).toBe(`data:image/webp;base64,${files['https://gif.test/fixe.webp'].toString('base64')}`);
 });
+
+test('messages vocaux joints seulement si le module est actif', async () => {
+  const { setModules, MODULES } = await import('../server/config.js');
+  const msg = { guild: { id: 'g-vocaux' }, attachments: new Map([['1', { url: 'https://cdn.test/vocal.ogg', contentType: 'audio/ogg', size: 2000 }]]) };
+  expect(mediaOf(msg)).toEqual([{ url: 'https://cdn.test/vocal.ogg', mime: 'audio/ogg' }]);
+  setModules('g-vocaux', Object.keys(MODULES).filter((m) => m !== 'vocaux'));
+  expect(mediaOf(msg)).toEqual([]);
+});

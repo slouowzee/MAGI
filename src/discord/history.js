@@ -1,3 +1,4 @@
+import { MessageFlags } from 'discord.js';
 import { PERSONAS, personaLabel } from '../personas.js';
 import { personaOf, REPLY_HEADER } from './webhooks.js';
 import { isOperator } from '../server/installation.js';
@@ -16,8 +17,9 @@ const GIF_LINK = /https?:\/\/(?:[\w-]+\.)*(?:tenor\.com|giphy\.com)\/\S+/gi;
 const HAS_GIF_LINK = /https?:\/\/(?:[\w-]+\.)*(?:tenor\.com|giphy\.com)\//i;
 const answeredTo = new Map();
 
-function kind(attachment) {
+function kind(attachment, msg) {
   const type = attachment.contentType ?? '';
+  if (type.startsWith('audio/') && msg.flags?.has?.(MessageFlags.IsVoiceMessage)) return 'message vocal';
   if (type === 'image/gif') return 'gif';
   if (type.startsWith('image/')) return 'image';
   if (type.startsWith('video/')) return 'vidéo';
@@ -27,7 +29,7 @@ function kind(attachment) {
 
 export function describe(msg, text = msg.content) {
   const parts = [text.replace(REPLY_HEADER, '').replace(GIF_LINK, '[gif]').replace(CUSTOM_EMOJI, ':$1:').trim()];
-  for (const attachment of msg.attachments?.values() ?? []) parts.push(`[${kind(attachment)}]`);
+  for (const attachment of msg.attachments?.values() ?? []) parts.push(`[${kind(attachment, msg)}]`);
   for (const sticker of msg.stickers?.values() ?? []) parts.push(`[sticker ${sticker.name}]`);
   return parts.filter(Boolean).join(' ');
 }
@@ -114,6 +116,15 @@ async function attachMedia(records) {
     parts.push({ type: 'text', text: `Pièce jointe n°${n} :` }, { type: 'image_url', image_url: { url: data } });
   }
   return parts;
+}
+
+export async function messageTurn(msg, instruction) {
+  const rec = record(msg, msg.client.user.id) ?? { id: msg.id, msg, author: displayName(msg), content: describe(msg) };
+  const media = await attachMedia([rec]);
+  const pieces = rec.pieces?.length ? ` [pièce jointe n°${rec.pieces.join(', n°')}]` : '';
+  const who = rec.speaker ? personaLabel(rec.speaker) : rec.author;
+  const text = `Message de ${who} :\n« ${rec.content.slice(0, MAX_CHARS)}${pieces} »\n\n${instruction}`;
+  return { role: 'user', content: media.length ? [{ type: 'text', text }, ...media] : text };
 }
 
 export function transcriptLine(msg) {

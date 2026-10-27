@@ -4,6 +4,7 @@ import { activePersonas, isMuted, moduleEnabled } from '../server/config.js';
 import { memoryContext, summarizeConversation } from './memory.js';
 import { floodCheck, quickReaction } from './rules.js';
 import { runVote } from './vote.js';
+import { runDebate, wantsDebate } from './debate.js';
 import { maybeIntervene } from './spontaneous.js';
 import { addressedPersonas, detect, VOTE_INTENT, wantsDetail, wantsSummary } from './triggers.js';
 import { buttonsFor, previewsFor } from '../discord/buttons.js';
@@ -71,6 +72,9 @@ export async function handleMessage(message, { catchUp = false } = {}) {
   if (trigger.vote && voting) return runVote(message, question);
   const allowed = activePersonas(message.guild.id);
   const group = addressedPersonas(message.content).filter((p) => allowed.includes(p));
+  if (moduleEnabled(message.guild.id, 'debat') && wantsDebate(question) && allowed.length >= 2) {
+    return runDebate(message, question, group.length >= 2 ? group : allowed, { vote: voting && VOTE_INTENT.test(message.content) });
+  }
   if (voting && group.length >= 2 && VOTE_INTENT.test(message.content)) {
     log.info('vote', `demandé par ${message.author.tag} : ${group.join(', ')}`, where);
     return runVote(message, message.content, group);

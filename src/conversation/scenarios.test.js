@@ -267,6 +267,15 @@ test('demande de résumé : le salon est relu par le code avant la réponse', as
   expect(context).toContain('] faceless : grave, je ramène la switch');
 });
 
+test('débat : deux tours entre les unités, puis vote si demandé', async () => {
+  const w = world('debat');
+  const msg = await w.say('slou', 'magi, débattez : pizza ou sushi ?');
+  expect(msg.answers.map((a) => a.persona)).toEqual(['melchior', 'balthasar', 'casper', 'melchior', 'balthasar', 'casper']);
+  expect(lastContext('casper')).toContain('Ce que les autres unités ont dit');
+  const voted = await w.say('slou', 'magi, débattez puis votez : on passe le serveur en anglais ?');
+  expect(voted.answers.at(-1).content).toContain('MAGI · ');
+});
+
 test('le propriétaire du serveur est signalé', async () => {
   const w = world('roles');
   await w.say('slou', 'melchior, statut ?');

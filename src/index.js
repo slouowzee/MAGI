@@ -11,6 +11,7 @@ import { db } from './storage/db.js';
 import { watchAuditLog } from './security/antinuke.js';
 import { startBackups } from './security/backup.js';
 import { catchUp } from './conversation/catch-up.js';
+import { handleCommand, isCommand } from './conversation/commands.js';
 import { log } from './logging/log.js';
 import { llmChain } from './llm/client.js';
 import { attachDiscord, flushAll } from './logging/discord.js';
@@ -51,6 +52,7 @@ client.on(Events.GuildRoleUpdate, (before, after) => {
 });
 client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => watchAuditLog(entry, guild).catch((err) => log.err('antinuke', err.message, { guild })));
 client.on(Events.InteractionCreate, (interaction) => {
+  if (isCommand(interaction)) return handleCommand(interaction);
   const id = interaction.customId ?? '';
   const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : handleInteraction;
   handler(interaction).catch((err) => log.err('interaction', `${id} : ${err.message}`, { guild: interaction.guild, channel: interaction.channel }));

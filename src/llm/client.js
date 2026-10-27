@@ -43,6 +43,42 @@ function pause(id) {
 
 export const forReply = () => (process.env.GEMINI_REPLY_MODEL ? { model: process.env.GEMINI_REPLY_MODEL, reasoning: 'none' } : {});
 export const activeProviders = () => Object.keys(PROVIDERS).filter((name) => process.env[PROVIDERS[name].key]);
+const stats = new Map();
+const listeners = new Set();
+let busy = 0;
+
+function track(id, outcome) {
+  const s = stats.get(id) ?? { ok: 0, fail: 0, latency: null, lastError: null, lastAt: null };
+  if (outcome.ms !== undefined) {
+    s.ok++;
+    s.latency = s.latency === null ? outcome.ms : Math.round(s.latency * 0.7 + outcome.ms * 0.3);
+  } else {
+    s.fail++;
+    s.lastError = outcome.error;
+  }
+  s.lastAt = Date.now();
+  stats.set(id, s);
+}
+
+function notify() {
+  for (const fn of listeners) fn({ busy, status: llmStatus() });
+}
+
+export function onLlmActivity(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+export function llmStatus(now = Date.now()) {
+  return activeProviders().flatMap((name) =>
+    PROVIDERS[name].models().map((model) => {
+      const id = `${name}/${model}`;
+      const until = pausedUntil.get(id) ?? 0;
+      return { provider: name, model, paused: until > now ? until : null, strikes: strikes.get(id) ?? 0, ...(stats.get(id) ?? { ok: 0, fail: 0, latency: null, lastError: null, lastAt: null }) };
+    }),
+  );
+}
+
 export const llmChain = () => activeProviders().map((name) => `${name} (${PROVIDERS[name].models().join(', ')})`).join(' → ');
 
 async function post(url, headers, body, timeoutMs, signal) {
@@ -75,7 +111,7 @@ async function post(url, headers, body, timeoutMs, signal) {
 }
 
 const isMedia = (p) => p.type === 'image_url';
-const isVideo = (p) => isMedia(p) && p.image_url.url.startsWith('data:video/');
+const isVideo = (p) => isMedia(p) && /^data:(?:video|audio)\//.test(p.image_url.url);
 
 function hideMedia(messages, hidden) {
   let found = false;
@@ -202,6 +238,7 @@ function race(list, args, deadline, stagger) {
           if (done) return;
           running.delete(candidate.id);
           strikes.delete(candidate.id);
+          track(candidate.id, { ms: Date.now() - started });
           for (const { candidate: slower, started: since } of running.values()) {
             if (since > started) continue;
             pause(slower.id);
@@ -214,6 +251,7 @@ function race(list, args, deadline, stagger) {
           if (done) return;
           if (err instanceof ContentRefused) return finish({ refused: err });
           if (err.timedOut || err.status === 429 || err.status >= 500) pause(candidate.id);
+          track(candidate.id, { error: err.message });
           transient ||= !(err.status >= 400 && err.status < 500) || err.status === 429;
           failure = err;
           log.info('llm', `${candidate.model} : ${err.message}`);
@@ -227,6 +265,17 @@ function race(list, args, deadline, stagger) {
 
 export async function chat({ messages, format, options, tools, model, reasoning, timeoutMs = 90_000 }) {
   if (!activeProviders().length) throw new LLMUnavailable('aucune clé de LLM configurée');
+  busy++;
+  notify();
+  try {
+    return await attempt({ messages, format, options, tools, model, reasoning, timeoutMs });
+  } finally {
+    busy--;
+    notify();
+  }
+}
+
+async function attempt({ messages, format, options, tools, model, reasoning, timeoutMs }) {
   const deadline = Date.now() + timeoutMs;
   let failure = new LLMUnavailable('aucun modèle disponible');
   for (const delay of [0, ...RETRY_DELAYS]) {
