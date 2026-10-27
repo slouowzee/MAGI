@@ -79,3 +79,17 @@ db.exec(`CREATE TABLE IF NOT EXISTS conversations (
   data TEXT NOT NULL,
   at INTEGER NOT NULL
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS birthdays (
+  guild_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  month INTEGER NOT NULL,
+  day INTEGER NOT NULL,
+  PRIMARY KEY (guild_id, user_id)
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS synchro (
+  guild_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  points INTEGER NOT NULL DEFAULT 0,
+  last_at INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (guild_id, user_id)
+)`);

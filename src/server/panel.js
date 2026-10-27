@@ -23,6 +23,8 @@ import { installAndReport, isOperator, logChannels, magiCategory, operatorRole }
 import { log } from '../logging/log.js';
 import { syncCommands } from '../conversation/commands.js';
 import { ensureGate } from '../security/gate.js';
+import { postTicketPanel } from '../community/tickets.js';
+import { createHub } from '../community/voice.js';
 import { DISCORD_LEVELS, discordLevel } from '../logging/discord.js';
 import { atLeast, currentLevel, inviteUrl, LEVELS } from './permissions.js';
 
@@ -193,6 +195,10 @@ function servicesSection(guild) {
     components: [
       channelSelect('tickets_channel', 'Salon du panneau de tickets', [setting(guild.id, 'tickets_channel')], 1),
       channelSelect('voice_hub', 'Salon vocal générateur', [setting(guild.id, 'voice_hub')], 1, [ChannelType.GuildVoice]),
+      row([
+        new ButtonBuilder().setCustomId(id('tickets_post')).setLabel('Publier le panneau de tickets').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(id('voice_hub_create')).setLabel('Créer le salon générateur').setStyle(ButtonStyle.Secondary),
+      ]),
     ],
   };
 }
@@ -423,6 +429,17 @@ export async function handlePanelInteraction(interaction) {
     return changed(`${FIELD_LABELS[field] ?? field} = ${values.join(', ') || 'aucun'}`);
   }
   if (field === 'audit') return ephemeral(auditReport(guild));
+  if (field === 'tickets_post') {
+    const posted = await postTicketPanel(guild).catch((err) => err);
+    if (posted instanceof Error) return ephemeral(`Impossible : ${posted.message}.`);
+    await interaction.update(panelPage(guild, 'services'));
+    return changed(`panneau de tickets publié dans ${posted.channel}`);
+  }
+  if (field === 'voice_hub_create') {
+    const hub = await createHub(guild);
+    await interaction.update(panelPage(guild, 'services'));
+    return changed(`salon générateur ${hub} créé`);
+  }
   if (field === 'backup') {
     backupGuild(guild);
     await interaction.update(panelPage(guild, 'securite'));

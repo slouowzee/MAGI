@@ -7,6 +7,7 @@ import { MEMORY_TOOLS } from './memory.js';
 import { CHANNEL_TOOLS } from './channel.js';
 import { REMINDER_TOOLS } from './reminders.js';
 import { ADMIN_TOOLS } from './admin/index.js';
+import { COMMUNITY_TOOLS } from './community.js';
 
 const inModule = (module, tools) => tools.map((tool) => ({ ...tool, module }));
 
@@ -16,6 +17,7 @@ export const TOOLS = [
   ...CHANNEL_TOOLS,
   ...inModule('rappels', REMINDER_TOOLS),
   ...inModule('administration', ADMIN_TOOLS),
+  ...COMMUNITY_TOOLS,
 ];
 
 export function canUse(tool, member) {

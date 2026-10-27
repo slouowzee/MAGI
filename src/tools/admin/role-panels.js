@@ -7,7 +7,7 @@ const PREFIX = 'magi-role:';
 const UNIQUE_PREFIX = 'magi-role1:';
 const REASON = 'MAGI, rôle en libre-service';
 const silent = { allowedMentions: { parse: [] } };
-const DANGEROUS = [
+export const DANGEROUS = [
   PermissionFlagsBits.Administrator,
   PermissionFlagsBits.ManageGuild,
   PermissionFlagsBits.ManageRoles,

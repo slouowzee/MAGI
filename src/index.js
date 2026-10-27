@@ -1,4 +1,4 @@
-import { Client, Events, GatewayIntentBits } from 'discord.js';
+import { Client, Events, GatewayIntentBits, Partials } from 'discord.js';
 import { handleMessage } from './conversation/handle-message.js';
 import { moderate } from './moderation/index.js';
 import { handleInteraction } from './discord/buttons.js';
@@ -8,6 +8,11 @@ import { farewell, logArrival, welcome } from './server/welcome.js';
 import { gateMember, hideNewChannel } from './security/gate.js';
 import { resumeLockdowns, trackJoin } from './security/raid.js';
 import { handleSecurityButton, isSecurityButton } from './security/actions.js';
+import { handleStar } from './community/stars.js';
+import { trackActivity } from './community/synchro.js';
+import { cleanTemporary, handleVoiceState } from './community/voice.js';
+import { startBirthdays } from './community/birthdays.js';
+import { handleTicketInteraction, isTicketInteraction } from './community/tickets.js';
 import { startReminders } from './tools/reminders.js';
 import { startConversationSweeper } from './conversation/memory.js';
 import { db } from './storage/db.js';
@@ -34,7 +39,10 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildModeration,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.GuildVoiceStates,
   ],
+  partials: [Partials.Message, Partials.Reaction, Partials.User],
 });
 
 client.once(Events.ClientReady, async (c) => {
@@ -48,6 +56,8 @@ client.once(Events.ClientReady, async (c) => {
   startBackups(c);
   startPresence(c);
   resumeLockdowns(c);
+  startBirthdays(c);
+  cleanTemporary(c).catch(() => {});
 });
 
 client.on(Events.GuildCreate, setupGuild);
@@ -70,13 +80,16 @@ client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => watchAuditLog(entry
 client.on(Events.InteractionCreate, (interaction) => {
   if (isCommand(interaction)) return handleCommand(interaction);
   const id = interaction.customId ?? '';
-  const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : isSecurityButton(id) ? handleSecurityButton : handleInteraction;
+  const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : isSecurityButton(id) ? handleSecurityButton : isTicketInteraction(id) ? handleTicketInteraction : handleInteraction;
   handler(interaction).catch((err) => log.err('interaction', `${id} : ${err.message}`, { guild: interaction.guild, channel: interaction.channel }));
 });
 client.on(Events.MessageCreate, async (message) => {
   if (await moderate(message).catch((err) => log.err('moderation', err.message, { guild: message.guild, channel: message.channel }))) return;
+  trackActivity(message).catch((err) => log.err('synchro', err.message, { guild: message.guild }));
   await handleMessage(message);
 });
+client.on(Events.MessageReactionAdd, (reaction) => handleStar(reaction).catch((err) => log.err('etoiles', err.message, { guild: reaction.message.guild })));
+client.on(Events.VoiceStateUpdate, (before, after) => handleVoiceState(before, after).catch((err) => log.err('vocal', err.message, { guild: after.guild })));
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {
