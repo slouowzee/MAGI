@@ -6,6 +6,7 @@ import { setSetting, setting } from '../storage/settings.js';
 const PATH = process.env.HOST_JOURNAL ?? 'data/host-journal.fifo';
 const SSH_WINDOW = 10 * 60_000;
 const SSH = new Set(['sshd', 'sshd-session']);
+const NOISE = [/Duplicate line for path/, /Foreign process '.+' changed sysctl/];
 const failures = new Map();
 let failureTimer = null;
 let lastAt = Number(setting('global', 'host_journal_at') ?? 0);
@@ -17,6 +18,7 @@ export function classify(raw) {
   const message = text(raw.MESSAGE);
   if (!message) return null;
   const level = LEVELS[Number(raw.PRIORITY)] ?? 'info';
+  if (NOISE.some((pattern) => pattern.test(message))) return { level: 'debug', component, message };
   if (SSH.has(component)) {
     if (message.startsWith('Accepted ')) return { level: 'notice', component: 'sshd', message };
     const failed = message.match(/^(?:Failed \S+ for (?:invalid user )?\S+|Invalid user \S*) from (\S+)/);

@@ -95,6 +95,8 @@ test('journal du VPS : connexions, sudo et mémoire saturée classés', () => {
   expect(j('systemd', 'docker.service: Failed with result \'exit-code\'.', '4')).toMatchObject({ level: 'err' });
   expect(j('CRON', 'pam_unix(cron:session): session opened', '6')).toMatchObject({ level: 'info', component: 'CRON' });
   expect(classify({ SYSLOG_IDENTIFIER: 'x', MESSAGE: [104, 105] })).toMatchObject({ message: 'hi' });
+  expect(j('systemd-tmpfiles', '/usr/lib/tmpfiles.d/legacy.conf:14: Duplicate line for path "/run/lock", ignoring.', '5')).toMatchObject({ level: 'debug' });
+  expect(j('systemd-networkd', "Foreign process 'dockerd[728]' changed sysctl '/proc/sys/net/ipv6/conf/eth0/disable_ipv6' from '0' to '1'", '4')).toMatchObject({ level: 'debug' });
 });
 
 test('journal du VPS : doublons ignorés, échecs SSH résumés', () => {
