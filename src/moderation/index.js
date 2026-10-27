@@ -1,4 +1,4 @@
-import { PermissionFlagsBits } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } from 'discord.js';
 import { castVote, tally } from '../conversation/vote.js';
 import { speak } from '../discord/webhooks.js';
 import { choose, ContentRefused } from '../llm/client.js';
@@ -51,9 +51,11 @@ async function classify(message, reasons) {
   }
 }
 
-function report(guild, level, lines, component = 'moderation', mention = null) {
-  log[level](component, lines.join('\n').slice(0, 1800), { guild, mention });
+function report(guild, level, lines, component = 'moderation', mention = null, components = null) {
+  log[level](component, lines.join('\n').slice(0, 1800), { guild, mention, components });
 }
+
+const cancelButton = (userId) => [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`magi-mod:annuler:${userId}`).setLabel('Annuler la sanction').setStyle(ButtonStyle.Secondary))];
 
 async function voteBan(message, reasons, count) {
   const { member, guild } = message;
@@ -119,7 +121,7 @@ export async function moderate(message) {
   report(guild, 'notice', [
     `${observing ? '[observation] ' : ''}${member} dans ${message.channel} : ${finding.reasons.join(', ')}${finding.level === 'suspect' ? ` (LLM : ${verdict})` : ''}, infraction ${count}/30 j → ${action.label}`,
     `« ${message.content.slice(0, 1200)} »`,
-  ]);
+  ], 'moderation', null, observing ? null : cancelButton(member.id));
   if (observing) return false;
 
   const reason = `MAGI, modération automatique : ${finding.reasons.join(' ; ')}`;

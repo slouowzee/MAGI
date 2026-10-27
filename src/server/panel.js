@@ -22,6 +22,7 @@ import { activePersonas, enabledModules, MODULES, mutedChannels, OPTIONS, option
 import { installAndReport, isOperator, logChannels, magiCategory, operatorRole } from './installation.js';
 import { log } from '../logging/log.js';
 import { syncCommands } from '../conversation/commands.js';
+import { ensureGate } from '../security/gate.js';
 import { DISCORD_LEVELS, discordLevel } from '../logging/discord.js';
 import { atLeast, currentLevel, inviteUrl, LEVELS } from './permissions.js';
 
@@ -339,6 +340,7 @@ export async function setupGuild(guild) {
   await installAndReport(guild);
   await refreshPanel(guild).catch((err) => log.err('config', `échec panneau : ${err.message}`, { guild }));
   await syncCommands(guild).catch((err) => log.err('commandes', `échec enregistrement des commandes : ${err.message}`, { guild }));
+  await ensureGate(guild).catch((err) => log.err('filtre', `échec mise en place du filtre : ${err.message}`, { guild }));
   await refreshHoneypot(guild).catch((err) => log.err('honeypot', `échec mise à jour du honeypot : ${err.message}`, { guild }));
   await restylePublications(guild)
     .then((count) => count && log.notice('publications', `${count} publication(s) remise(s) en forme`, { guild }))
@@ -411,7 +413,10 @@ export async function handlePanelInteraction(interaction) {
   if (APPLY[field]) {
     const { section, apply } = APPLY[field];
     apply(guild, interaction.values ?? []);
-    if (field === 'modules') await syncCommands(guild).catch((err) => log.err('commandes', `échec enregistrement des commandes : ${err.message}`, { guild }));
+    if (field === 'modules') {
+      await syncCommands(guild).catch((err) => log.err('commandes', `échec enregistrement des commandes : ${err.message}`, { guild }));
+      ensureGate(guild).catch((err) => log.err('filtre', `échec mise en place du filtre : ${err.message}`, { guild }));
+    }
     setSetting(guild.id, 'config_page', section);
     await interaction.update(panelPage(guild, section));
     const values = (interaction.values ?? []).map((v) => (interaction.isChannelSelectMenu?.() ? `<#${v}>` : v));

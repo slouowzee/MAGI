@@ -4,7 +4,10 @@ import { moderate } from './moderation/index.js';
 import { handleInteraction } from './discord/buttons.js';
 import { handleRoleButton, isRoleButton } from './tools/admin/role-panels.js';
 import { handlePanelInteraction, isPanelInteraction, setupGuild } from './server/panel.js';
-import { farewell, welcome } from './server/welcome.js';
+import { farewell, logArrival, welcome } from './server/welcome.js';
+import { gateMember, hideNewChannel } from './security/gate.js';
+import { resumeLockdowns, trackJoin } from './security/raid.js';
+import { handleSecurityButton, isSecurityButton } from './security/actions.js';
 import { startReminders } from './tools/reminders.js';
 import { startConversationSweeper } from './conversation/memory.js';
 import { db } from './storage/db.js';
@@ -44,10 +47,21 @@ client.once(Events.ClientReady, async (c) => {
   startConversationSweeper(c);
   startBackups(c);
   startPresence(c);
+  resumeLockdowns(c);
 });
 
 client.on(Events.GuildCreate, setupGuild);
-client.on(Events.GuildMemberAdd, (member) => welcome(member).catch((err) => log.err('membres', `échec bienvenue : ${err.message}`, { guild: member.guild })));
+client.on(Events.GuildMemberAdd, async (member) => {
+  logArrival(member);
+  try {
+    const raid = await trackJoin(member);
+    if (await gateMember(member, { lockdown: raid })) return;
+    await welcome(member);
+  } catch (err) {
+    log.err('membres', `échec arrivée de ${member.user.tag} : ${err.message}`, { guild: member.guild });
+  }
+});
+client.on(Events.ChannelCreate, (channel) => channel.guild && hideNewChannel(channel).catch(() => {}));
 client.on(Events.GuildMemberRemove, (member) => farewell(member).catch(() => {}));
 client.on(Events.GuildRoleUpdate, (before, after) => {
   if (after.tags?.botId === client.user.id && before.permissions.bitfield !== after.permissions.bitfield) setupGuild(after.guild);
@@ -56,7 +70,7 @@ client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => watchAuditLog(entry
 client.on(Events.InteractionCreate, (interaction) => {
   if (isCommand(interaction)) return handleCommand(interaction);
   const id = interaction.customId ?? '';
-  const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : handleInteraction;
+  const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : isSecurityButton(id) ? handleSecurityButton : handleInteraction;
   handler(interaction).catch((err) => log.err('interaction', `${id} : ${err.message}`, { guild: interaction.guild, channel: interaction.channel }));
 });
 client.on(Events.MessageCreate, async (message) => {

@@ -13,9 +13,12 @@ function welcomeChannel(guild) {
   return guild.channels.cache.get(setting(guild.id, 'welcome_channel')) ?? guild.systemChannel ?? null;
 }
 
+export function logArrival(member) {
+  log.notice('membres', `arrivée ${member.user.tag} (${member.id}), compte du <t:${Math.floor(member.user.createdTimestamp / 1000)}>`, { guild: member.guild });
+}
+
 export async function welcome(member) {
   const { guild } = member;
-  log.notice('membres', `arrivée ${member.user.tag} (${member.id}), compte du <t:${Math.floor(member.user.createdTimestamp / 1000)}>`, { guild });
   if (member.user.bot || !moduleEnabled(guild.id, 'bienvenue')) return;
   const channel = welcomeChannel(guild);
   if (!channel) return;

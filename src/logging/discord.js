@@ -15,6 +15,8 @@ const SOURCES = {
   moderation: 'moderation',
   antinuke: 'securite',
   honeypot: 'securite',
+  antiraid: 'securite',
+  filtre: 'securite',
   audit: 'securite',
   sauvegarde: 'securite',
   sshd: 'securite',
@@ -97,11 +99,11 @@ export async function deliver(guild, entry) {
   const channel = channels[sourceOf(entry.component)] ?? channels.logs;
   if (!channel) return;
   const text = textLine(entry, guild);
-  if (!entry.mention) return queue(channel, `${entry.host} ${entry.component} ${entry.level} ${entry.channel?.id} ${entry.message}`, text);
+  if (!entry.mention && !entry.components) return queue(channel, `${entry.host} ${entry.component} ${entry.level} ${entry.channel?.id} ${entry.message}`, text);
   await flush(channel.id);
-  const { users = [], roles = [] } = entry.mention;
+  const { users = [], roles = [] } = entry.mention ?? {};
   const pings = [...users.map((id) => `<@${id}>`), ...roles.map((id) => `<@&${id}>`)].join(' ');
-  await send(channel, { content: `${pings}\n${block([clip(text)])}`, allowedMentions: { users, roles } });
+  await send(channel, { content: `${pings ? `${pings}\n` : ''}${block([clip(text)])}`, allowedMentions: { users, roles }, components: entry.components ?? [] });
 }
 
 export const ownerGuilds = (client) => (ownerId ? [...client.guilds.cache.values()].filter((g) => g.ownerId === ownerId) : []);
