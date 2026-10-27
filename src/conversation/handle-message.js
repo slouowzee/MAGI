@@ -1,6 +1,6 @@
 import { pickPersona, randomPersona, startsNewTopic } from './router.js';
 import { addMessage, answered, awaitingAnswer, closeConversation, followUpConversation, isClaimed, locateConversation, openConversation } from './threads.js';
-import { activePersonas, isMuted, moduleEnabled } from '../server/config.js';
+import { activePersonas, isMuted, moduleEnabled, personaForChannel } from '../server/config.js';
 import { memoryContext, summarizeConversation } from './memory.js';
 import { floodCheck, quickReaction } from './rules.js';
 import { runVote } from './vote.js';
@@ -87,7 +87,8 @@ export async function handleMessage(message, { catchUp = false } = {}) {
   }
   const current = conversation ?? openConversation({ channelId, guildId: message.guild.id }, now);
   addMessage(current, message.id, message.author.id, now, line);
-  let persona = allowed.includes(trigger.persona) ? trigger.persona : following && allowed.includes(following.persona) ? following.persona : null;
+  const channelPersona = current.persona ? null : personaForChannel(message.channel);
+  let persona = allowed.includes(trigger.persona) ? trigger.persona : following && allowed.includes(following.persona) ? following.persona : allowed.includes(channelPersona) ? channelPersona : null;
   if (!persona) {
     const pick = await pickPersona(question, current.persona, allowed);
     if (pick.vote && voting) {

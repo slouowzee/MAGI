@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "bun src/index.js",
-    "test": "bun test"
+    "test": "bun test",
+    "eval": "bun scripts/eval-prompts.js"
   },
   "dependencies": {
     "discord.js": "14.27.0",

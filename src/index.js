@@ -12,6 +12,7 @@ import { watchAuditLog } from './security/antinuke.js';
 import { startBackups } from './security/backup.js';
 import { catchUp } from './conversation/catch-up.js';
 import { handleCommand, isCommand } from './conversation/commands.js';
+import { startPresence } from './server/presence.js';
 import { log } from './logging/log.js';
 import { llmChain } from './llm/client.js';
 import { attachDiscord, flushAll } from './logging/discord.js';
@@ -42,6 +43,7 @@ client.once(Events.ClientReady, async (c) => {
   startReminders(c);
   startConversationSweeper(c);
   startBackups(c);
+  startPresence(c);
 });
 
 client.on(Events.GuildCreate, setupGuild);

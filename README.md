@@ -41,6 +41,8 @@ src/
 
 `ops/magi-journal.service` : service systemd du VPS qui transmet le journal système au bot.
 
+`bun run eval [persona…]` : rejoue un jeu de messages sur les vrais modèles et affiche réponses et latences, pour vérifier une retouche des prompts.
+
 Les tests sont à côté du fichier qu'ils testent (`*.test.js`).
 
 ## Commandes
@@ -48,6 +50,7 @@ Les tests sont à côté du fichier qu'ils testent (`*.test.js`).
 ```bash
 bun install
 bun test
+bun run eval
 bun start
 ```
 
