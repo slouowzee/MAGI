@@ -56,3 +56,11 @@ test('demandes de résumé reconnues, apostrophes typographiques comprises', asy
     [true, true, true, true, false, false],
   );
 });
+
+test('période du résumé : hier et aujourd’hui en heure de Paris', async () => {
+  const { periodOf } = await import('../tools/channel.js');
+  const now = Date.parse('2026-10-27T00:30:00+01:00');
+  assert.deepEqual(periodOf('résume ce qui s’est dit hier', now), { day: '2026-10-26', label: 'hier' });
+  assert.deepEqual(periodOf("récap d'aujourd’hui", now), { day: '2026-10-27', label: "aujourd'hui" });
+  assert.equal(periodOf('résume la discussion', now), undefined);
+});

@@ -7,7 +7,7 @@ import { runVote } from './vote.js';
 import { maybeIntervene } from './spontaneous.js';
 import { addressedPersonas, detect, VOTE_INTENT, wantsDetail, wantsSummary } from './triggers.js';
 import { buttonsFor, previewsFor } from '../discord/buttons.js';
-import { conversationFor, rememberAnswer } from '../discord/history.js';
+import { conversationFor, conversationPrompt, rememberAnswer } from '../discord/history.js';
 import { splitMessage } from '../discord/split.js';
 import { speak } from '../discord/webhooks.js';
 import { LLMUnavailable } from '../llm/client.js';
@@ -99,12 +99,13 @@ export async function handleMessage(message, { catchUp = false } = {}) {
   try {
     const { turns, participants, target, included } = await conversationFor(message, persona, message.content, current, (id) => isClaimed(channelId, id));
     for (const id of included) addMessage(current, id, null, Date.now());
+    const summary = wantsSummary(trigger.text);
     const { content: reply, model, actions } = await respond({
-      messages: buildMessages(persona, turns, length, memoryContext(message.guild.id, participants)),
+      messages: buildMessages(persona, summary ? [{ role: 'user', content: conversationPrompt([`${target} : ${message.content}`], target) }] : turns, length, memoryContext(message.guild.id, participants)),
       options: { num_predict: MAX_TOKENS[length] },
       member: message.member,
       message,
-      force: wantsSummary(trigger.text) ? 'resumer' : null,
+      force: summary ? 'resumer' : null,
     });
     clearInterval(typing);
     log.info('conversation', `${message.author.tag} → ${persona}, conv ${current.id}, ${model}, ${((Date.now() - started) / 1000).toFixed(1)} s`, where);

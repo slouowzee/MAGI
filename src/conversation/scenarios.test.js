@@ -262,9 +262,9 @@ test('demande de résumé : le salon est relu par le code avant la réponse', as
   await w.say('faceless', 'grave, je ramène la switch');
   await w.say('slou', 'magi, fais-moi un résumé de ce qui s’est dit');
   const context = requests.at(-1).context;
-  expect(context).toStartWith('Derniers messages du salon');
-  expect(context).toContain('lea : on se fait une soirée jeux vendredi ?');
-  expect(context).toContain('faceless : grave, je ramène la switch');
+  expect(context).toStartWith('Derniers messages du salon, datés');
+  expect(context).toMatch(/\[\w+\.? \d{2}\/\d{2} \d{2}:\d{2}\] lea : on se fait une soirée jeux vendredi \?/);
+  expect(context).toContain('] faceless : grave, je ramène la switch');
 });
 
 test('le propriétaire du serveur est signalé', async () => {
