@@ -101,7 +101,7 @@ export async function handleMessage(message, { catchUp = false } = {}) {
     for (const id of included) addMessage(current, id, null, Date.now());
     const summary = wantsSummary(trigger.text);
     const { content: reply, model, actions } = await respond({
-      messages: buildMessages(persona, summary ? [{ role: 'user', content: conversationPrompt([`${target} : ${message.content}`], target) }] : turns, length, memoryContext(message.guild.id, participants)),
+      messages: buildMessages(persona, summary ? [{ role: 'user', content: conversationPrompt([`${target} : ${message.content}`], target) }] : turns, length, await memoryContext(message.guild.id, participants, message.content)),
       options: { num_predict: MAX_TOKENS[length] },
       member: message.member,
       message,

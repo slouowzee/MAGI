@@ -9,14 +9,14 @@ import { log } from '../logging/log.js';
 const MIN_LINES = 4;
 const SWEEP_EVERY = 60_000;
 
-export function memoryContext(guildId, participants) {
+export async function memoryContext(guildId, participants, query = '') {
   if (!moduleEnabled(guildId, 'memoire')) return '';
   const lines = [];
   const summaries = new Map();
   for (const { id, name } of participants) {
-    const facts = factsAbout(guildId, id);
+    const facts = await factsAbout(guildId, id, undefined, query);
     if (facts.length) lines.push(`- ${name} : ${facts.join(' ; ')}`);
-    for (const summary of summariesAbout(guildId, id)) summaries.set(summary, [...(summaries.get(summary) ?? []), name]);
+    for (const summary of await summariesAbout(guildId, id, undefined, query)) summaries.set(summary, [...(summaries.get(summary) ?? []), name]);
   }
   for (const [summary, names] of summaries) lines.push(`- conversation passée avec ${names.join(', ')} : ${summary}`);
   if (!lines.length) return '';
@@ -43,7 +43,7 @@ export async function summarizeConversation(client, conversation) {
       ],
       options: { num_predict: 150, temperature: 0.2 },
     });
-    saveSummary(conversation.guildId, conversation.channelId, [...conversation.participants], content);
+    await saveSummary(conversation.guildId, conversation.channelId, [...conversation.participants], content);
     log.debug('memoire', `résumé conv ${conversation.id} enregistré`);
   } catch (err) {
     log.warning('memoire', `échec résumé conv ${conversation.id} : ${err.message}`);

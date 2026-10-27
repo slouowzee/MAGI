@@ -8,6 +8,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "discord.js": "14.27.0"
+    "discord.js": "14.27.0",
+    "fortunememory": "1.2.0"
   }
 }

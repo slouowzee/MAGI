@@ -41,7 +41,7 @@ export async function maybeIntervene(message) {
   lastIntervention.set(channelId, Date.now());
   log.info('conversation', `intervention ${choice} après ${message.author.tag}`, { channel: message.channel });
   const { turns, participants, target } = await conversationFor(message, choice, message.content);
-  const extra = [SPONTANEOUS, memoryContext(message.guild.id, participants)].filter(Boolean).join('\n');
+  const extra = [SPONTANEOUS, await memoryContext(message.guild.id, participants, message.content)].filter(Boolean).join('\n');
   const { content } = await chat({ messages: buildMessages(choice, turns, 'courte', extra), options: { num_predict: MAX_TOKENS.courte }, ...forReply() });
   const reply = cleanReply(content);
   if (!reply) return;

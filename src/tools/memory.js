@@ -21,7 +21,7 @@ export const MEMORY_TOOLS = [
     parameters: { type: 'object', properties: {} },
     access: 'everyone',
     async run({ guild, member }) {
-      const facts = factsAbout(guild.id, member.id, 30);
+      const facts = await factsAbout(guild.id, member.id, 100);
       return facts.length ? `Souvenirs sur ${member.displayName} :\n${facts.map((f) => `- ${f}`).join('\n')}` : `Aucun souvenir sur ${member.displayName}.`;
     },
   },
@@ -32,7 +32,7 @@ export const MEMORY_TOOLS = [
     access: 'everyone',
     confirm: () => 'Tout oublier sur moi',
     async run({ guild, member }) {
-      const { facts, summaries } = forgetUser(guild.id, member.id);
+      const { facts, summaries } = await forgetUser(guild.id, member.id);
       return `Oublié : ${facts} souvenir(s) et ${summaries} résumé(s) de conversation concernant ${member.displayName}.`;
     },
   },

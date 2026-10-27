@@ -36,6 +36,7 @@ src/
     installation.js           rôle Opérateur MAGI, catégorie et salons MAGI, hiérarchie
   storage/
     db.js                     base SQLite
+    memory.js                 mémoire fortunememory (faits, résumés, recherche)
 ```
 
 `ops/magi-journal.service` : service systemd du VPS qui transmet le journal système au bot.
