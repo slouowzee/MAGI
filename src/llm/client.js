@@ -27,6 +27,7 @@ const PROVIDERS = {
     key: 'GROQ_API_KEY',
     models: () => [process.env.GROQ_MODEL || 'openai/gpt-oss-120b'],
     media: 'none',
+    maxTokens: 7_000,
     thinking: (model) => (model.includes('gpt-oss') ? { body: { reasoning_effort: 'low', include_reasoning: false }, tokens: 1024 } : null),
   },
 };
@@ -62,7 +63,9 @@ async function post(url, headers, body, timeoutMs) {
     let detail;
     try {
       const parsed = JSON.parse(body);
-      detail = (Array.isArray(parsed) ? parsed[0] : parsed)?.error?.status;
+      const error = (Array.isArray(parsed) ? parsed[0] : parsed)?.error;
+      const limit = error?.message?.match(/\bon ([^:`]+): Limit (\d+), Used (\d+), Requested (\d+)/);
+      detail = [error?.status ?? error?.code, limit && `${limit[1]}, limite ${limit[2]}, utilisé ${limit[3]}, demandé ${limit[4]}`].filter(Boolean).join(' ') || undefined;
     } catch {}
     const error = new LLMUnavailable(`HTTP ${res.status} ${detail ?? body.replace(/\s+/g, ' ').slice(0, 120)}`);
     error.status = res.status;
@@ -92,8 +95,11 @@ function hideMedia(messages, hidden) {
 
 const shortId = (id) => Bun.hash(String(id)).toString(36).padStart(9, '0').slice(-9);
 
+const FOREIGN_SIGNATURE = { google: { thought_signature: 'skip_thought_signature_validator' } };
+
 function forProvider(provider, messages) {
-  let out = messages.map(({ name, ...m }) => (m.tool_calls ? { ...m, tool_calls: m.tool_calls.map(({ extra_content, ...c }) => (provider.media === 'video' ? { ...c, extra_content } : c)) } : m));
+  const keepSignature = provider.media === 'video';
+  let out = messages.map(({ name, ...m }) => (m.tool_calls ? { ...m, tool_calls: m.tool_calls.map(({ extra_content, ...c }) => (keepSignature ? { ...c, extra_content: extra_content ?? FOREIGN_SIGNATURE } : c)) } : m));
   if (provider.media === 'image') out = hideMedia(out, isVideo) || out;
   if (provider.media === 'none') out = hideMedia(out, isMedia) || out;
   if (provider.shortToolIds) {
@@ -118,6 +124,11 @@ async function complete(name, { messages, format, options = {}, tools, model, re
   if (format) body.response_format = { type: 'json_schema', json_schema: { name: 'reponse', schema: format } };
   if (reasoning && name === 'gemini') body.reasoning_effort = reasoning;
   if (tools?.length) body.tools = tools;
+  const size = (b) => Math.ceil(JSON.stringify(b).length / 3.5) + (b.max_tokens ?? 0);
+  if (provider.maxTokens && size(body) > provider.maxTokens) {
+    delete body.tools;
+    if (size(body) > provider.maxTokens) throw Object.assign(new LLMUnavailable(`requête trop grosse (≈${size(body)} tokens, limite ${provider.maxTokens})`), { status: 413 });
+  }
   const data = await post(provider.url, { Authorization: `Bearer ${process.env[provider.key]}` }, body, timeoutMs);
   const choice = data.choices?.[0];
   const message = choice?.message;
@@ -165,7 +176,7 @@ export async function chat({ messages, format, options, tools, model, reasoning,
   for (const delay of [0, ...RETRY_DELAYS]) {
     if (delay) {
       if (Date.now() + delay >= deadline) break;
-      log.notice('llm', `aucun modèle disponible, nouvel essai dans ${delay / 1000} s`);
+      log.info('llm', `aucun modèle disponible, nouvel essai dans ${delay / 1000} s`);
       await Bun.sleep(delay);
     }
     const list = candidates(model);

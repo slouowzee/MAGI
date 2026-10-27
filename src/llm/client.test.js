@@ -211,3 +211,45 @@ test('Gemini saturé : Mistral puis Groq prennent le relais, chacun avec ce qu�
   otherResponse = (url) => ok(String(url).includes('mistral') ? 'mistral ok' : 'groq ok');
   geminiResponse = () => ok('gemini ok');
 });
+
+test('appel d’outil venu d’un autre fournisseur : signature factice pour Gemini', async () => {
+  process.env.GEMINI_API_KEY = 'test';
+  let sent;
+  geminiResponse = (body) => {
+    sent = body;
+    return ok('résumé');
+  };
+  await chat({
+    model: 'modele-signature',
+    messages: [
+      { role: 'user', content: 'résume' },
+      { role: 'assistant', content: '', tool_calls: [{ id: 'fc_1', type: 'function', function: { name: 'resumer', arguments: '{}' } }] },
+      { role: 'tool', tool_call_id: 'fc_1', name: 'resumer', content: 'slou : salut' },
+    ],
+  });
+  assert.deepEqual(sent.messages[1].tool_calls[0].extra_content, { google: { thought_signature: 'skip_thought_signature_validator' } });
+  geminiResponse = () => ok('gemini ok');
+});
+
+test('Groq : outils retirés si la requête dépasse sa limite, refus sans pause si elle reste trop grosse', async () => {
+  process.env.GROQ_API_KEY = 'test';
+  delete process.env.GEMINI_API_KEY;
+  others.length = 0;
+  const tools = [{ type: 'function', function: { name: 'outil', description: 'x'.repeat(25_000), parameters: { type: 'object', properties: {} } } }];
+  const r = await chat({ messages: [{ role: 'user', content: 'salut' }], tools, options: { num_predict: 200 } });
+  assert.equal(r.content, 'groq ok');
+  assert.equal(others.at(-1).body.tools, undefined);
+  await assert.rejects(chat({ messages: [{ role: 'user', content: 'y'.repeat(40_000) }], options: { num_predict: 200 } }), /requête trop grosse/);
+  const again = await chat({ messages: [{ role: 'user', content: 'encore' }], options: { num_predict: 200 } });
+  assert.equal(again.content, 'groq ok');
+  delete process.env.GROQ_API_KEY;
+});
+
+test('erreur de quota Groq : limite lisible dans le message', async () => {
+  process.env.GROQ_API_KEY = 'test';
+  delete process.env.GEMINI_API_KEY;
+  otherResponse = () => Response.json({ error: { message: 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_x` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 6500, Requested 4200. Please try again in 20s.', type: 'tokens', code: 'rate_limit_exceeded' } }, { status: 429 });
+  await assert.rejects(chat({ messages: [{ role: 'user', content: 'q' }], timeoutMs: 1_000 }), (err) => err.message === 'HTTP 429 rate_limit_exceeded tokens per minute (TPM), limite 8000, utilisé 6500, demandé 4200');
+  otherResponse = (url) => ok(String(url).includes('mistral') ? 'mistral ok' : 'groq ok');
+  delete process.env.GROQ_API_KEY;
+});
