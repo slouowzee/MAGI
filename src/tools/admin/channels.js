@@ -13,6 +13,11 @@ function category(guild, ref) {
   return cat;
 }
 
+function renamable(guild, member, channel) {
+  if (magiChannelIds(guild).includes(channel.id) && member.id !== guild.ownerId) throw new Error(`#${channel.name} appartient à MAGI : seul le propriétaire du serveur peut le renommer`);
+  return channel;
+}
+
 function notLogs(guild, channel) {
   if (magiChannelIds(guild).includes(channel.id)) throw new Error(`#${channel.name} appartient à MAGI et ne peut pas être modifié par un outil`);
   return channel;
@@ -94,8 +99,8 @@ export const CHANNEL_ADMIN_TOOLS = [
       "Renomme un salon ou une catégorie. Salons texte : minuscules, chiffres, tirets, emojis et « ・ » ; Discord retire les points, espaces et majuscules. Pour aligner un salon sur le style du serveur, reprends le motif des autres noms vus avec liste_salons (par exemple « 📜・reglement »).",
     parameters: { type: 'object', properties: { ...channelArg, nom: { type: 'string' } }, required: ['nom'] },
     access: 'operator',
-    async run({ guild, message, args, reason }) {
-      const channel = notLogs(guild, targetChannel(guild, args.salon, message.channel));
+    async run({ guild, member, message, args, reason }) {
+      const channel = renamable(guild, member, targetChannel(guild, args.salon, message.channel));
       const old = channel.name;
       const wanted = String(args.nom);
       await channel.setName(wanted, reason);
