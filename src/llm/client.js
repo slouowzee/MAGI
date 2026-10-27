@@ -195,13 +195,15 @@ function race(list, args, deadline, stagger) {
       const left = deadline - Date.now();
       if (left <= 0) return settle();
       const controller = new AbortController();
-      running.set(candidate.id, { candidate, controller });
+      const started = Date.now();
+      running.set(candidate.id, { candidate, controller, started });
       withMedia(candidate.provider, { ...args, model: candidate.model, reasoning: candidate.model === args.model ? args.reasoning : undefined, timeoutMs: left, signal: controller.signal })
         .then((answer) => {
           if (done) return;
           running.delete(candidate.id);
           strikes.delete(candidate.id);
-          for (const { candidate: slower } of running.values()) {
+          for (const { candidate: slower, started: since } of running.values()) {
+            if (since > started) continue;
             pause(slower.id);
             log.info('llm', `${slower.model} : plus lent que ${candidate.model}`);
           }
