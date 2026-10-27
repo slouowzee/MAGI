@@ -48,3 +48,11 @@ test('toutes les unités interpellées sont repérées, pas celles dont on parle
   assert.equal(VOTE_INTENT.test('votez : on commande ?'), true);
   assert.equal(VOTE_INTENT.test('le votant arrive'), false);
 });
+
+test('demandes de résumé reconnues, apostrophes typographiques comprises', async () => {
+  const { wantsSummary } = await import('./triggers.js');
+  assert.deepEqual(
+    ['magi, fait moi un petit résumé de ce qui s’est dit hier', 'résume la discussion', 'tu peux récap ce qui se passe ici ?', 'ce que j’ai raté ?', 'magi, salut', 'fais-moi un résumé du film Dune'].map(wantsSummary),
+    [true, true, true, true, false, false],
+  );
+});

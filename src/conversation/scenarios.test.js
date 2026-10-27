@@ -120,7 +120,7 @@ function world(name) {
     if (!users[name]) {
       const id = nextId();
       users[name] = { id, bot: false, username: name, globalName: null, tag: name };
-      guild.members.cache.set(id, { id, displayName: name, guild, roles: { cache: new Collection() } });
+      guild.members.cache.set(id, { id, displayName: name, user: users[name], guild, roles: { cache: new Collection() } });
     }
     return users[name];
   }
@@ -254,6 +254,17 @@ test('réponse à une ancienne réplique de MAGI : toute la chaîne citée est j
   expect(context).toContain('slou (message cité, propriétaire du serveur) : balthasar, je te teste');
   expect(context).toContain('Balthasar (MAGI, message cité, à slou) : ');
   expect(context.indexOf('je te teste')).toBeLessThan(context.indexOf('Balthasar (MAGI'));
+});
+
+test('demande de résumé : le salon est relu par le code avant la réponse', async () => {
+  const w = world('resume');
+  await w.say('lea', 'on se fait une soirée jeux vendredi ?');
+  await w.say('faceless', 'grave, je ramène la switch');
+  await w.say('slou', 'magi, fais-moi un résumé de ce qui s’est dit');
+  const context = requests.at(-1).context;
+  expect(context).toStartWith('Derniers messages du salon');
+  expect(context).toContain('lea : on se fait une soirée jeux vendredi ?');
+  expect(context).toContain('faceless : grave, je ramène la switch');
 });
 
 test('le propriétaire du serveur est signalé', async () => {

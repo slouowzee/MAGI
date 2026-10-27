@@ -31,6 +31,15 @@ export function parseName(content) {
 
 const DETAIL = /\b(?:r[ée]sum\w*|expli(?:que|quer|cation|cations)|d[ée]taill\w*|en d[ée]tail|d[ée]veloppe\w*|approfondi\w*|tuto\w*|[ée]tape par [ée]tape|pas [àa] pas)\b/i;
 
+const SUMMARY = /(?<![\p{L}])(?:r[ée]sum[ée]s?|r[ée]sumer|r[ée]cap\p{L}*)(?![\p{L}])/iu;
+const ABOUT_CHAT = /discussion|conv|salon|ici|hier|aujourd'hui|ce matin|cette nuit|messages?|ce qu[i']|rat[ée]/iu;
+const MISSED = /ce que j'?ai rat[ée]|ce qu[i']\s*(?:s'est|on a|vous avez|ils ont) (?:dit|pass[ée]|racont[ée])/iu;
+
+export function wantsSummary(text) {
+  const clean = (text ?? '').replace(/[’‘]/g, "'");
+  return MISSED.test(clean) || (SUMMARY.test(clean) && ABOUT_CHAT.test(clean));
+}
+
 export function wantsDetail(text) {
   return DETAIL.test(text);
 }

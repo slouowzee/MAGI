@@ -5,7 +5,7 @@ import { memoryContext, summarizeConversation } from './memory.js';
 import { floodCheck, quickReaction } from './rules.js';
 import { runVote } from './vote.js';
 import { maybeIntervene } from './spontaneous.js';
-import { addressedPersonas, detect, VOTE_INTENT, wantsDetail } from './triggers.js';
+import { addressedPersonas, detect, VOTE_INTENT, wantsDetail, wantsSummary } from './triggers.js';
 import { buttonsFor, previewsFor } from '../discord/buttons.js';
 import { conversationFor, rememberAnswer } from '../discord/history.js';
 import { splitMessage } from '../discord/split.js';
@@ -104,6 +104,7 @@ export async function handleMessage(message, { catchUp = false } = {}) {
       options: { num_predict: MAX_TOKENS[length] },
       member: message.member,
       message,
+      force: wantsSummary(trigger.text) ? 'resumer' : null,
     });
     clearInterval(typing);
     log.info('conversation', `${message.author.tag} → ${persona}, conv ${current.id}, ${model}, ${((Date.now() - started) / 1000).toFixed(1)} s`, where);

@@ -5,7 +5,7 @@ const MAX_CHARS = 8000;
 export const CHANNEL_TOOLS = [
   {
     name: 'resumer',
-    description: "Récupère les derniers messages du salon pour en faire un résumé, quand quelqu'un demande ce qu'il a raté ou un résumé de la discussion.",
+    description: "Relit les derniers messages du salon (jusqu'à 100, y compris ceux d'hier ou des jours précédents) pour en faire un résumé : ce que quelqu'un a raté, ce qui s'est dit hier, le résumé de la discussion.",
     parameters: {
       type: 'object',
       properties: { nombre: { type: 'integer', description: 'Nombre de messages à relire, 50 par défaut, 100 au maximum.' } },
