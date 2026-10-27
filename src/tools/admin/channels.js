@@ -90,14 +90,17 @@ export const CHANNEL_ADMIN_TOOLS = [
   },
   {
     name: 'renommer_salon',
-    description: 'Renomme un salon ou une catégorie.',
+    description:
+      "Renomme un salon ou une catégorie. Salons texte : minuscules, chiffres, tirets, emojis et « ・ » ; Discord retire les points, espaces et majuscules. Pour aligner un salon sur le style du serveur, reprends le motif des autres noms vus avec liste_salons (par exemple « 📜・reglement »).",
     parameters: { type: 'object', properties: { ...channelArg, nom: { type: 'string' } }, required: ['nom'] },
     access: 'operator',
     async run({ guild, message, args, reason }) {
       const channel = notLogs(guild, targetChannel(guild, args.salon, message.channel));
       const old = channel.name;
-      await channel.setName(String(args.nom), reason);
-      return `#${old} renommé en ${channel}.`;
+      const wanted = String(args.nom);
+      await channel.setName(wanted, reason);
+      if (channel.name === old) return `Nom inchangé : Discord a transformé « ${wanted} » en « ${channel.name} », identique à l'ancien. Choisis un autre nom.`;
+      return `#${old} renommé en #${channel.name}${channel.name === wanted ? '' : ` (Discord a transformé « ${wanted} »)`}.`;
     },
   },
   {
