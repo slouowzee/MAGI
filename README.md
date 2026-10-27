@@ -3,7 +3,7 @@
 Bot Discord à trois personas inspirées des MAGI d'*Evangelion* : Melchior, Balthasar et Casper.
 
 - Spécification : [docs/spec.md](docs/spec.md)
-- Découpage en tâches : [docs/taches.md](docs/taches.md), suivi dans Plane (projet MAGI)
+- Suivi des tâches : Plane (projet MAGI)
 
 ## Structure
 
