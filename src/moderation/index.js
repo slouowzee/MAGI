@@ -74,11 +74,11 @@ async function trapped(message) {
   const { guild, member } = message;
   await message.delete().catch(() => {});
   const banned = await guild.members
-    .ban(member, { reason: 'MAGI : message dans le salon piège', deleteMessageSeconds: 86_400 })
+    .ban(member, { reason: 'MAGI : message dans le honeypot', deleteMessageSeconds: 86_400 })
     .then(() => true)
-    .catch((err) => report(guild, 'err', [`échec ban ${member} : ${err.message}`], 'piege'));
-  if (banned) report(guild, 'warning', [`${member.user.tag} (${member.id}) banni : message dans ${message.channel}, 24 h de messages supprimées`, `« ${message.content.slice(0, 500)} »`], 'piege');
-  await countTrigger(guild).catch((err) => report(guild, 'err', [`échec compteur : ${err.message}`], 'piege'));
+    .catch((err) => report(guild, 'err', [`échec ban ${member} : ${err.message}`], 'honeypot'));
+  if (banned) report(guild, 'warning', [`${member.user.tag} (${member.id}) banni : message dans ${message.channel}, 24 h de messages supprimées`, `« ${message.content.slice(0, 500)} »`], 'honeypot');
+  await countTrigger(guild).catch((err) => report(guild, 'err', [`échec compteur : ${err.message}`], 'honeypot'));
 }
 
 export async function moderate(message) {

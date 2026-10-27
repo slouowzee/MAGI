@@ -14,7 +14,7 @@ export const DEFAULT_DISCORD_LEVEL = 'notice';
 const SOURCES = {
   moderation: 'moderation',
   antinuke: 'securite',
-  piege: 'securite',
+  honeypot: 'securite',
   audit: 'securite',
   sauvegarde: 'securite',
   sshd: 'securite',
