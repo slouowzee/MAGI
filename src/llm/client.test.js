@@ -253,3 +253,13 @@ test('erreur de quota Groq : limite lisible dans le message', async () => {
   otherResponse = (url) => ok(String(url).includes('mistral') ? 'mistral ok' : 'groq ok');
   delete process.env.GROQ_API_KEY;
 });
+
+test('Groq : seuls les derniers outils sautent quand la requête est trop grosse', async () => {
+  process.env.GROQ_API_KEY = 'test';
+  delete process.env.GEMINI_API_KEY;
+  others.length = 0;
+  const tool = (name, size) => ({ type: 'function', function: { name, description: 'x'.repeat(size), parameters: { type: 'object', properties: {} } } });
+  await chat({ messages: [{ role: 'user', content: 'résume' }], tools: [tool('resumer', 100), tool('admin', 25_000)], options: { num_predict: 200 } });
+  assert.deepEqual(others.at(-1).body.tools.map((t) => t.function.name), ['resumer']);
+  delete process.env.GROQ_API_KEY;
+});

@@ -5,7 +5,7 @@ export class ContentRefused extends Error {}
 
 const COOLDOWN = 60_000;
 const MAX_COOLDOWN = 30 * 60_000;
-const PATIENCE = 12_000;
+const STAGGER = 5_000;
 const RETRY_DELAYS = [2_000, 5_000];
 
 const PROVIDERS = {
@@ -45,14 +45,14 @@ export const forReply = () => (process.env.GEMINI_REPLY_MODEL ? { model: process
 export const activeProviders = () => Object.keys(PROVIDERS).filter((name) => process.env[PROVIDERS[name].key]);
 export const llmChain = () => activeProviders().map((name) => `${name} (${PROVIDERS[name].models().join(', ')})`).join(' → ');
 
-async function post(url, headers, body, timeoutMs) {
+async function post(url, headers, body, timeoutMs, signal) {
   let res;
   try {
     res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: signal ? AbortSignal.any([AbortSignal.timeout(timeoutMs), signal]) : AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
     const timedOut = err.name === 'TimeoutError';
@@ -111,7 +111,7 @@ function forProvider(provider, messages) {
   return out;
 }
 
-async function complete(name, { messages, format, options = {}, tools, model, reasoning, timeoutMs }) {
+async function complete(name, { messages, format, options = {}, tools, model, reasoning, timeoutMs, signal }) {
   const provider = PROVIDERS[name];
   const thinking = provider.thinking?.(model);
   const body = {
@@ -126,10 +126,11 @@ async function complete(name, { messages, format, options = {}, tools, model, re
   if (tools?.length) body.tools = tools;
   const size = (b) => Math.ceil(JSON.stringify(b).length / 3.5) + (b.max_tokens ?? 0);
   if (provider.maxTokens && size(body) > provider.maxTokens) {
-    delete body.tools;
+    while (body.tools?.length && size(body) > provider.maxTokens) body.tools = body.tools.slice(0, -1);
+    if (!body.tools?.length) delete body.tools;
     if (size(body) > provider.maxTokens) throw Object.assign(new LLMUnavailable(`requête trop grosse (≈${size(body)} tokens, limite ${provider.maxTokens})`), { status: 413 });
   }
-  const data = await post(provider.url, { Authorization: `Bearer ${process.env[provider.key]}` }, body, timeoutMs);
+  const data = await post(provider.url, { Authorization: `Bearer ${process.env[provider.key]}` }, body, timeoutMs, signal);
   const choice = data.choices?.[0];
   const message = choice?.message;
   if (choice?.finish_reason === 'content_filter') throw new ContentRefused(`réponse bloquée par le filtre de ${name}`);
@@ -169,6 +170,59 @@ function candidates(model) {
   return awake.length ? awake : all;
 }
 
+function race(list, args, deadline, stagger) {
+  return new Promise((resolve) => {
+    const running = new Map();
+    let next = 0;
+    let done = false;
+    let failure = null;
+    let transient = false;
+    let timer = null;
+    const finish = (outcome) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      for (const { controller } of running.values()) controller.abort();
+      resolve(outcome);
+    };
+    const settle = () => {
+      if (!running.size && next >= list.length) finish({ failure, transient });
+    };
+    const launch = () => {
+      clearTimeout(timer);
+      if (done || next >= list.length) return settle();
+      const candidate = list[next++];
+      const left = deadline - Date.now();
+      if (left <= 0) return settle();
+      const controller = new AbortController();
+      running.set(candidate.id, { candidate, controller });
+      withMedia(candidate.provider, { ...args, model: candidate.model, reasoning: candidate.model === args.model ? args.reasoning : undefined, timeoutMs: left, signal: controller.signal })
+        .then((answer) => {
+          if (done) return;
+          running.delete(candidate.id);
+          strikes.delete(candidate.id);
+          for (const { candidate: slower } of running.values()) {
+            pause(slower.id);
+            log.info('llm', `${slower.model} : plus lent que ${candidate.model}`);
+          }
+          finish({ answer: result(answer, candidate.model) });
+        })
+        .catch((err) => {
+          running.delete(candidate.id);
+          if (done) return;
+          if (err instanceof ContentRefused) return finish({ refused: err });
+          if (err.timedOut || err.status === 429 || err.status >= 500) pause(candidate.id);
+          transient ||= !(err.status >= 400 && err.status < 500) || err.status === 429;
+          failure = err;
+          log.info('llm', `${candidate.model} : ${err.message}`);
+          launch();
+        });
+      timer = setTimeout(launch, stagger);
+    };
+    launch();
+  });
+}
+
 export async function chat({ messages, format, options, tools, model, reasoning, timeoutMs = 90_000 }) {
   if (!activeProviders().length) throw new LLMUnavailable('aucune clé de LLM configurée');
   const deadline = Date.now() + timeoutMs;
@@ -179,25 +233,11 @@ export async function chat({ messages, format, options, tools, model, reasoning,
       log.info('llm', `aucun modèle disponible, nouvel essai dans ${delay / 1000} s`);
       await Bun.sleep(delay);
     }
-    const list = candidates(model);
-    let transient = false;
-    for (const [i, candidate] of list.entries()) {
-      const left = deadline - Date.now();
-      if (left <= 0) break;
-      const patience = i < list.length - 1 ? Math.min(PATIENCE, timeoutMs / 3) : 60_000;
-      try {
-        const answer = await withMedia(candidate.provider, { messages, format, options, tools, model: candidate.model, reasoning: candidate.model === model ? reasoning : undefined, timeoutMs: Math.min(left, patience) });
-        strikes.delete(candidate.id);
-        return result(answer, candidate.model);
-      } catch (err) {
-        if (err instanceof ContentRefused) throw err;
-        if (err.timedOut || err.status === 429 || err.status >= 500) pause(candidate.id);
-        transient ||= !(err.status >= 400 && err.status < 500) || err.status === 429;
-        failure = err;
-        log.info('llm', `${candidate.model} : ${err.message}`);
-      }
-    }
-    if (!transient) break;
+    const outcome = await race(candidates(model), { messages, format, options, tools, model, reasoning }, deadline, Math.min(STAGGER, timeoutMs / 3));
+    if (outcome.answer) return outcome.answer;
+    if (outcome.refused) throw outcome.refused;
+    failure = outcome.failure ?? failure;
+    if (!outcome.transient) break;
   }
   throw failure;
 }
