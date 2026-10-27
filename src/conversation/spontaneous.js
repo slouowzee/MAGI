@@ -9,8 +9,10 @@ import { addMessage, answered, openConversation } from './threads.js';
 import { log } from '../logging/log.js';
 
 const COOLDOWN = 30 * 60_000;
+const JUDGE_EVERY = 60_000;
 const MIN_LENGTH = 15;
 const lastIntervention = new Map();
+const lastJudged = new Map();
 
 const JUDGE = `Tu décides si une unité de MAGI (le bot du serveur) doit intervenir d'elle-même dans une discussion Discord, sans qu'on l'ait appelée.
 N'interviens que si c'est vraiment bienvenu : une question restée sans réponse que MAGI sait traiter, une erreur factuelle, un débat où un avis tranché amuserait, quelqu'un qui semble aller mal. Sinon, ignorer. Dans le doute, ignorer.
@@ -23,9 +25,15 @@ export function canIntervene(channelId, now = Date.now()) {
   return now - (lastIntervention.get(channelId) ?? -Infinity) >= COOLDOWN;
 }
 
+export function claimJudge(channelId, now = Date.now()) {
+  if (now - (lastJudged.get(channelId) ?? -Infinity) < JUDGE_EVERY) return false;
+  lastJudged.set(channelId, now);
+  return true;
+}
+
 export async function maybeIntervene(message) {
   const channelId = message.channel.id;
-  if (message.content.trim().length < MIN_LENGTH || !moduleEnabled(message.guild.id, 'interventions') || !interventionsAllowed(channelId) || !canIntervene(channelId)) return;
+  if (message.content.trim().length < MIN_LENGTH || !moduleEnabled(message.guild.id, 'interventions') || !interventionsAllowed(channelId) || !canIntervene(channelId) || !claimJudge(channelId)) return;
   const fetched = await message.channel.messages.fetch({ limit: 8, before: message.id }).catch(() => null);
   const lines = [...(fetched?.values() ?? [])].reverse().map(transcriptLine).filter(Boolean);
   lines.push(transcriptLine(message));
