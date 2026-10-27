@@ -40,7 +40,7 @@ async function execute(tool, args, { member, message, actions = [] }) {
   try {
     const output = await tool.run({ guild: member.guild, member, message, args, reason, offer });
     if (tool.panel) await refreshPanel(member.guild).catch(() => {});
-    log.notice('outils', `${tool.name} par ${member.user.tag}`, { guild: member.guild, channel: message.channel });
+    log[tool.readonly ? 'info' : 'notice']('outils', `${tool.name} par ${member.user.tag}`, { guild: member.guild, channel: message.channel });
     return output;
   } catch (err) {
     log.warning('outils', `échec ${tool.name} par ${member.user.tag} : ${err.message}`, { guild: member.guild, channel: message.channel });

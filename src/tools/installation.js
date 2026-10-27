@@ -9,6 +9,7 @@ export const INSTALLATION_TOOLS = [
       "Vérifie l'installation de MAGI sur ce serveur sans rien modifier : rôle Opérateur MAGI, salon #magi-logs, hiérarchie des rôles. À utiliser pour toute question sur l'installation de MAGI. Ensuite, présente les étapes manquantes.",
     parameters: { type: 'object', properties: {} },
     access: 'owner',
+    readonly: true,
     async run({ guild, offer }) {
       const steps = await installStatus(guild);
       const report = statusReport(steps);

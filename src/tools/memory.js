@@ -20,6 +20,7 @@ export const MEMORY_TOOLS = [
     description: 'Liste ce que MAGI a retenu sur la personne qui écrit.',
     parameters: { type: 'object', properties: {} },
     access: 'everyone',
+    readonly: true,
     async run({ guild, member }) {
       const facts = await factsAbout(guild.id, member.id, 100);
       return facts.length ? `Souvenirs sur ${member.displayName} :\n${facts.map((f) => `- ${f}`).join('\n')}` : `Aucun souvenir sur ${member.displayName}.`;

@@ -1,7 +1,8 @@
 import { expect, test } from 'bun:test';
 import assert from 'node:assert/strict';
 process.env.DB_PATH = ':memory:';
-const { addMessage, answered, awaitingAnswer, closeConversation, expiredConversations, findConversation, followUpConversation, openConversation } = await import('./threads.js');
+const { addMessage, answered, awaitingAnswer, closeConversation, expiredConversations, followUpConversation, locateConversation, openConversation } = await import('./threads.js');
+const findConversation = (where, now) => locateConversation(where, now).conversation;
 const { loadConversations } = await import('../storage/conversations.js');
 
 function conversation(channelId, authorId, messageId, now = 0) {

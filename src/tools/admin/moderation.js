@@ -25,6 +25,7 @@ export const MODERATION_TOOLS = [
     description: "Liste les infractions de modération d'un membre sur les 30 derniers jours.",
     parameters: { type: 'object', properties: { membre: { type: 'string' } }, required: ['membre'] },
     access: 'operator',
+    readonly: true,
     async run({ guild, args }) {
       const m = await findMember(guild, args.membre);
       if (!m) return `Membre introuvable : ${args.membre}`;

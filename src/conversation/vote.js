@@ -28,11 +28,11 @@ export function tally(votes) {
 }
 
 export function announcement({ outcome, pour, contre, abstentions, total }) {
-  if (outcome === 'impossible') return '**MAGI — Délibération impossible.** Aucune majorité.';
+  if (outcome === 'impossible') return '**MAGI · Délibération impossible.** Aucune majorité.';
   const unanimous = (outcome === 'adoptée' ? pour : contre) === total;
-  if (unanimous) return `**MAGI — Résolution ${outcome} à l'unanimité.**`;
+  if (unanimous) return `**MAGI · Résolution ${outcome} à l'unanimité.**`;
   const score = outcome === 'adoptée' ? `${pour} contre ${contre}` : `${contre} contre ${pour}`;
-  return `**MAGI — Résolution ${outcome}, ${score}${abstentions ? `, ${abstentions} abstention${abstentions > 1 ? 's' : ''}` : ''}.**`;
+  return `**MAGI · Résolution ${outcome}, ${score}${abstentions ? `, ${abstentions} abstention${abstentions > 1 ? 's' : ''}` : ''}.**`;
 }
 
 export async function castVote(persona, question) {

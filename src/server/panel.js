@@ -241,7 +241,7 @@ export async function refreshPanel(guild, { repost = false } = {}) {
 export async function setupGuild(guild) {
   await installAndReport(guild);
   await refreshPanel(guild).catch((err) => log.err('config', `échec panneau : ${err.message}`, { guild }));
-  await refreshHoneypot(guild).catch((err) => log.err('honeypot', `échec mise à jour du salon piège : ${err.message}`, { guild }));
+  await refreshHoneypot(guild).catch((err) => log.err('piege', `échec mise à jour du salon piège : ${err.message}`, { guild }));
   await restylePublications(guild)
     .then((count) => count && log.notice('publications', `${count} publication(s) remise(s) en forme`, { guild }))
     .catch((err) => log.err('publications', `échec remise en forme : ${err.message}`, { guild }));

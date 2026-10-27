@@ -45,3 +45,20 @@ test("rapport d'état de l'installation", async () => {
   assert.match(statusReport([{ step: 'hiérarchie', done: false, manual: true }]), /Il ne reste que l'étape manuelle/);
   assert.match(statusReport([{ step: 'x', done: true, manual: false }]), /^Installation complète/);
 });
+
+test('outils : lectures notées en info, actions en notice', async () => {
+  const { addSink } = await import('../logging/log.js');
+  const { runTool } = await import('./index.js');
+  const seen = [];
+  const detach = addSink((e) => e.component === 'outils' && seen.push([e.message.split(' ')[0], e.level]));
+  const tools = [
+    { name: 'lire', access: 'everyone', readonly: true, run: async () => 'lu' },
+    { name: 'agir', access: 'everyone', run: async () => 'fait' },
+  ];
+  const member = { id: 'm', user: { tag: 'slou' }, guild: { id: 'g-outils', name: 'G' } };
+  const ctx = { member, message: { channel: { name: 'test' } } };
+  await runTool({ name: 'lire', args: {} }, ctx, tools);
+  await runTool({ name: 'agir', args: {} }, ctx, tools);
+  detach();
+  assert.deepEqual(seen, [['lire', 'info'], ['agir', 'notice']]);
+});
