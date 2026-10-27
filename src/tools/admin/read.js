@@ -12,6 +12,7 @@ export const READ_TOOLS = [
     description: "Informations de modération sur un membre : arrivée sur le serveur, âge du compte, rôles, exclusion temporaire en cours.",
     parameters: { type: 'object', properties: { membre: { type: 'string', description: 'Mention, identifiant ou pseudo.' } }, required: ['membre'] },
     access: 'operator',
+    readonly: true,
     async run({ guild, args }) {
       const m = await findMember(guild, args.membre);
       if (!m) return `Membre introuvable : ${args.membre}`;
@@ -25,6 +26,7 @@ export const READ_TOOLS = [
     description: 'Liste les rôles du serveur, du plus haut au plus bas, avec leur nombre de membres connus.',
     parameters: none,
     access: 'operator',
+    readonly: true,
     async run({ guild }) {
       return [...guild.roles.cache.values()]
         .filter((r) => r.id !== guild.id)
@@ -38,6 +40,7 @@ export const READ_TOOLS = [
     description: 'Liste les catégories et salons du serveur.',
     parameters: none,
     access: 'operator',
+    readonly: true,
     async run({ guild }) {
       const channels = [...guild.channels.cache.values()].sort((a, b) => a.rawPosition - b.rawPosition);
       const lines = [];
@@ -54,6 +57,7 @@ export const READ_TOOLS = [
     description: "Dernières actions du journal d'audit Discord (qui a fait quoi).",
     parameters: { type: 'object', properties: { nombre: { type: 'integer', description: '10 par défaut, 25 au maximum.' } } },
     access: 'operator',
+    readonly: true,
     async run({ guild, args }) {
       const logs = await guild.fetchAuditLogs({ limit: Math.min(Math.max(Number(args.nombre) || 10, 1), 25) });
       return [...logs.entries.values()]

@@ -33,10 +33,6 @@ export function locateConversation({ channelId, authorId, referenceId, mentionId
   return { conversation: recent, by: recent ? 'author' : null };
 }
 
-export function findConversation(where, now = Date.now()) {
-  return locateConversation(where, now).conversation;
-}
-
 export function followUpConversation(channelId, userId, now = Date.now()) {
   return latest(live(channelId, now).filter((c) => c.follow?.userId === userId && now <= c.follow.until));
 }

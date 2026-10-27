@@ -23,7 +23,7 @@ export async function welcome(member) {
   const persona = personas.includes('balthasar') ? 'balthasar' : randomPersona(Math.random, personas);
   const rules = findPublication(guild.id, 'règlement');
   const hint = rules ? ` Invite la personne à lire le règlement dans <#${rules.channel_id}>.` : '';
-  let text = 'Bienvenue parmi nous. Installe-toi, et n’hésite pas à te présenter.';
+  let text = 'Bienvenue parmi nous, installe-toi et présente-toi quand tu veux.';
   try {
     const { content } = await chat({
       messages: [

@@ -32,6 +32,7 @@ export const SECURITY_TOOLS = [
       "Analyse la sécurité du serveur sans rien modifier : permissions dangereuses de @everyone, des rôles et des salons, niveau de vérification, filtre de contenu, double authentification. Présente ensuite les points à corriger, du plus grave au moins grave.",
     parameters: { type: 'object', properties: {} },
     access: 'operator',
+    readonly: true,
     run: ({ guild }) => auditReport(guild),
   },
   {

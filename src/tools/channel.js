@@ -28,6 +28,7 @@ export const CHANNEL_TOOLS = [
       properties: { nombre: { type: 'integer', description: 'Nombre de messages à relire, 50 par défaut, 100 au maximum.' } },
     },
     access: 'everyone',
+    readonly: true,
     async run({ message, args }) {
       const period = periodOf(message.content, message.createdTimestamp);
       const limit = period ? 100 : Math.min(Math.max(Number(args.nombre) || 50, 5), 100);

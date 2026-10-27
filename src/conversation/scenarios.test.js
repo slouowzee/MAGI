@@ -283,7 +283,7 @@ test('vote entre deux personas nommées', async () => {
   const w = world('vote');
   await w.say('slou', 'balthasar et melchior, votez : on commande des pizzas ?');
   expect(w.posted.filter((p) => p.persona !== 'magi').map((p) => p.persona)).toEqual(['balthasar', 'melchior']);
-  expect(w.posted.at(-1).content).toBe("**MAGI — Résolution adoptée à l'unanimité.**");
+  expect(w.posted.at(-1).content).toBe("**MAGI · Résolution adoptée à l'unanimité.**");
 });
 
 test('salon muet : aucune réponse', async () => {

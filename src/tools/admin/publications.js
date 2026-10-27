@@ -146,6 +146,7 @@ export const PUBLICATION_TOOLS = [
     description: 'Liste les derniers messages publiés par MAGI sur ce serveur.',
     parameters: { type: 'object', properties: {} },
     access: 'operator',
+    readonly: true,
     async run({ guild }) {
       const list = recentPublications(guild.id);
       if (!list.length) return 'Aucune publication de MAGI sur ce serveur.';

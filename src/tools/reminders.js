@@ -31,6 +31,7 @@ export const REMINDER_TOOLS = [
     description: 'Liste les rappels en attente de la personne qui écrit.',
     parameters: { type: 'object', properties: {} },
     access: 'everyone',
+    readonly: true,
     async run({ guild, member }) {
       const list = pendingReminders(guild.id, member.id);
       if (!list.length) return 'Aucun rappel en attente.';
