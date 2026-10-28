@@ -1,4 +1,5 @@
 import { PermissionFlagsBits } from 'discord.js';
+import { PERSONAS } from '../../core/personas.js';
 import { castVote, tally } from '../vote/vote.js';
 import { speak } from '../../core/discord/webhooks.js';
 import { choose, ContentRefused } from '../../core/llm/client.js';
@@ -59,7 +60,8 @@ function report(guild, level, lines, component = 'moderation', mention = null, c
 const INCIDENT = 60_000;
 const incidents = new Map();
 const VERDICT_KIND = { spam: 'spam', indesirable: 'indesirable', flagrant: 'flagrant' };
-const shortVote = (votes) => votes.map((v) => `${v.persona} ${v.verdict === 'APPROUVÉ' ? 'pour' : v.verdict === 'REFUSÉ' ? 'contre' : 'abstention'}`).join(', ');
+const BALLOT = { 'APPROUVÉ': '✅', 'REFUSÉ': '❌' };
+export const shortVote = (votes) => votes.map((v) => `${PERSONAS[v.persona]?.name ?? v.persona} ${BALLOT[v.verdict] ?? '➖'}`).join(' · ');
 
 async function voteBan(guild, c, member, reasons, count, sample) {
   const name = member?.displayName ?? member?.user?.username ?? 'ce membre';
@@ -68,11 +70,11 @@ async function voteBan(guild, c, member, reasons, count, sample) {
   const result = tally(votes);
   if (result.outcome === 'adoptée') {
     const banned = await guild.members.ban(c.userId, { reason: `MAGI, modération automatique : ${count} infractions, vote ${result.pour} contre ${result.contre}`, deleteMessageSeconds: 86_400 }).then(() => true).catch(() => false);
-    updateCase(guild, c.id, banned ? { banned: true, action: `${c.action}, banni par vote` } : {}, { event: banned ? `vote de ban adopté (${shortVote(votes)}), banni` : 'vote de ban adopté, mais le ban a échoué' });
+    updateCase(guild, c.id, banned ? { banned: true, action: `${c.action}, banni par vote` } : {}, { event: banned ? `vote de ban : ${shortVote(votes)} → banni` : `vote de ban : ${shortVote(votes)} → adopté, mais le ban a échoué` });
     log.notice('moderation', `cas #${c.id} : <@${c.userId}> banni par vote ${result.pour} contre ${result.contre}`, { guild, quiet: true });
     return;
   }
-  updateCase(guild, c.id, {}, { event: `vote de ban ${result.outcome === 'rejetée' ? 'rejeté' : 'sans majorité'} (${shortVote(votes)}), à vérifier` });
+  updateCase(guild, c.id, {}, { event: `vote de ban : ${shortVote(votes)} → ${result.outcome === 'rejetée' ? 'rejeté' : 'sans majorité'}, à vérifier` });
   await alertCase(guild, c, operatorRole(guild)?.id, `cas #${c.id} : le ban de <@${c.userId}> n'a pas été voté, à vérifier.`);
 }
 

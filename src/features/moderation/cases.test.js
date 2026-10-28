@@ -57,3 +57,9 @@ test('carte de cas : couleur et boutons selon l’état, identifiants uniques', 
   assert.match(JSON.stringify(json({ ...base, observing: true })), /Aurait fait/);
   assert.match(history('g-rafale', 'yui'), /#1 · .* · Infraction flagrante/);
 });
+
+test('vote de ban : une icône par unité', async () => {
+  const { shortVote } = await import('./index.js');
+  assert.equal(shortVote([{ persona: 'melchior', verdict: 'APPROUVÉ' }, { persona: 'balthasar', verdict: 'APPROUVÉ' }, { persona: 'casper', verdict: 'REFUSÉ' }]), 'Melchior ✅ · Balthasar ✅ · Casper ❌');
+  assert.equal(shortVote([{ persona: 'casper', verdict: 'ABSTENTION' }]), 'Casper ➖');
+});
