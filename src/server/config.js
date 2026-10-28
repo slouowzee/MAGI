@@ -63,8 +63,12 @@ export function enabledModules(guildId) {
   return Object.keys(MODULES).filter((name) => moduleEnabled(guildId, name));
 }
 
+export function setModule(guildId, name, on) {
+  setSetting(guildId, `module:${name}`, on ? '1' : '0');
+}
+
 export function setModules(guildId, enabled) {
-  for (const name of Object.keys(MODULES)) setSetting(guildId, `module:${name}`, enabled.includes(name) ? '1' : '0');
+  for (const name of Object.keys(MODULES)) setModule(guildId, name, enabled.includes(name));
 }
 
 export function activePersonas(guildId) {

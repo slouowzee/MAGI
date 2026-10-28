@@ -9,6 +9,7 @@ import { buildMessages, cleanReply, MAX_TOKENS } from '../llm/prompts.js';
 import { datedTranscript } from '../tools/channel.js';
 import { memoryContext } from './memory.js';
 import { log } from '../logging/log.js';
+import { openPanel } from '../server/panel.js';
 
 const ASK = {
   'Vérifier (Melchior)': { persona: 'melchior', instruction: "Vérifie les affirmations factuelles de ce message : dis ce qui est vrai, faux ou invérifiable, sans rien inventer. S'il n'y a rien de factuel à vérifier, dis-le." },
@@ -38,7 +39,10 @@ export const COMMANDS = [
       name: 'magi',
       type: ApplicationCommandType.ChatInput,
       description: 'MAGI',
-      options: [{ type: ApplicationCommandOptionType.Subcommand, name: 'statut', description: 'État des modèles de langage, latences et pauses (opérateurs)' }],
+      options: [
+        { type: ApplicationCommandOptionType.Subcommand, name: 'statut', description: 'État des modèles de langage, latences et pauses (opérateurs)' },
+        { type: ApplicationCommandOptionType.Subcommand, name: 'config', description: 'Ouvrir le panneau de configuration, visible par toi seul (opérateurs)' },
+      ],
     },
   },
 ];
@@ -123,7 +127,9 @@ export async function handleCommand(interaction) {
         ? () => whisper(interaction)
         : interaction.commandName === 'magi' && interaction.options.getSubcommand(false) === 'statut'
           ? () => status(interaction)
-          : null;
+          : interaction.commandName === 'magi' && interaction.options.getSubcommand(false) === 'config'
+            ? () => openPanel(interaction)
+            : null;
   if (!run) return;
   try {
     await run();
