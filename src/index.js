@@ -55,7 +55,8 @@ client.once(Events.ClientReady, async (c) => {
   const stopped = Number(setting('global', 'last_stop') ?? 0);
   const offline = stopped && Date.now() - stopped < 30 * 60_000 ? Math.max(1, Math.round((Date.now() - stopped) / 1000)) : null;
   setSetting('global', 'last_stop', null);
-  log.notice('bot', `${offline ? `Redémarré, ${offline} s d'interruption` : 'En ligne'} · modèles : ${llmChain() || 'aucun'}`);
+  log.notice('bot', offline ? `Redémarré, ${offline} s d'interruption` : 'En ligne');
+  if (!llmChain()) log.err('bot', 'aucun modèle de langage configuré, les unités ne peuvent pas répondre');
   startDigest(c, { channelOf: (guild) => logChannels(guild).logs, ownerGuilds });
   followHostJournal();
   await catchUp(c).catch((err) => log.err('rattrapage', `échec : ${err.message}`));
