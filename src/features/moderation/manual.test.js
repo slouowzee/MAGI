@@ -85,3 +85,28 @@ test('purge : efface cas et infractions du membre, et seulement les siens', asyn
   assert.equal(infractionLine('g-purge', 'yui'), 'Aucune infraction sur les 30 derniers jours.');
   assert.ok(recordOf('g-manuel', 'yui').cases.length > 0);
 });
+
+test('purge : le bouton « Tout effacer » répond et vide le casier', async () => {
+  const { handleLookupInteraction } = await import('./lookup.js');
+  const { recordOf } = await import('./store.js');
+  const w = world('g-bouton');
+  await punish({ guild: w.guild, moderator: w.mod, userId: 'yui', action: 'warn', reason: 'a' });
+  const owner = { ...w.mod, id: 'owner', permissions: { has: () => true } };
+  const replies = [];
+  const interaction = { customId: 'magi-look:purge-ok:yui', guild: w.guild, guildId: 'g-bouton', member: owner, user: { tag: 'owner' }, update: async (p) => replies.push(p.content), editReply: async (p) => replies.push(p.content), reply: async (p) => replies.push(p.content) };
+  await handleLookupInteraction(interaction);
+  assert.equal(replies[0], 'Purge en cours…');
+  assert.match(replies[1], /^Casier de <@yui> effacé : 1 cas, 1 infraction/);
+  assert.deepEqual([recordOf('g-bouton', 'yui').cases.length, recordOf('g-bouton', 'yui').infractions], [0, 0]);
+});
+
+test('lookup : la fenêtre Mute applique la sanction', async () => {
+  const { handleLookupInteraction } = await import('./lookup.js');
+  const w = world('g-fenetre');
+  const replies = [];
+  const fields = { duree: '6h', texte: 'spam en vocal' };
+  const interaction = { customId: 'magi-look:mute-set:yui', guild: w.guild, guildId: 'g-fenetre', member: w.mod, user: { tag: 'mod' }, fields: { getTextInputValue: (k) => fields[k] }, deferReply: async () => {}, editReply: async (p) => replies.push(p.content), reply: async (p) => replies.push(p.content) };
+  await handleLookupInteraction(interaction);
+  assert.match(replies[0], /^<@yui> exclu 6 h · cas #\d+/);
+  assert.deepEqual(w.calls.at(-1), ['timeout', 'yui', 6 * 3_600_000]);
+});

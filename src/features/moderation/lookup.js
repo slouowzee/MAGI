@@ -192,7 +192,7 @@ async function confirmPurge(interaction, userId) {
   });
 }
 
-async function purge(interaction, userId) {
+async function purgeRecord(interaction, userId) {
   const { guild, member: operator } = interaction;
   await interaction.update({ content: 'Purge en cours…', components: [] });
   const reason = `MAGI, purge du casier par ${interaction.user.tag}`;
@@ -211,7 +211,7 @@ export async function handleLookupInteraction(interaction) {
   if (!allowedToLook(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits.", ...ephemeral });
   if (action === 'purge' || action === 'purge-ok') {
     if (!isOperator(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits : purger un casier est réservé aux opérateurs MAGI.", ...ephemeral });
-    return action === 'purge' ? confirmPurge(interaction, userId) : purge(interaction, userId);
+    return action === 'purge' ? confirmPurge(interaction, userId) : purgeRecord(interaction, userId);
   }
   if (!action.endsWith('-set')) {
     if (action !== 'note' && !mayPunish(interaction.member, action)) return interaction.reply({ content: "Tu n'as pas la permission Discord pour cette sanction.", ...ephemeral });
@@ -225,8 +225,8 @@ export async function handleLookupInteraction(interaction) {
   }
   const duration = kind === 'mute' ? parseDuration(interaction.fields.getTextInputValue('duree')) : null;
   if (kind === 'mute' && !duration) return interaction.reply({ content: `Durée inconnue : choisis parmi ${Object.keys(DURATIONS).join(', ')}.`, ...ephemeral });
-  const purge = kind === 'ban' ? (PURGES[interaction.fields.getTextInputValue('messages').trim().toLowerCase()]?.[1] ?? 0) : 0;
+  const wipe = kind === 'ban' ? (PURGES[interaction.fields.getTextInputValue('messages').trim().toLowerCase()]?.[1] ?? 0) : 0;
   await interaction.deferReply(ephemeral);
-  const result = await punish({ guild: interaction.guild, moderator: interaction.member, userId, action: kind, reason: value, duration, purge }).catch((err) => `Impossible : ${err.message}.`);
+  const result = await punish({ guild: interaction.guild, moderator: interaction.member, userId, action: kind, reason: value, duration, purge: wipe }).catch((err) => `Impossible : ${err.message}.`);
   return interaction.editReply({ content: result });
 }
