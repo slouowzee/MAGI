@@ -34,15 +34,23 @@ test('une rafale du même membre donne un seul cas, une seule infraction, une se
 });
 
 test('carte de cas : couleur et boutons selon l’état, identifiants uniques', () => {
-  const base = { id: 7, userId: 'yui', kind: 'spam', reasons: ['10 messages en 3 s'], verdict: 'spam', action: 'suppression + exclusion 1 h', deleted: 10, sample: 'youre such a tryhard', infraction: 2, timeout: 3_600_000, status: 'active', events: [{ at: 1_793_021_041_000, text: 'exclu 1 h' }] };
+  const base = { id: 7, userId: 'yui', kind: 'spam', reasons: ['10 messages en 3 s'], verdict: 'spam', action: 'suppression + exclusion 1 h', deleted: 10, sample: 'youre such a tryhard', infraction: 2, infractionId: 5, excluded: false, status: 'active', events: [{ at: 1_793_021_041_000, text: 'exclu 1 h' }] };
   const json = (c) => caseCard(c).toJSON();
   const ids = (c) => JSON.stringify(json(c)).match(/"custom_id":"[^"]+"/g);
   const active = json(base);
-  assert.equal(active.accent_color, 0xd85a30);
+  assert.equal(active.accent_color, 0xef9f27);
   assert.match(JSON.stringify(active), /Cas #7 · Spam/);
   assert.match(JSON.stringify(active), /10 messages supprimés/);
   assert.match(JSON.stringify(active), /et 9 autres/);
-  assert.deepEqual(ids(base), ['"custom_id":"magi-mod:cas-annuler:7"', '"custom_id":"magi-mod:cas-exclure:7"', '"custom_id":"magi-mod:cas-bannir:7"', '"custom_id":"magi-mod:historique:yui"']);
+  assert.deepEqual(ids(base), ['"custom_id":"magi-mod:cas-infraction:7"', '"custom_id":"magi-mod:cas-exclure:7"', '"custom_id":"magi-mod:cas-bannir:7"', '"custom_id":"magi-mod:historique:yui"']);
+  const both = { ...base, excluded: true, excludedUntil: 1_793_024_641_000, banned: true, infractionId: 3, infraction: 3 };
+  assert.deepEqual(ids(both), ['"custom_id":"magi-mod:cas-lever:7"', '"custom_id":"magi-mod:cas-debannir:7"', '"custom_id":"magi-mod:cas-infraction:7"', '"custom_id":"magi-mod:cas-annuler:7"', '"custom_id":"magi-mod:historique:yui"']);
+  assert.equal(json(both).accent_color, 0xe24b4a);
+  assert.match(JSON.stringify(json(both)), /En cours\*\* : exclu jusqu'à <t:1793024641:t> · banni · infraction 3\/30 j/);
+  const lifted = { ...both, excluded: false, banned: false, infractionRevoked: true };
+  assert.equal(json(lifted).accent_color, 0x1d9e75);
+  assert.match(JSON.stringify(json(lifted)), /infraction retirée/);
+  assert.deepEqual(ids({ ...both, excluded: false }), ['"custom_id":"magi-mod:cas-debannir:7"', '"custom_id":"magi-mod:cas-infraction:7"', '"custom_id":"magi-mod:cas-annuler:7"', '"custom_id":"magi-mod:historique:yui"']);
   assert.deepEqual(ids({ ...base, status: 'annulee' }), ['"custom_id":"magi-mod:historique:yui"']);
   assert.equal(json({ ...base, status: 'annulee' }).accent_color, 0x1d9e75);
   assert.deepEqual(ids({ ...base, observing: true }), ['"custom_id":"magi-mod:cas-exclure:7"', '"custom_id":"magi-mod:cas-bannir:7"', '"custom_id":"magi-mod:historique:yui"']);

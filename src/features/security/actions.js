@@ -47,6 +47,18 @@ async function verify(interaction) {
 
 const DAY = 86_400_000;
 
+async function liftTimeout(member, reason) {
+  if (!(member?.communicationDisabledUntilTimestamp > Date.now())) return false;
+  await member.timeout(null, reason);
+  return true;
+}
+
+async function liftBan(guild, userId, reason) {
+  if (!(await guild.bans.fetch(userId).catch(() => null))) return false;
+  await guild.members.unban(userId, reason);
+  return true;
+}
+
 async function caseAction(interaction, action, id) {
   const { guild } = interaction;
   const c = getCase(Number(id));
@@ -54,26 +66,38 @@ async function caseAction(interaction, action, id) {
   const by = interaction.member.displayName;
   const reason = `MAGI, cas #${c.id}, par ${interaction.user.tag}`;
   const member = await guild.members.fetch(c.userId).catch(() => null);
-  let change = {};
+  let change;
   let event;
-  if (action === 'cas-annuler') {
-    if (c.infractionId) revokeInfraction(c.infractionId);
-    if (member?.communicationDisabledUntilTimestamp > Date.now()) await member.timeout(null, reason).catch(() => {});
-    const unbanned = !member && (await guild.bans.fetch(c.userId).catch(() => null)) ? await guild.members.unban(c.userId, reason).then(() => true).catch(() => false) : false;
-    change = { status: 'annulee', banned: false };
-    event = `sanction annulée par ${by}${unbanned ? ', bannissement levé' : ''}`;
-    bumpStat(guild.id, 'cas_annules');
-  } else if (action === 'cas-exclure') {
-    if (!member) return ephemeral(interaction, "Ce membre n'est plus sur le serveur.");
-    const ok = await member.timeout(DAY, reason).then(() => true).catch((err) => ephemeral(interaction, `Impossible : ${err.message}`).then(() => false));
-    if (!ok) return;
-    change = { status: 'exclu' };
-    event = `exclu 24 h par ${by}`;
-  } else if (action === 'cas-bannir') {
-    const ok = await guild.members.ban(c.userId, { reason, deleteMessageSeconds: 86_400 }).then(() => true).catch((err) => ephemeral(interaction, `Impossible : ${err.message}`).then(() => false));
-    if (!ok) return;
-    change = { banned: true };
-    event = `banni par ${by}`;
+  try {
+    if (action === 'cas-lever') {
+      const lifted = await liftTimeout(member, reason);
+      change = { excluded: false, excludedUntil: null };
+      event = lifted ? `exclusion levée par ${by}` : `exclusion déjà terminée (${by})`;
+    } else if (action === 'cas-debannir') {
+      const lifted = await liftBan(guild, c.userId, reason);
+      change = { banned: false };
+      event = lifted ? `débanni par ${by}` : `n'était plus banni (${by})`;
+    } else if (action === 'cas-infraction') {
+      if (c.infractionId) revokeInfraction(c.infractionId);
+      change = { infractionRevoked: true };
+      event = `infraction retirée par ${by}`;
+    } else if (action === 'cas-annuler') {
+      const done = [(await liftTimeout(member, reason)) && 'exclusion levée', (await liftBan(guild, c.userId, reason)) && 'débanni', c.infractionId && !c.infractionRevoked && revokeInfraction(c.infractionId) && 'infraction retirée'].filter(Boolean);
+      change = { status: 'annulee', excluded: false, excludedUntil: null, banned: false, infractionRevoked: true };
+      event = `tout annulé par ${by}${done.length ? ` : ${done.join(', ')}` : ''}`;
+      bumpStat(guild.id, 'cas_annules');
+    } else if (action === 'cas-exclure') {
+      if (!member) return ephemeral(interaction, "Ce membre n'est plus sur le serveur.");
+      await member.timeout(DAY, reason);
+      change = { excluded: true, excludedUntil: Date.now() + DAY, status: 'active' };
+      event = `exclu 24 h par ${by}`;
+    } else if (action === 'cas-bannir') {
+      await guild.members.ban(c.userId, { reason, deleteMessageSeconds: 86_400 });
+      change = { banned: true, status: 'active' };
+      event = `banni par ${by}`;
+    } else return ephemeral(interaction, 'Action inconnue.');
+  } catch (err) {
+    return ephemeral(interaction, `Impossible : ${err.message}`);
   }
   const updated = updateCase(guild, c.id, change, { event });
   log.notice('moderation', `cas #${c.id} : ${event}`, { guild, quiet: true });

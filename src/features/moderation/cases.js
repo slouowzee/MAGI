@@ -10,12 +10,47 @@ const timers = new Map();
 const text = (content) => new TextDisplayBuilder().setContent(content);
 const stamp = (ms, style = 'R') => `<t:${Math.floor(ms / 1000)}:${style}>`;
 
+export const excludedOf = (c) => c.excluded ?? Boolean(c.timeout || c.status === 'exclu');
+const counted = (c) => Boolean(c.infractionId) && !c.infractionRevoked;
+
 export function severityOf(c) {
-  if (c.status === 'annulee') return 'annulee';
   if (c.observing) return 'observation';
+  if (c.status === 'annulee' || (!c.banned && !excludedOf(c) && !counted(c))) return 'annulee';
   if (c.banned) return 'ban';
-  if (c.timeout || c.status === 'exclu') return 'exclusion';
+  if (excludedOf(c)) return 'exclusion';
   return 'avertissement';
+}
+
+export function stateLine(c) {
+  const parts = [
+    excludedOf(c) && `exclu${c.excludedUntil ? ` jusqu'à ${stamp(c.excludedUntil, 't')}` : ''}`,
+    c.banned && 'banni',
+    c.infractionId && (c.infractionRevoked ? 'infraction retirée' : `infraction ${c.infraction}/30 j`),
+  ].filter(Boolean);
+  return parts.length ? parts.join(' · ') : 'plus aucune sanction en cours';
+}
+
+const button = (action, id, label, style = ButtonStyle.Secondary) => new ButtonBuilder().setCustomId(`magi-mod:${action}:${id}`).setLabel(label).setStyle(style);
+
+export function caseButtons(c) {
+  const rows = [];
+  if (!c.observing && c.status !== 'annulee') {
+    const undo = [
+      excludedOf(c) && button('cas-lever', c.id, "Lever l'exclusion"),
+      c.banned && button('cas-debannir', c.id, 'Débannir'),
+      counted(c) && button('cas-infraction', c.id, "Retirer l'infraction"),
+    ].filter(Boolean);
+    if (undo.length > 1) undo.push(button('cas-annuler', c.id, 'Tout annuler', ButtonStyle.Primary));
+    if (undo.length) rows.push(new ActionRowBuilder().addComponents(undo));
+  }
+  const open = c.status !== 'annulee';
+  const more = [
+    open && !c.banned && !excludedOf(c) && button('cas-exclure', c.id, 'Exclure 24 h'),
+    open && !c.banned && button('cas-bannir', c.id, 'Bannir', ButtonStyle.Danger),
+    button('historique', c.userId, 'Historique'),
+  ].filter(Boolean);
+  rows.push(new ActionRowBuilder().addComponents(more));
+  return rows;
 }
 
 export function caseCard(c, { avatar = null, joinedAt = null, createdAt = null } = {}) {
@@ -23,7 +58,8 @@ export function caseCard(c, { avatar = null, joinedAt = null, createdAt = null }
   const header = `### Cas #${c.id} · ${KINDS[c.kind] ?? c.kind}${c.observing ? ' (observation)' : ''}\n${who}`;
   const lines = [
     `**Motif** : ${c.reasons.join(', ')}${c.verdict && c.verdict !== 'flagrant' ? ` · avis du modèle : ${c.verdict}` : ''}`,
-    `**${c.observing ? 'Aurait fait' : 'Sanction'}** : ${c.action}${c.deleted > 1 ? ` · ${c.deleted} messages ${c.observing ? 'concernés' : 'supprimés'}` : ''}${c.infraction ? ` · infraction ${c.infraction}/30 j` : ''}`,
+    `**${c.observing ? 'Aurait fait' : 'Sanction'}** : ${c.action}${c.deleted > 1 ? ` · ${c.deleted} messages ${c.observing ? 'concernés' : 'supprimés'}` : ''}`,
+    !c.observing && `**En cours** : ${stateLine(c)}`,
     c.sample && `> ${c.sample.replace(/\s+/g, ' ').slice(0, 300)}${c.deleted > 1 ? ` *(et ${c.deleted - 1} autre${c.deleted > 2 ? 's' : ''})*` : ''}`,
   ].filter(Boolean);
   const container = new ContainerBuilder().setAccentColor(COLORS[severityOf(c)]);
@@ -31,13 +67,7 @@ export function caseCard(c, { avatar = null, joinedAt = null, createdAt = null }
   else container.addTextDisplayComponents(text(header));
   container.addTextDisplayComponents(text(lines.join('\n')));
   if (c.events?.length) container.addSeparatorComponents(new SeparatorBuilder()).addTextDisplayComponents(text(c.events.slice(-6).map((e) => `-# ${stamp(e.at, 't')} · ${e.text}`).join('\n')));
-  const buttons = [new ButtonBuilder().setCustomId(`magi-mod:historique:${c.userId}`).setLabel('Historique').setStyle(ButtonStyle.Secondary)];
-  if (c.status !== 'annulee' && !c.observing) buttons.unshift(new ButtonBuilder().setCustomId(`magi-mod:cas-annuler:${c.id}`).setLabel('Annuler la sanction').setStyle(ButtonStyle.Secondary));
-  if (c.status !== 'annulee' && !c.banned) {
-    if (c.status !== 'exclu') buttons.splice(buttons.length - 1, 0, new ButtonBuilder().setCustomId(`magi-mod:cas-exclure:${c.id}`).setLabel('Exclure 24 h').setStyle(ButtonStyle.Secondary));
-    buttons.splice(buttons.length - 1, 0, new ButtonBuilder().setCustomId(`magi-mod:cas-bannir:${c.id}`).setLabel('Bannir').setStyle(ButtonStyle.Danger));
-  }
-  container.addActionRowComponents(new ActionRowBuilder().addComponents(buttons));
+  for (const row of caseButtons(c)) container.addActionRowComponents(row);
   return container;
 }
 

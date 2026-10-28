@@ -110,13 +110,14 @@ async function sanction(message, finding, observing) {
     infractionId: infraction.id,
     sample: message.content,
     observing,
-    timeout: action.timeout ?? null,
+    excluded: !observing && Boolean(action.timeout),
+    excludedUntil: !observing && action.timeout ? Date.now() + action.timeout : null,
   });
   log.info('moderation', `cas #${c.id} : ${member.user.tag}, ${finding.reasons.join(', ')} → ${action.label}${observing ? ' (observation)' : ''}`, { guild, quiet: true });
   if (observing) return c;
   const reason = `MAGI, modération automatique (cas #${c.id}) : ${finding.reasons.join(' ; ')}`;
   await message.delete().catch(() => {});
-  if (action.timeout) await member.timeout(action.timeout, reason).catch((err) => updateCase(guild, c.id, {}, { event: `exclusion impossible : ${err.message}` }));
+  if (action.timeout) await member.timeout(action.timeout, reason).catch((err) => updateCase(guild, c.id, { excluded: false, excludedUntil: null }, { event: `exclusion impossible : ${err.message}` }));
   if (action.warn) {
     await speak(message.channel, 'balthasar', `<@${member.id}>, ton message a été retiré : ${finding.reasons[0]}. Premier avertissement, la prochaine fois ce sera une exclusion temporaire.`, { mentions: [member.id] }).catch(() => {});
   }
