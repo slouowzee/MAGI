@@ -110,6 +110,7 @@ export async function handleMessage(message, { catchUp = false } = {}) {
       options: { num_predict: MAX_TOKENS[length] },
       member: message.member,
       message,
+      persona,
       force: summary ? 'resumer' : null,
     });
     clearInterval(typing);

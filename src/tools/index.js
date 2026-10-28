@@ -36,11 +36,11 @@ export function schemas(tools) {
   return tools.map(({ name, description, parameters }) => ({ type: 'function', function: { name, description, parameters } }));
 }
 
-async function execute(tool, args, { member, message, actions = [] }) {
+async function execute(tool, args, { member, message, persona = null, actions = [] }) {
   const reason = `MAGI, demandé par ${member.user.tag}`;
   const offer = (action) => actions.push(action);
   try {
-    const output = await tool.run({ guild: member.guild, member, message, args, reason, offer });
+    const output = await tool.run({ guild: member.guild, member, message, persona, args, reason, offer });
     if (tool.panel) await refreshPanel(member.guild).catch(() => {});
     log[tool.readonly ? 'info' : 'notice']('outils', `${tool.name} par ${member.user.tag}`, { guild: member.guild, channel: message.channel });
     return output;

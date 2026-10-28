@@ -36,6 +36,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS reminders (
   due_at INTEGER NOT NULL,
   done INTEGER NOT NULL DEFAULT 0
 )`);
+const reminderColumns = db.query('PRAGMA table_info(reminders)').all().map((c) => c.name);
+for (const column of ['persona', 'message_id']) if (!reminderColumns.includes(column)) db.exec(`ALTER TABLE reminders ADD COLUMN ${column} TEXT`);
 db.exec(`CREATE TABLE IF NOT EXISTS infractions (
   id INTEGER PRIMARY KEY,
   guild_id TEXT NOT NULL,

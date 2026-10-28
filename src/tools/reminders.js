@@ -1,29 +1,49 @@
 import { speak } from '../discord/webhooks.js';
+import { activePersonas } from '../server/config.js';
 import { addReminder, cancelReminder, dueReminders, markDone, pendingReminders } from '../storage/reminders.js';
 import { log } from '../logging/log.js';
 
-const CHECK_EVERY = 30_000;
-const stamp = (ms) => `<t:${Math.floor(ms / 1000)}:F> (<t:${Math.floor(ms / 1000)}:R>)`;
+const CHECK_EVERY = 10_000;
+const DAY = 24 * 3600_000;
+const LINES = { melchior: 'Rappel', balthasar: 'Petit rappel', casper: "C'est l'heure" };
+
+export function stamp(ms, now = Date.now()) {
+  const s = Math.floor(ms / 1000);
+  return ms - now < DAY ? `à <t:${s}:t> (<t:${s}:R>)` : `le <t:${s}:F> (<t:${s}:R>)`;
+}
+
+export function dueFrom(args, now = Date.now()) {
+  const minutes = Number(args.minutes);
+  if (Number.isFinite(minutes) && minutes > 0) return now + Math.round(minutes * 60_000);
+  return Date.parse(String(args.date ?? ''));
+}
+
+export function reminderLine(persona, text) {
+  const body = text.trim().replace(/[.!\s]+$/, '');
+  const start = /^\p{Lu}\p{Ll}/u.test(body) ? body[0].toLowerCase() + body.slice(1) : body;
+  return `${LINES[persona] ?? LINES.balthasar} : ${start}.`;
+}
 
 export const REMINDER_TOOLS = [
   {
     name: 'rappel',
     description:
-      "Programme un rappel pour la personne qui écrit (« rappelle-moi demain à 18h de… »). Calcule la date à partir de la date et de l'heure actuelles données dans tes consignes.",
+      "Programme un rappel pour la personne qui écrit. Délai relatif (« dans 10 min », « dans 2 h ») : donne minutes, le code calcule l'heure exacte. Heure précise (« demain à 18h ») : donne date, calculée à partir de la date et de l'heure actuelles données dans tes consignes.",
     parameters: {
       type: 'object',
       properties: {
-        date: { type: 'string', description: 'Date et heure du rappel en ISO 8601 avec le décalage horaire, par exemple 2026-10-26T18:00:00+01:00.' },
-        texte: { type: 'string', description: 'Ce qu’il faut rappeler, en quelques mots.' },
+        minutes: { type: 'number', description: 'Délai en minutes à partir de maintenant, pour « dans … ».' },
+        date: { type: 'string', description: 'Date et heure précises en ISO 8601 avec le décalage horaire, par exemple 2026-10-26T18:00:00+01:00.' },
+        texte: { type: 'string', description: 'Ce qu’il faut rappeler, en quelques mots, sans « rappelle-moi ».' },
       },
-      required: ['date', 'texte'],
+      required: ['texte'],
     },
     access: 'everyone',
-    async run({ guild, member, message, args }) {
-      const dueAt = Date.parse(String(args.date ?? ''));
-      const result = addReminder({ guildId: guild.id, channelId: message.channel.id, userId: member.id, text: String(args.texte ?? ''), dueAt });
+    async run({ guild, member, message, persona, args }) {
+      const dueAt = dueFrom(args);
+      const result = addReminder({ guildId: guild.id, channelId: message.channel.id, userId: member.id, text: String(args.texte ?? ''), dueAt, persona, messageId: message.id });
       if (result.error) return `Rappel refusé : ${result.error}`;
-      return `Rappel n°${result.id} enregistré pour ${stamp(dueAt)}. Recopie tel quel ce format de date Discord dans ta réponse.`;
+      return `Rappel n°${result.id} enregistré, il tombera ${stamp(dueAt)}. Confirme en une phrase et recopie ce format de date Discord tel quel.`;
     },
   },
   {
@@ -49,15 +69,23 @@ export const REMINDER_TOOLS = [
   },
 ];
 
+async function deliver(client, reminder) {
+  const channel = await client.channels.fetch(reminder.channel_id).catch(() => null);
+  if (!channel) return;
+  const active = activePersonas(reminder.guild_id);
+  const persona = active.includes(reminder.persona) ? reminder.persona : active.includes('balthasar') ? 'balthasar' : active[0];
+  const source = reminder.message_id ? await channel.messages.fetch(reminder.message_id).catch(() => null) : null;
+  const line = reminderLine(persona, reminder.text);
+  await speak(channel, persona, source ? line : `<@${reminder.user_id}> ${line}`, { mentions: [reminder.user_id], replyTo: source ?? undefined })
+    .then(() => log.info('rappels', `n°${reminder.id} envoyé à <@${reminder.user_id}> par ${persona}`, { channel }))
+    .catch((err) => log.err('rappels', `échec n°${reminder.id} : ${err.message}`, { channel }));
+}
+
 export function startReminders(client) {
   setInterval(async () => {
     for (const reminder of dueReminders()) {
       markDone(reminder.id);
-      const channel = await client.channels.fetch(reminder.channel_id).catch(() => null);
-      if (!channel) continue;
-      await speak(channel, 'balthasar', `<@${reminder.user_id}> petit rappel : ${reminder.text}`, { mentions: [reminder.user_id] })
-        .then(() => log.info('rappels', `n°${reminder.id} envoyé à <@${reminder.user_id}>`, { channel }))
-        .catch((err) => log.err('rappels', `échec n°${reminder.id} : ${err.message}`, { channel }));
+      await deliver(client, reminder);
     }
   }, CHECK_EVERY);
 }

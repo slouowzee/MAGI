@@ -70,7 +70,7 @@ export const COMMUNITY_TOOLS = [
       const { start, title } = eventDraft(guild, args);
       return `Créer « ${title} » le ${day(start)}`;
     },
-    async run({ guild, member, message, args, reason }) {
+    async run({ guild, member, message, persona, args, reason }) {
       const { start, end, voice, title } = eventDraft(guild, args);
       const event = await guild.scheduledEvents.create({
         name: title,
@@ -83,7 +83,7 @@ export const COMMUNITY_TOOLS = [
         description: args.description ? String(args.description).slice(0, 1000) : undefined,
         reason,
       });
-      const reminder = addReminder({ guildId: guild.id, channelId: message.channel.id, userId: member.id, text: `« ${title} » commence dans 15 min`, dueAt: start - 15 * 60_000 });
+      const reminder = addReminder({ guildId: guild.id, channelId: message.channel.id, userId: member.id, text: `« ${title} » commence dans 15 min`, dueAt: start - 15 * 60_000, persona, messageId: message.id });
       return `Événement créé : https://discord.com/events/${guild.id}/${event.id}${reminder.id ? ', rappel 15 min avant' : ''}.`;
     },
   },

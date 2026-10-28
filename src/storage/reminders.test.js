@@ -23,3 +23,18 @@ test('un rappel échu est livré une seule fois, un rappel annulé jamais', () =
   markDone(id);
   assert.deepEqual(dueReminders(10_000), []);
 });
+
+test('rappel : délai relatif exact, persona et message d’origine conservés, phrase propre', async () => {
+  const { dueFrom, reminderLine, stamp } = await import('../tools/reminders.js');
+  const now = Date.parse('2026-10-28T14:11:50Z');
+  assert.equal(dueFrom({ minutes: 1, date: '2026-10-28T15:12:00+01:00' }, now), now + 60_000);
+  assert.equal(dueFrom({ date: '2026-10-28T18:00:00+01:00' }, now), Date.parse('2026-10-28T17:00:00Z'));
+  const { id } = addReminder({ ...base, userId: 'p', dueAt: now + 60_000, persona: 'casper', messageId: 'm1' }, now);
+  const saved = dueReminders(now + 61_000).find((r) => r.id === id);
+  assert.equal(saved.persona, 'casper');
+  assert.equal(saved.message_id, 'm1');
+  assert.equal(reminderLine('casper', 'Finir la tâche'), "C'est l'heure : finir la tâche.");
+  assert.equal(reminderLine('melchior', 'PR de MAGI !'), 'Rappel : PR de MAGI.');
+  assert.match(stamp(now + 60_000, now), /^à <t:\d+:t> \(<t:\d+:R>\)$/);
+  assert.match(stamp(now + 3 * 86_400_000, now), /^le <t:\d+:F>/);
+});
