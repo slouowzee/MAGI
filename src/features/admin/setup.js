@@ -6,7 +6,7 @@ import { postTicketPanel } from '../community/tickets.js';
 import { createHub } from '../community/voice.js';
 
 const SETUPS = {
-  etoiles: { label: 'Hall of Fame', key: 'stars_channel', name: '🔥・hall-of-fame', topic: 'Les messages qui reçoivent assez de 🔥 entrent ici.' },
+  etoiles: { label: 'Hall of Fame', key: 'stars_channel', name: '🏆・hall-of-fame', topic: 'Les messages qui reçoivent assez de réactions entrent ici.' },
   tickets: { label: 'Tickets', key: 'tickets_channel', name: '🎫・support', topic: 'Ouvre un ticket pour parler aux opérateurs en privé.' },
   bienvenue: { label: 'Bienvenue', key: 'welcome_channel', name: '👋・bienvenue', topic: 'Arrivées et départs.', skip: (guild) => guild.systemChannel },
   vocal_temporaire: { label: 'Salons vocaux temporaires', key: 'voice_hub', hub: true },

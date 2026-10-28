@@ -51,7 +51,7 @@ export const HINTS = {
   vocaux: 'Écoute les messages vocaux.',
   statut: 'Pastille et texte du profil : ce que fait MAGI, infos du serveur, veille la nuit.',
   administration: 'Gestion du serveur à la demande des opérateurs.',
-  etoiles: 'Copie les messages qui reçoivent assez de 🔥 dans un salon.',
+  etoiles: 'Copie dans un salon les messages qui reçoivent assez de réactions avec l’emoji choisi.',
   anniversaires: 'Souhaite les anniversaires à 9 h.',
   synchro: 'Activité des membres, paliers et rôles.',
   sondages: 'Sondages Discord à la demande.',

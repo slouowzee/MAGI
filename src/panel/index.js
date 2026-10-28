@@ -39,6 +39,7 @@ import { securitySection } from './pages/securite.js';
 import { automodSection } from './pages/automod.js';
 import { serverSection } from './pages/serveur.js';
 import { SERVER_ACTIONS } from './server-actions.js';
+import { parseEmoji } from '../features/community/hall-of-fame.js';
 import { logsSection } from './pages/logs.js';
 import { permissionsSection } from './pages/permissions.js';
 
@@ -246,6 +247,23 @@ export async function handlePanelInteraction(interaction) {
     return PAGES[page] ? show(page) : ephemeral('Page inconnue.');
   }
   if (SERVER_ACTIONS[field]) return SERVER_ACTIONS[field](interaction);
+  if (field === 'stars_emoji') {
+    const value = interaction.values?.[0];
+    if (value === 'autre') {
+      const input = new TextInputBuilder().setCustomId('emoji').setLabel('Emoji, ou emoji du serveur <:nom:id>').setStyle(TextInputStyle.Short).setMaxLength(60).setRequired(true);
+      return interaction.showModal(new ModalBuilder().setCustomId(id('stars_emoji_set')).setTitle('Emoji du Hall of Fame').addComponents(row(input)));
+    }
+    if (value !== 'actuel') setSetting(guild.id, 'stars_emoji', value);
+    await show('communaute');
+    return value === 'actuel' ? null : changed(`emoji du Hall of Fame = ${value}`);
+  }
+  if (field === 'stars_emoji_set' && interaction.isModalSubmit()) {
+    const emoji = parseEmoji(interaction.fields.getTextInputValue('emoji'));
+    if (!emoji) return ephemeral('Ce n’est pas un emoji : colle un emoji, ou un emoji du serveur sous la forme <:nom:id> (tape \\:nom: dans Discord pour l’obtenir).');
+    setSetting(guild.id, 'stars_emoji', emoji);
+    await show('communaute');
+    return changed(`emoji du Hall of Fame = ${emoji}`);
+  }
   if (field === 'digest') {
     const on = setting(guild.id, 'digest') === 'off';
     setSetting(guild.id, 'digest', on ? 'on' : 'off');

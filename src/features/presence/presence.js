@@ -5,6 +5,7 @@ import { PERSONAS } from '../../core/personas.js';
 import { countSettings } from '../../core/settings.js';
 import { synchroTop } from '../community/store.js';
 import { rateOf } from '../community/synchro.js';
+import { wallEmoji } from '../community/hall-of-fame.js';
 
 const DEBOUNCE = 1_500;
 const ROTATE = 180_000;
@@ -64,7 +65,7 @@ function tips(guildId) {
     'Écris « magi, … » pour me parler',
     on('commandes') && 'Clic droit sur un message → Applications → Avis de Casper',
     on('commandes') && '/chuchoter pour parler en privé à une unité',
-    on('etoiles') && '🔥 sur un message pour l’envoyer au Hall of Fame',
+    on('etoiles') && `${wallEmoji(guildId)} sur un message pour l’envoyer au Hall of Fame`,
     on('vote') && '« magi, votez : … » pour un vote des trois unités',
     on('debat') && '« débattez : … » pour lancer un débat',
     on('rappels') && '« rappelle-moi dans 10 min de … »',

@@ -82,3 +82,16 @@ test('événement et anniversaire : validations', async () => {
   await assert.rejects(tool('anniversaire').run({ guild, member, args: { jour: 31, mois: 2 } }), /date invalide/);
   assert.equal(await tool('anniversaire').run({ guild, member, args: { jour: 29, mois: 2 } }), 'Anniversaire de Slou enregistré : 29/2.');
 });
+
+test('Hall of Fame : emoji réglable, emoji du serveur reconnu par son identifiant', async () => {
+  const { parseEmoji, sameEmoji, wallEmoji } = await import('./hall-of-fame.js');
+  assert.equal(wallEmoji('g-emoji'), '🔥');
+  setSetting('g-emoji', 'stars_emoji', '❤️');
+  assert.ok(sameEmoji({ name: '❤', id: null }, wallEmoji('g-emoji')));
+  assert.ok(!sameEmoji({ name: '🔥', id: null }, wallEmoji('g-emoji')));
+  assert.ok(sameEmoji({ name: 'pog', id: '123456789012345678' }, '<:pog:123456789012345678>'));
+  assert.ok(!sameEmoji({ name: 'pog', id: '999999999999999999' }, '<:pog:123456789012345678>'));
+  assert.equal(parseEmoji(' 🏆 '), '🏆');
+  assert.equal(parseEmoji('<a:dance:123456789012345678>'), '<a:dance:123456789012345678>');
+  assert.equal(parseEmoji('trophée'), null);
+});
