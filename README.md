@@ -9,34 +9,33 @@ Bot Discord à trois personas inspirées des MAGI d'*Evangelion* : Melchior, Bal
 
 ```
 src/
-  index.js                    démarrage du client Discord et branchement des événements
-  personas.js                 noms et avatars des trois unités
-  conversation/               qui répond, et comment
-    handle-message.js         traitement d'un message, du déclencheur à la réponse
-    triggers.js               détection des noms, du vote, des demandes détaillées
-    router.js                 choix et mémoire de la persona par salon
-    rules.js                  réactions rapides et anti-flood
-  discord/                    échanges avec Discord
-    webhooks.js               voix des personas
-    buttons.js                boutons sous les messages
-    history.js                derniers messages du salon pour le contexte
-    split.js                  découpe sous la limite de 2000 caractères
-  llm/                        modèles de langage
-    client.js                 Gemini, Mistral et Groq en relais, nouveaux essais
-    prompts.js                prompts système des personas, nettoyage des réponses
-    respond.js                boucle d'appel d'outils
-  tools/                      outils que le LLM peut appeler
-    index.js                  registre, droits d'accès, confirmation, journal
-    installation.js           état et installation de MAGI
-  logging/
-    log.js                    logs au format syslog, niveaux, sortie serveur
-    discord.js                salons de logs Discord, lots colorés, niveau minimal
-    host.js                   journal du VPS reçu par tube nommé
-  server/
-    installation.js           rôle Opérateur MAGI, catégorie et salons MAGI, hiérarchie
-  storage/
-    db.js                     base SQLite
-    memory.js                 mémoire fortunememory (faits, résumés, recherche)
+  index.js                démarrage du client Discord et branchement des événements
+  tools.js                registre des outils du LLM, droits d'accès, confirmation, journal
+  core/                   socle partagé, sans fonction métier
+    db.js settings.js     base SQLite et réglages par serveur
+    config.js             modules activables et options
+    personas.js           noms et avatars des trois unités
+    permissions.js        niveaux de permissions et liens d'autorisation
+    installation.js       rôle Opérateur MAGI, catégorie et salons MAGI, hiérarchie
+    llm/                  Gemini et Groq en relais, prompts, boucle d'appel d'outils
+    discord/              voix des personas (webhooks), historique, médias, découpe, boutons
+    log/                  logs syslog, salons de logs Discord, journal du VPS
+  panel/                  panneau #magi-config
+    index.js              rendu, navigation, vues privées, interactions
+    ui.js                 briques communes (interrupteurs, menus, alertes)
+    pages/                une page par fichier
+  features/               une fonction par dossier : logique, stockage (store.js), outils (tools.js)
+    conversation/         qui répond et comment, interventions, résumé du salon, rattrapage
+    commands/             clic droit, /chuchoter, /magi
+    memory/               mémoire fortunememory et contexte injecté
+    reminders/            rappels
+    vote/                 votes et débats entre unités
+    community/            Hall of Fame, anniversaires, synchronisation, tickets, vocaux temporaires
+    moderation/           détection et sanctions
+    security/             anti-nuke, AutoMod, audit, sauvegardes, filtre, anti-raid, honeypot
+    admin/                outils d'administration (salons, membres, rôles, publications, scaffold)
+    presence/             statut du bot
+    welcome/              arrivées et départs
 ```
 
 `ops/magi-journal.service` : service systemd du VPS qui transmet le journal système au bot.

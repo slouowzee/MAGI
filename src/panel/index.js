@@ -1,0 +1,290 @@
+import {
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ButtonBuilder,
+  ButtonStyle,
+  ChannelType,
+  ContainerBuilder,
+  MessageFlags,
+  PermissionFlagsBits as P,
+  StringSelectMenuBuilder,
+} from 'discord.js';
+import { PERSONAS } from '../core/personas.js';
+import { auditReport } from '../features/security/audit.js';
+import { backupGuild } from '../features/security/backup.js';
+import { disableHoneypot, enableHoneypot, honeypotOf, refreshHoneypot } from '../features/security/honeypot.js';
+import { restylePublications } from '../features/admin/publications.js';
+import { replaceInterventions } from '../features/conversation/interventions.js';
+import { setModerationMode } from '../features/moderation/store.js';
+import { setSetting, setting } from '../core/settings.js';
+import { moduleEnabled, MODULES, setActivePersonas, setModule, setMutedChannels, setSettingList } from '../core/config.js';
+import { installAndReport, isOperator, magiCategory, operatorRole } from '../core/installation.js';
+import { log } from '../core/log/log.js';
+import { COMMANDS, syncCommands } from '../features/commands/commands.js';
+import { ensureGate } from '../features/security/gate.js';
+import { automodAllowList, setAutomodAllowList, setAutomodRules, syncAutomod } from '../features/security/automod.js';
+import { postTicketPanel } from '../features/community/tickets.js';
+import { createHub } from '../features/community/voice.js';
+import { atLeast } from '../core/permissions.js';
+import { PREFIX, PAGES, id, row, text, separator, pageOf } from './ui.js';
+import { homeSection } from './pages/accueil.js';
+import { conversationSection } from './pages/conversation.js';
+import { statusSection } from './pages/statut.js';
+import { personasSection } from './pages/personas.js';
+import { communitySection } from './pages/communaute.js';
+import { servicesSection } from './pages/services.js';
+import { arrivalsSection } from './pages/arrivees.js';
+import { securitySection } from './pages/securite.js';
+import { automodSection } from './pages/automod.js';
+import { logsSection } from './pages/logs.js';
+import { permissionsSection } from './pages/permissions.js';
+
+const COLOR = 0xd65c62;
+const V2 = MessageFlags.IsComponentsV2;
+const PRIVATE = V2 | MessageFlags.Ephemeral;
+
+const silent = { allowedMentions: { parse: [] } };
+
+const BUILDERS = {
+  accueil: homeSection,
+  conversation: conversationSection,
+  statut: statusSection,
+  personas: personasSection,
+  communaute: communitySection,
+  services: servicesSection,
+  arrivees: arrivalsSection,
+  securite: securitySection,
+  automod: automodSection,
+  logs: logsSection,
+  permissions: permissionsSection,
+};
+
+function navigation(name) {
+  const names = Object.keys(PAGES);
+  const at = names.indexOf(name);
+  const prev = names[(at - 1 + names.length) % names.length];
+  const next = names[(at + 1) % names.length];
+  return [
+    row(
+      new StringSelectMenuBuilder()
+        .setCustomId(id('page'))
+        .setPlaceholder('Aller à une page')
+        .addOptions(names.map((page) => ({ label: PAGES[page], value: page, default: page === name }))),
+    ),
+    row([
+      new ButtonBuilder().setCustomId(id(`page:${prev}`)).setLabel(`‹ ${PAGES[prev]}`).setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(id(`page:${next}`)).setLabel(`${PAGES[next]} ›`).setStyle(ButtonStyle.Secondary),
+    ]),
+  ];
+}
+
+export function panelPage(guild, name = 'accueil', { live = false } = {}) {
+  const names = Object.keys(PAGES);
+  const title = name === 'accueil' ? 'Configuration de MAGI' : PAGES[name];
+  const header = text(`## ${title}\n-# Page ${names.indexOf(name) + 1}/${names.length}${live ? ' · visible par toi seul' : ''}`);
+  const blocks = [header, separator(), ...BUILDERS[name](guild, { live }), separator(), ...navigation(name)];
+  return { components: [new ContainerBuilder({ accent_color: COLOR, components: blocks.map((b) => b.toJSON()) })], flags: V2 };
+}
+
+export function openPanel(interaction, page = 'accueil') {
+  if (!isOperator(interaction.member)) return interaction.reply({ content: 'Réservé aux opérateurs MAGI.', flags: MessageFlags.Ephemeral, ...silent });
+  return interaction.reply({ ...panelPage(interaction.guild, page, { live: true }), flags: PRIVATE, ...silent });
+}
+
+function configChannel(guild) {
+  return guild.channels.cache.get(setting(guild.id, 'config_channel')) ?? null;
+}
+
+async function ensureConfigChannel(guild) {
+  const existing = configChannel(guild);
+  const category = magiCategory(guild);
+  if (existing) {
+    if (category && existing.parentId !== category.id) {
+      await existing.setParent(category.id, { lockPermissions: false, reason: 'Installation de MAGI' });
+      await existing.setPosition(0);
+    }
+    return existing;
+  }
+  const role = operatorRole(guild);
+  const channel = await guild.channels.create({
+    name: 'magi-config',
+    type: ChannelType.GuildText,
+    parent: category?.id,
+    position: 0,
+    topic: 'Panneau de configuration de MAGI, réservé aux opérateurs.',
+    reason: 'Installation de MAGI',
+    permissionOverwrites: [
+      { id: guild.roles.everyone.id, deny: [P.ViewChannel] },
+      ...(role ? [{ id: role.id, allow: [P.ViewChannel, P.ReadMessageHistory] }] : []),
+      { id: guild.members.me.id, allow: [P.ViewChannel, P.SendMessages, P.EmbedLinks] },
+    ],
+  });
+  setSetting(guild.id, 'config_channel', channel.id);
+  return channel;
+}
+
+export async function refreshPanel(guild, { repost = false } = {}) {
+  if (!operatorRole(guild) || !atLeast(guild.members.me.permissions, 'gestion')) return null;
+  const channel = await ensureConfigChannel(guild);
+  for (const old of Object.values(JSON.parse(setting(guild.id, 'config_panel') ?? '{}'))) await channel.messages.delete(old).catch(() => {});
+  setSetting(guild.id, 'config_panel', null);
+  const existing = setting(guild.id, 'config_message');
+  const message = existing ? await channel.messages.fetch(existing).catch(() => null) : null;
+  if (message && !repost && message.flags.has(V2)) {
+    await message.edit(panelPage(guild));
+    return channel;
+  }
+  await message?.delete().catch(() => {});
+  setSetting(guild.id, 'config_message', (await channel.send({ ...panelPage(guild), ...silent })).id);
+  return channel;
+}
+
+export async function setupGuild(guild) {
+  await installAndReport(guild);
+  await refreshPanel(guild).catch((err) => log.err('config', `échec panneau : ${err.message}`, { guild }));
+  await syncCommands(guild).catch((err) => log.err('commandes', `échec enregistrement des commandes : ${err.message}`, { guild }));
+  await ensureGate(guild).catch((err) => log.err('filtre', `échec mise en place du filtre : ${err.message}`, { guild }));
+  await refreshHoneypot(guild).catch((err) => log.err('honeypot', `échec mise à jour du honeypot : ${err.message}`, { guild }));
+  await resyncAutomod(guild);
+  await restylePublications(guild)
+    .then((count) => count && log.notice('publications', `${count} publication(s) remise(s) en forme`, { guild }))
+    .catch((err) => log.err('publications', `échec remise en forme : ${err.message}`, { guild }));
+}
+
+export function isPanelInteraction(customId) {
+  return customId.startsWith(PREFIX);
+}
+
+const FIELD_LABELS = {
+  personas: 'personas',
+  moderation: 'modération',
+  muted: 'salons muets',
+  interventions: 'salons des interventions',
+  welcome: 'salon de bienvenue',
+  log_level: 'niveau des logs',
+  stars_threshold: 'flammes nécessaires',
+  stars_channel: 'salon du Hall of Fame',
+  birthday_channel: 'salon des anniversaires',
+  synchro_channel: 'salon de synchronisation',
+  tickets_channel: 'salon des tickets',
+  voice_hub: 'salon vocal générateur',
+  gate_min_age: 'âge minimal à l’arrivée',
+  gate_rules: 'critères du filtre',
+  raid_threshold: 'seuil anti-raid',
+  automod_presets: 'filtres AutoMod',
+  presence_items: 'infos du statut',
+  presence_night: 'veille la nuit',
+  presence_idle: 'veille sans messages',
+  automod_rules: 'règles AutoMod',
+  automod_mentions: 'mentions AutoMod',
+};
+const single = (key) => (guild, values) => setSetting(guild.id, key, values[0] ?? null);
+const resyncAutomod = (guild) => syncAutomod(guild).catch((err) => log.err('automod', `échec synchronisation : ${err.message}`, { guild }));
+
+const APPLY = {
+  personas: { page: 'personas', apply: (guild, values) => setActivePersonas(guild.id, values) },
+  muted: { page: 'personas', apply: (guild, values) => setMutedChannels(guild.id, values) },
+  interventions: { page: 'conversation', apply: (guild, values) => replaceInterventions(guild.id, values) },
+  stars_threshold: { page: 'communaute', apply: single('stars_threshold') },
+  stars_channel: { page: 'communaute', apply: single('stars_channel') },
+  birthday_channel: { page: 'communaute', apply: single('birthday_channel') },
+  synchro_channel: { page: 'communaute', apply: single('synchro_channel') },
+  tickets_channel: { page: 'services', apply: single('tickets_channel') },
+  voice_hub: { page: 'services', apply: single('voice_hub') },
+  welcome: { page: 'arrivees', apply: single('welcome_channel') },
+  gate_min_age: { page: 'arrivees', apply: single('gate_min_age') },
+  gate_rules: { page: 'arrivees', apply: (guild, values) => setSettingList(guild.id, 'gate_rules', values) },
+  raid_threshold: { page: 'arrivees', apply: single('raid_threshold') },
+  moderation: { page: 'securite', apply: (guild, values) => setModerationMode(guild.id, values[0]) },
+  automod_presets: { page: 'automod', apply: (guild, values) => setSettingList(guild.id, 'automod_presets', values) },
+  automod_rules: { page: 'automod', apply: (guild, values) => setAutomodRules(guild.id, values) },
+  automod_mentions: { page: 'automod', apply: single('automod_mentions') },
+  log_level: { page: 'logs', apply: single('log_level') },
+  presence_items: { page: 'statut', apply: (guild, values) => setSettingList(guild.id, 'presence_items', values) },
+  presence_night: { page: 'statut', apply: single('presence_night') },
+  presence_idle: { page: 'statut', apply: single('presence_idle') },
+};
+
+export async function handlePanelInteraction(interaction) {
+  const { guild, member } = interaction;
+  const field = interaction.customId.slice(PREFIX.length);
+  const ephemeral = (content) => interaction.reply({ content: content.slice(0, 2000), flags: MessageFlags.Ephemeral, ...silent });
+  if (!isOperator(member)) return ephemeral('Ce panneau est réservé aux opérateurs MAGI.');
+  const show = (page) =>
+    interaction.message?.flags.has(MessageFlags.Ephemeral) ? interaction.update(panelPage(guild, page, { live: true })) : openPanel(interaction, page);
+  const changed = (summary) => {
+    log.notice('config', `${summary} par ${member.user.tag}`, { guild });
+    refreshPanel(guild).catch(() => {});
+  };
+
+  if (field === 'page' || field.startsWith('page:')) {
+    const page = field === 'page' ? interaction.values?.[0] : field.slice('page:'.length);
+    return PAGES[page] ? show(page) : ephemeral('Page inconnue.');
+  }
+  if (field.startsWith('module:')) {
+    const key = field.slice('module:'.length);
+    if (!MODULES[key]) return ephemeral('Module inconnu.');
+    const on = !moduleEnabled(guild.id, key);
+    setModule(guild.id, key, on);
+    if (COMMANDS.some((c) => c.module === key)) await syncCommands(guild).catch((err) => log.err('commandes', `échec enregistrement des commandes : ${err.message}`, { guild }));
+    if (key === 'automod') resyncAutomod(guild);
+    if (key === 'filtre_arrivee') ensureGate(guild).catch((err) => log.err('filtre', `échec mise en place du filtre : ${err.message}`, { guild }));
+    await show(pageOf(key));
+    return changed(`${MODULES[key]} ${on ? 'activé' : 'coupé'}`);
+  }
+  if (field.startsWith('persona_ch:')) {
+    const persona = field.slice('persona_ch:'.length);
+    if (!PERSONAS[persona]) return ephemeral('Persona inconnue.');
+    setSettingList(guild.id, `persona_channels:${persona}`, interaction.values ?? []);
+    await show('personas');
+    return changed(`salons de ${PERSONAS[persona].name} = ${(interaction.values ?? []).map((v) => `<#${v}>`).join(', ') || 'aucun'}`);
+  }
+  if (APPLY[field]) {
+    const { page, apply } = APPLY[field];
+    apply(guild, interaction.values ?? []);
+    if (field.startsWith('automod_')) resyncAutomod(guild);
+    await show(page);
+    const values = (interaction.values ?? []).map((v) => (interaction.isChannelSelectMenu?.() ? `<#${v}>` : v));
+    return changed(`${FIELD_LABELS[field] ?? field} = ${values.join(', ') || 'aucun'}`);
+  }
+  if (field === 'automod_allow') {
+    const input = new TextInputBuilder().setCustomId('mots').setLabel('Un mot ou une expression par ligne').setStyle(TextInputStyle.Paragraph).setMaxLength(4000).setRequired(false);
+    const current = automodAllowList(guild.id).join('\n');
+    if (current) input.setValue(current);
+    return interaction.showModal(new ModalBuilder().setCustomId(id('automod_allow_set')).setTitle('Liste blanche AutoMod').addComponents(row(input)));
+  }
+  if (field === 'automod_allow_set' && interaction.isModalSubmit()) {
+    const words = setAutomodAllowList(guild.id, interaction.fields.getTextInputValue('mots'));
+    resyncAutomod(guild);
+    await show('automod');
+    return changed(`liste blanche AutoMod = ${words.length} mot(s)`);
+  }
+  if (field === 'audit') return ephemeral(auditReport(guild));
+  if (field === 'tickets_post') {
+    const posted = await postTicketPanel(guild).catch((err) => err);
+    if (posted instanceof Error) return ephemeral(`Impossible : ${posted.message}.`);
+    await show('services');
+    return changed(`panneau de tickets publié dans ${posted.channel}`);
+  }
+  if (field === 'voice_hub_create') {
+    const hub = await createHub(guild);
+    await show('services');
+    return changed(`salon générateur ${hub} créé`);
+  }
+  if (field === 'backup') {
+    backupGuild(guild);
+    await show('securite');
+    return changed('structure sauvegardée');
+  }
+  if (field === 'honeypot') {
+    const reason = `MAGI, demandé par ${member.user.tag}`;
+    const existed = Boolean(honeypotOf(guild));
+    if (existed) await disableHoneypot(guild, reason);
+    else await enableHoneypot(guild, reason);
+    resyncAutomod(guild);
+    await show('securite');
+    return changed(existed ? 'honeypot supprimé' : 'honeypot créé');
+  }
+  return ephemeral('Réglage inconnu.');
+}

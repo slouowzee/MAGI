@@ -1,8 +1,8 @@
 process.env.DB_PATH = ':memory:';
 process.env.LOG_LEVEL ??= 'warning';
-const { chat } = await import('../src/llm/client.js');
-const { buildMessages, cleanReply, MAX_TOKENS } = await import('../src/llm/prompts.js');
-const { conversationPrompt } = await import('../src/discord/history.js');
+const { chat } = await import('../src/core/llm/client.js');
+const { buildMessages, cleanReply, MAX_TOKENS } = await import('../src/core/llm/prompts.js');
+const { conversationPrompt } = await import('../src/core/discord/history.js');
 
 const MESSAGES = [
   "je viens de finir mon projet de bot discord, 3 semaines dessus",
