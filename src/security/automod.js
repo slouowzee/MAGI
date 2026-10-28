@@ -145,18 +145,26 @@ async function sync(guild) {
   for (const rule of mine) if (!wanted.some((w) => w.name === rule.name)) await attempt(guild, rule.name, () => rule.delete('MAGI : règle AutoMod retirée'));
   for (const { triggerType, ...rule } of wanted) {
     const existing = mine.find((r) => r.name === rule.name);
-    const adopted = !existing && SINGLE.has(triggerType) ? rules.find((r) => r.triggerType === triggerType && r.enabled && !r.name.startsWith(PREFIX)) : null;
-    if (adopted) {
-      await attempt(guild, rule.name, async () => {
-        await adopted.edit(rule).catch((err) => {
-          throw err.status === 404 ? new Error(`« ${adopted.name} » ne peut pas être modifiée par une app, coupe-la dans Paramètres du serveur → AutoMod pour que MAGI la remplace`) : err;
-        });
-        log.notice('automod', `règle « ${adopted.name} » reprise par MAGI sous le nom ${rule.name}`, { guild });
-      });
-      continue;
-    }
-    await attempt(guild, rule.name, () => (existing ? existing.edit(rule) : guild.autoModerationRules.create({ ...rule, triggerType, reason: 'MAGI : AutoMod' })));
+    const other = !existing && SINGLE.has(triggerType) ? rules.find((r) => r.triggerType === triggerType && !r.name.startsWith(PREFIX)) : null;
+    setSetting(guild.id, `automod_locked:${triggerType}`, null);
+    if (other) await adopt(guild, other, rule, triggerType);
+    else await attempt(guild, rule.name, () => (existing ? existing.edit(rule) : guild.autoModerationRules.create({ ...rule, triggerType, reason: 'MAGI : AutoMod' })));
   }
+}
+
+async function adopt(guild, other, rule, triggerType) {
+  try {
+    await other.edit(rule);
+    log.notice('automod', `règle « ${other.name} » reprise par MAGI sous le nom ${rule.name}`, { guild });
+  } catch (err) {
+    if (err.status !== 404 && err.status !== 403) return log.warning('automod', `${rule.name} : ${err.message}`, { guild });
+    setSetting(guild.id, `automod_locked:${triggerType}`, other.name);
+    log.notice('automod', `« ${other.name} » est verrouillée par Discord, MAGI la laisse telle quelle${other.enabled ? '' : ' : elle est coupée, réactive-la dans Paramètres du serveur → AutoMod'}`, { guild });
+  }
+}
+
+export function lockedRule(guildId, triggerType) {
+  return setting(guildId, `automod_locked:${triggerType}`);
 }
 
 export function syncAutomod(guild) {

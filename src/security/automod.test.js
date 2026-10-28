@@ -2,9 +2,10 @@ import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { AutoModerationActionType as A, AutoModerationRuleTriggerType as T, Collection, PermissionFlagsBits as P, PermissionsBitField } from 'discord.js';
 
-const { FAMILIES, setAutomodAllowList, setAutomodRules, syncAutomod, wantedRules } = await import('./automod.js');
+const { FAMILIES, lockedRule, setAutomodAllowList, setAutomodRules, syncAutomod, wantedRules } = await import('./automod.js');
 const { setModule, setSettingList } = await import('../server/config.js');
 const { setSetting } = await import('../storage/settings.js');
+const { panelPage } = await import('../server/panel.js');
 
 function fakeGuild(id, perms, existing = []) {
   const calls = [];
@@ -82,6 +83,15 @@ test('AutoMod : crée, met à jour, reprend la règle de mentions existante, sup
   setModule('g-sync', 'automod', false);
   await syncAutomod(guild);
   assert.deepEqual(calls.map(([kind, name]) => `${kind} ${name}`), ['delete MAGI · Filtres']);
+
+  const locked = { name: 'Block Mention Spam', creatorId: 'owner', triggerType: T.MentionSpam, enabled: false };
+  const { guild: community, calls: tried } = fakeGuild('g-community', [P.ManageGuild], [locked]);
+  community.autoModerationRules.fetch = async () => new Collection([['0', { ...locked, edit: async () => { throw Object.assign(new Error('404: Not Found'), { status: 404 }); } }]]);
+  setModule('g-community', 'automod', true);
+  await syncAutomod(community);
+  assert.ok(!tried.some(([, name]) => name === 'MAGI · Mentions'));
+  assert.equal(lockedRule('g-community', T.MentionSpam), 'Block Mention Spam');
+  assert.ok(JSON.stringify(panelPage(community, 'automod').components[0].toJSON()).includes('verrouillée par Discord'));
 
   const { guild: weak, calls: none } = fakeGuild('g-weak', []);
   setModule('g-weak', 'automod', true);

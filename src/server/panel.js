@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  AutoModerationRuleTriggerType,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
@@ -29,7 +30,7 @@ import { installAndReport, isOperator, logChannels, magiCategory, operatorRole }
 import { log } from '../logging/log.js';
 import { COMMANDS, statusReport, syncCommands } from '../conversation/commands.js';
 import { ensureGate } from '../security/gate.js';
-import { automodAllowList, automodPresets, automodRules, PRESET_LABELS, RULE_LABELS, setAutomodAllowList, setAutomodRules, syncAutomod } from '../security/automod.js';
+import { automodAllowList, automodPresets, automodRules, lockedRule, PRESET_LABELS, RULE_LABELS, setAutomodAllowList, setAutomodRules, syncAutomod } from '../security/automod.js';
 import { postTicketPanel } from '../community/tickets.js';
 import { createHub } from '../community/voice.js';
 import { DISCORD_LEVELS, discordLevel } from '../logging/discord.js';
@@ -295,6 +296,7 @@ function automodSection(guild) {
   const rules = automodRules(guild.id);
   const presets = automodPresets(guild.id);
   const allow = automodAllowList(guild.id);
+  const mentionsLock = lockedRule(guild.id, AutoModerationRuleTriggerType.MentionSpam);
   return [
     feature(guild, 'automod', `${rules.length + 3}/${Object.keys(RULE_LABELS).length + 3} règles`),
     separator(),
@@ -316,8 +318,12 @@ function automodSection(guild) {
         .setMaxValues(Object.keys(PRESET_LABELS).length)
         .addOptions(Object.entries(PRESET_LABELS).map(([value, label]) => ({ label, value, default: presets.includes(value) }))),
     ),
-    text('**Spam de mentions et spam**\n-# Le spam détecté par Discord est toujours bloqué.'),
-    choice(guild, 'automod_mentions', 'Mentions par message', (v) => `Bloquer au-delà de ${v} mentions`),
+    ...(mentionsLock
+      ? [text(`**Spam de mentions et spam**\n-# Le spam détecté par Discord est toujours bloqué. Les mentions restent gérées par « ${mentionsLock} », verrouillée par Discord : réglable dans Paramètres du serveur → AutoMod.`)]
+      : [
+          text('**Spam de mentions et spam**\n-# Le spam détecté par Discord est toujours bloqué.'),
+          choice(guild, 'automod_mentions', 'Mentions par message', (v) => `Bloquer au-delà de ${v} mentions`),
+        ]),
     separator(),
     new SectionBuilder()
       .addTextDisplayComponents(text(`**Liste blanche**\n${allow.length ? allow.join(', ').slice(0, 500) : 'Aucun mot'}\n-# Mots et expressions qui ne déclenchent jamais les règles.`))
