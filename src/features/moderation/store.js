@@ -69,3 +69,19 @@ export function saveCase({ id, guildId, userId, at, ...data }) {
 export function casesOf(guildId, userId, limit = 10) {
   return casesOfQuery.all(guildId, userId, limit).map(parse);
 }
+
+const purgeInfractions = db.query('DELETE FROM infractions WHERE guild_id = ? AND user_id = ?');
+const purgeCases = db.query('DELETE FROM cases WHERE guild_id = ? AND user_id = ?');
+const allCases = db.query('SELECT * FROM cases WHERE guild_id = ? AND user_id = ? ORDER BY id');
+const countAll = db.query('SELECT count(*) AS n FROM infractions WHERE guild_id = ? AND user_id = ?');
+
+export function recordOf(guildId, userId) {
+  return { cases: allCases.all(guildId, userId).map(parse), infractions: countAll.get(guildId, userId).n };
+}
+
+export function purgeMember(guildId, userId) {
+  const record = recordOf(guildId, userId);
+  purgeInfractions.run(guildId, userId);
+  purgeCases.run(guildId, userId);
+  return record;
+}

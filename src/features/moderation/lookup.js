@@ -24,8 +24,9 @@ import { paliers, rateOf } from '../community/synchro.js';
 import { pendingReminders } from '../reminders/store.js';
 import { factsAbout } from '../memory/store.js';
 import { gateRole } from '../security/gate.js';
-import { activeInfractions, casesOf } from './store.js';
-import { excludedOf, KINDS, sanctionOf } from './cases.js';
+import { activeInfractions, casesOf, purgeMember, recordOf } from './store.js';
+import { excludedOf, KINDS, markPurged, sanctionOf } from './cases.js';
+import { log } from '../../core/log/log.js';
 import { decide } from './index.js';
 import { DURATIONS, mayPunish, parseDuration, PURGES, punish } from './manual.js';
 
@@ -148,6 +149,7 @@ export async function lookupCard(guild, userId) {
       [member && button('warn', 'Avertir'), member && button('mute', 'Exclure'), member && button('kick', 'Expulser'), !banned && button('ban', 'Bannir', ButtonStyle.Danger), button('note', 'Ajouter une note', ButtonStyle.Primary)].filter(Boolean),
     ),
   );
+  container.addActionRowComponents(new ActionRowBuilder().addComponents(button('purge', 'Purger les sanctions', ButtonStyle.Danger)));
   return { components: [container], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral, allowedMentions: { parse: [] } };
 }
 
@@ -175,9 +177,42 @@ function modal(action, userId) {
   return new ModalBuilder().setCustomId(`${PREFIX}${action}-set:${userId}`).setTitle(titles[action]).addComponents(rows);
 }
 
+async function confirmPurge(interaction, userId) {
+  const { guild } = interaction;
+  const record = recordOf(guild.id, userId);
+  const member = await guild.members.fetch(userId).catch(() => null);
+  const timedOut = member?.communicationDisabledUntilTimestamp > Date.now();
+  const banned = !member && (await guild.bans.fetch(userId).catch(() => null));
+  const parts = [`${record.cases.length} cas`, `${record.infractions} infraction${record.infractions > 1 ? 's' : ''}`, timedOut && 'son exclusion en cours', banned && 'son bannissement'].filter(Boolean);
+  if (!record.cases.length && !record.infractions && !timedOut && !banned) return interaction.reply({ content: `Rien à purger : le dossier de <@${userId}> est déjà vide.`, ...ephemeral });
+  return interaction.reply({
+    content: `Effacer tout le casier de <@${userId}> : ${parts.join(', ')} ? Les cartes de ses cas seront vidées. C'est définitif.`,
+    components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}purge-ok:${userId}`).setLabel('Tout effacer').setStyle(ButtonStyle.Danger))],
+    ...ephemeral,
+  });
+}
+
+async function purge(interaction, userId) {
+  const { guild, member: operator } = interaction;
+  await interaction.update({ content: 'Purge en cours…', components: [] });
+  const reason = `MAGI, purge du casier par ${interaction.user.tag}`;
+  const target = await guild.members.fetch(userId).catch(() => null);
+  const lifted = [];
+  if (target?.communicationDisabledUntilTimestamp > Date.now()) await target.timeout(null, reason).then(() => lifted.push('exclusion levée')).catch(() => {});
+  if (!target && (await guild.bans.fetch(userId).catch(() => null))) await guild.members.unban(userId, reason).then(() => lifted.push('débanni')).catch(() => {});
+  const record = purgeMember(guild.id, userId);
+  for (const c of record.cases) await markPurged(guild, c, operator.displayName);
+  log.notice('moderation', `${operator} a purgé le casier de <@${userId}> : ${record.cases.length} cas, ${record.infractions} infraction${record.infractions > 1 ? 's' : ''}${lifted.length ? `, ${lifted.join(', ')}` : ''}`, { guild });
+  return interaction.editReply({ content: `Casier de <@${userId}> effacé : ${record.cases.length} cas, ${record.infractions} infraction${record.infractions > 1 ? 's' : ''}${lifted.length ? `, ${lifted.join(', ')}` : ''}.` });
+}
+
 export async function handleLookupInteraction(interaction) {
   const [action, userId] = interaction.customId.slice(PREFIX.length).split(':');
   if (!allowedToLook(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits.", ...ephemeral });
+  if (action === 'purge' || action === 'purge-ok') {
+    if (!isOperator(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits : purger un casier est réservé aux opérateurs MAGI.", ...ephemeral });
+    return action === 'purge' ? confirmPurge(interaction, userId) : purge(interaction, userId);
+  }
   if (!action.endsWith('-set')) {
     if (action !== 'note' && !mayPunish(interaction.member, action)) return interaction.reply({ content: "Tu n'as pas la permission Discord pour cette sanction.", ...ephemeral });
     return interaction.showModal(modal(action, userId));

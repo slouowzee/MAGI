@@ -72,3 +72,16 @@ test('lookup complet : identité, infractions, cas, notes, boutons, dans les lim
   const texts = payload.components[0].toJSON().components.flatMap((c) => [c, ...(c.components ?? [])]).map((c) => c.content ?? '').join('');
   assert.ok(texts.length < 4000);
 });
+
+test('purge : efface cas et infractions du membre, et seulement les siens', async () => {
+  const { purgeMember, recordOf } = await import('./store.js');
+  const w = world('g-purge');
+  await punish({ guild: w.guild, moderator: w.mod, userId: 'yui', action: 'warn', reason: 'a' });
+  await punish({ guild: w.guild, moderator: w.mod, userId: 'yui', action: 'warn', reason: 'b' });
+  assert.deepEqual([recordOf('g-purge', 'yui').cases.length, recordOf('g-purge', 'yui').infractions], [2, 2]);
+  const removed = purgeMember('g-purge', 'yui');
+  assert.equal(removed.cases.length, 2);
+  assert.deepEqual([recordOf('g-purge', 'yui').cases.length, recordOf('g-purge', 'yui').infractions], [0, 0]);
+  assert.equal(infractionLine('g-purge', 'yui'), 'Aucune infraction sur les 30 derniers jours.');
+  assert.ok(recordOf('g-manuel', 'yui').cases.length > 0);
+});
