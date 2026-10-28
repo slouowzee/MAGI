@@ -1,6 +1,7 @@
 import { install, installReport, installStatus, statusReport } from '../../core/installation.js';
 import { refreshPanel } from '../../panel/index.js';
 import { inviteUrl } from '../../core/permissions.js';
+import { setting } from '../../core/settings.js';
 
 export const INSTALLATION_TOOLS = [
   {
@@ -40,12 +41,12 @@ export const INSTALLATION_TOOLS = [
   {
     name: 'panneau_config',
     description:
-      "Affiche à nouveau le panneau de configuration de MAGI dans le salon #magi-config (permissions, modules, personas, salons, sécurité). À utiliser quand on demande les réglages ou la configuration de MAGI.",
+      "Donne le lien du panneau de configuration de #magi-config, ou le republie s'il a été supprimé. Seulement quand on demande où est le panneau ou de le réafficher : il ne modifie rien et ne crée aucun salon (pour ça, preparer_salons). Les opérateurs règlent tout eux-mêmes dans ce panneau, ou avec /magi config.",
     parameters: { type: 'object', properties: {} },
     access: 'owner',
     async run({ guild }) {
-      const channel = await refreshPanel(guild, { repost: true });
-      return channel ? `Panneau de configuration affiché dans ${channel}.` : "Le panneau n'est pas disponible : MAGI doit d'abord être installé avec le niveau de permissions Gestion.";
+      const channel = await refreshPanel(guild);
+      return channel ? `Panneau à jour : https://discord.com/channels/${guild.id}/${channel.id}/${setting(guild.id, 'config_message')}` : "Le panneau n'est pas disponible : MAGI doit d'abord être installé avec le niveau de permissions Gestion.";
     },
   },
 ];

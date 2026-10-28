@@ -24,3 +24,15 @@ test('renommage sans effet ou transformé par Discord : signalé', async () => {
   assert.match(await run('owner', '💬・general', '💬・general.'), /Nom inchangé/);
   assert.equal(await run('owner', '💬・general', '.💬・general-2'), '#💬・general renommé en #💬・general-2 (Discord a transformé « .💬・general-2 »).');
 });
+
+test('preparer_salons : seulement les fonctions actives sans salon', async () => {
+  const { setupPlan } = await import('./setup.js');
+  const { setModules } = await import('../../core/config.js');
+  const { setSetting } = await import('../../core/settings.js');
+  const guild = { id: 'g-setup', systemChannel: null, channels: { cache: new Map([['hof', { id: 'hof' }]]) } };
+  setModules('g-setup', ['etoiles', 'tickets', 'vocal_temporaire', 'bienvenue']);
+  assert.deepEqual(setupPlan(guild).map((s) => s.module), ['etoiles', 'tickets', 'bienvenue', 'vocal_temporaire']);
+  setSetting('g-setup', 'stars_channel', 'hof');
+  assert.deepEqual(setupPlan({ ...guild, systemChannel: { id: 'sys' } }).map((s) => s.module), ['tickets', 'vocal_temporaire']);
+  assert.deepEqual(setupPlan(guild, ['tickets']).map((s) => s.module), ['tickets']);
+});

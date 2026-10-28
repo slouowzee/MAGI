@@ -8,5 +8,6 @@ import { INTERVENTION_TOOLS } from '../conversation/tools.js';
 import { PUBLICATION_TOOLS } from './publications.js';
 import { ROLE_PANEL_TOOLS } from './role-panels.js';
 import { SECURITY_TOOLS } from '../security/tools.js';
+import { SETUP_TOOLS } from './setup.js';
 
-export const ADMIN_TOOLS = [...READ_TOOLS, ...MEMBER_TOOLS, ...CHANNEL_ADMIN_TOOLS, ...ROLE_TOOLS, ...SCAFFOLD_TOOLS, ...MODERATION_TOOLS, ...INTERVENTION_TOOLS, ...PUBLICATION_TOOLS, ...ROLE_PANEL_TOOLS, ...SECURITY_TOOLS];
+export const ADMIN_TOOLS = [...READ_TOOLS, ...MEMBER_TOOLS, ...CHANNEL_ADMIN_TOOLS, ...ROLE_TOOLS, ...SCAFFOLD_TOOLS, ...MODERATION_TOOLS, ...INTERVENTION_TOOLS, ...PUBLICATION_TOOLS, ...ROLE_PANEL_TOOLS, ...SECURITY_TOOLS, ...SETUP_TOOLS];
