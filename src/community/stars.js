@@ -7,7 +7,7 @@ import { chat, forReply } from '../llm/client.js';
 import { buildMessages, cleanReply, MAX_TOKENS } from '../llm/prompts.js';
 import { log } from '../logging/log.js';
 
-const STAR = '🏆';
+const STAR = '🔥';
 
 export function starEmbed(message) {
   const embed = new EmbedBuilder()

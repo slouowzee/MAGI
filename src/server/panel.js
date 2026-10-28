@@ -60,7 +60,7 @@ const HINTS = {
   vocaux: 'Écoute les messages vocaux.',
   statut: "Le statut du bot montre ce qu'il fait.",
   administration: 'Gestion du serveur à la demande des opérateurs.',
-  etoiles: 'Copie les messages qui reçoivent assez de 🏆 dans un salon.',
+  etoiles: 'Copie les messages qui reçoivent assez de 🔥 dans un salon.',
   anniversaires: 'Souhaite les anniversaires à 9 h.',
   synchro: 'Activité des membres, paliers et rôles.',
   sondages: 'Sondages Discord à la demande.',
@@ -196,8 +196,8 @@ function personasSection(guild) {
 
 function communitySection(guild) {
   return [
-    feature(guild, 'etoiles', `${option(guild.id, 'stars_threshold')} 🏆 · ${one('stars_channel', guild)}`),
-    choice(guild, 'stars_threshold', 'Trophées nécessaires', (v) => `${v} 🏆 pour entrer`),
+    feature(guild, 'etoiles', `${option(guild.id, 'stars_threshold')} 🔥 · ${one('stars_channel', guild)}`),
+    choice(guild, 'stars_threshold', 'Flammes nécessaires', (v) => `${v} 🔥 pour entrer`),
     channelSelect('stars_channel', 'Salon du Hall of Fame', [setting(guild.id, 'stars_channel')], 1),
     separator(),
     feature(guild, 'anniversaires', one('birthday_channel', guild)),
@@ -435,7 +435,7 @@ const FIELD_LABELS = {
   interventions: 'salons des interventions',
   welcome: 'salon de bienvenue',
   log_level: 'niveau des logs',
-  stars_threshold: 'trophées nécessaires',
+  stars_threshold: 'flammes nécessaires',
   stars_channel: 'salon du Hall of Fame',
   birthday_channel: 'salon des anniversaires',
   synchro_channel: 'salon de synchronisation',
