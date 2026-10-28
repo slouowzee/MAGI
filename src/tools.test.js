@@ -50,15 +50,27 @@ test('outils : lectures notées en info, actions en notice', async () => {
   const { addSink } = await import('./core/log/log.js');
   const { runTool } = await import('./tools.js');
   const seen = [];
-  const detach = addSink((e) => e.component === 'outils' && seen.push([e.message.split(' ')[0], e.level]));
+  const detach = addSink((e) => e.component === 'outils' && seen.push([e.message, e.level]));
   const tools = [
     { name: 'lire', access: 'everyone', readonly: true, run: async () => 'lu' },
     { name: 'agir', access: 'everyone', run: async () => 'fait' },
   ];
-  const member = { id: 'm', user: { tag: 'slou' }, guild: { id: 'g-outils', name: 'G' } };
+  const member = { id: 'm', user: { tag: 'slou' }, guild: { id: 'g-outils', name: 'G' }, toString: () => '<@m>' };
   const ctx = { member, message: { channel: { name: 'test' } } };
   await runTool({ name: 'lire', args: {} }, ctx, tools);
   await runTool({ name: 'agir', args: {} }, ctx, tools);
   detach();
-  assert.deepEqual(seen, [['lire', 'info'], ['agir', 'notice']]);
+  assert.deepEqual(seen, [['<@m> a utilisé **lire** : lu', 'info'], ['<@m> a utilisé **agir** : fait', 'notice']]);
+});
+
+test('outils : les consignes destinées au modèle ne finissent pas dans les logs', async () => {
+  const { addSink } = await import('./core/log/log.js');
+  const { runTool } = await import('./tools.js');
+  const seen = [];
+  const detach = addSink((e) => e.component === 'outils' && seen.push(e.message));
+  const tools = [{ name: 'rappel', access: 'everyone', run: async () => 'Rappel n°3 enregistré, il tombera à 15:12. Confirme en une phrase et recopie ce format tel quel.' }];
+  const member = { id: 'm', user: { tag: 'slou' }, guild: { id: 'g-outils2', name: 'G' }, toString: () => '<@m>' };
+  await runTool({ name: 'rappel', args: {} }, { member, message: { channel: { name: 'test' } } }, tools);
+  detach();
+  assert.deepEqual(seen, ['<@m> a utilisé **rappel** : Rappel n°3 enregistré, il tombera à 15:12.']);
 });

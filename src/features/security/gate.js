@@ -78,7 +78,7 @@ export async function gateMember(member, { lockdown = false } = {}) {
   const gate = await ensureGate(guild);
   if (!gate) return false;
   await member.roles.add(gate.role, REASON);
-  log.notice('filtre', `${member.user.tag} (${member.id}) en attente de vérification : ${reasons.join(', ')}`, { guild });
+  log.notice('filtre', `${member} doit passer la vérification · ${reasons.filter((r) => r !== 'tous les nouveaux').join(', ') || 'tous les nouveaux passent par là'}`, { guild });
   return true;
 }
 

@@ -26,7 +26,7 @@ export function countEntry(entry, now = Date.now()) {
   const { component, message } = entry;
   if (component === 'membres' && / est arrivée?(?=\s|$)/.test(message)) bumpStat(scope, 'arrivees', 1, now);
   if (component === 'membres' && / est partie?(?=\s|$)/.test(message)) bumpStat(scope, 'departs', 1, now);
-  if (component === 'tickets' && /ticket ouvert/.test(message)) bumpStat(scope, 'tickets', 1, now);
+  if (component === 'tickets' && /a ouvert un ticket/.test(message)) bumpStat(scope, 'tickets', 1, now);
   if (component === 'bot' && /^(Redémarré|Démarré)/.test(message)) bumpStat('global', 'redemarrages', 1, now);
   const model = component === 'conversation' && message.match(/, conv \d+, ([^,]+), [\d.]+ s$/)?.[1];
   if (model) {

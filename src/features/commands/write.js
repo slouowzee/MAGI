@@ -81,12 +81,12 @@ export async function handleWriteModal(interaction) {
     const target = await channel.messages.fetch(editId).catch(() => null);
     if (!target) return interaction.reply({ content: 'Message introuvable.', ...ephemeral });
     await target.edit(payload);
-    log.notice('commandes', `message de MAGI modifié par ${interaction.user.tag}`, { channel });
+    log.notice('commandes', `${interaction.member} a réécrit un message de MAGI : ${target.url}`, { channel });
     return interaction.reply({ content: `Message modifié : ${target.url}`, ...ephemeral });
   }
   const sent = PERSONAS[form] ? await speak(channel, form, text) : await channel.send({ ...payload, allowedMentions: { parse: [] } });
   if (form === 'publication') savePublication({ guildId: guild.id, channelId: channel.id, messageId: sent.id, title: title || text.slice(0, 60) });
-  log.notice('commandes', `message écrit par ${interaction.user.tag} publié (${FORMS[form]})`, { channel });
+  log.notice('commandes', `${interaction.member} a publié un message (${FORMS[form].toLowerCase()}) : ${sent.url}`, { channel });
   return interaction.reply({ content: `Publié : ${sent.url}`, ...ephemeral });
 }
 
@@ -122,6 +122,6 @@ export async function clear(interaction) {
   const onlyMagi = interaction.options.getBoolean('magi');
   const { deleted, old } = await sweep(channel, count, (m) => (!author || m.author.id === author.id) && (!onlyMagi || fromMagi(m, interaction.client.user.id)));
   const who = `${author ? ` de ${author}` : ''}${onlyMagi ? ' de MAGI' : ''}`;
-  log.notice('commandes', `clear : ${deleted} message(s)${author ? ` de ${author.tag}` : ''}${onlyMagi ? ' de MAGI' : ''} supprimé(s) par ${interaction.user.tag}`, { channel });
+  log.notice('commandes', `${interaction.member} a supprimé ${deleted} message${deleted > 1 ? 's' : ''}${author ? ` de ${author}` : ''}${onlyMagi ? ' de MAGI' : ''}`, { channel });
   return interaction.editReply({ content: `${deleted} message(s) supprimé(s)${who}.${old ? ` ${old} trop ancien(s) (plus de 14 jours) laissé(s) : Discord ne permet pas de les supprimer en lot.` : ''}` });
 }

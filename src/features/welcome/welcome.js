@@ -14,7 +14,8 @@ function welcomeChannel(guild) {
 }
 
 export function logArrival(member) {
-  log.notice('membres', `${member} est arrivé · ${member.user.tag} · compte créé <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, { guild: member.guild });
+  const young = Date.now() - member.user.createdTimestamp < 7 * 86_400_000;
+  log.notice('membres', `${member} est arrivé · compte créé <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>${young ? ' ⚠️ compte récent' : ''}`, { guild: member.guild });
 }
 
 export async function welcome(member) {
@@ -38,7 +39,7 @@ export async function welcome(member) {
     });
     text = cleanReply(content) || text;
   } catch {}
-  const posted = await speak(channel, persona, `<@${member.id}> ${text}`, { mentions: [member.id] }).catch((err) => log.err('membres', `échec bienvenue : ${err.message}`, { guild, channel }));
+  const posted = await speak(channel, persona, `<@${member.id}> ${text}`, { mentions: [member.id] }).catch((err) => log.err('membres', `message de bienvenue non envoyé : ${err.message}`, { guild, channel }));
   if (!posted) return;
   rememberAnswer(posted, member.displayName);
   const conversation = openConversation({ channelId: channel.id, guildId: guild.id });

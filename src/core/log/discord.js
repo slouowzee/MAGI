@@ -38,6 +38,14 @@ const ICONS = {
   rappels: '⏰', tickets: '🎫', bot: '🔄', commandes: '⌨️', conversation: '💬', vote: '🗳️', debat: '💭', etoiles: '🔥', synchro: '📈',
   anniversaires: '🎂', vocal: '🔊', publications: '📰', journal: '📜', interaction: '🖱️', rattrapage: '⏪',
 };
+export const PALETTE = { erreur: 0xe24b4a, alerte: 0xef9f27, securite: 0x7f77dd, moderation: 0xd85a30, config: 0x378add, arrivee: 0x1d9e75, depart: 0x888780, communaute: 0xd4537e, systeme: 0x5f5e5a };
+const GROUPS = {
+  config: 'config', outils: 'config', installation: 'config', commandes: 'config', publications: 'config',
+  automod: 'securite', antinuke: 'securite', antiraid: 'securite', filtre: 'securite', honeypot: 'securite', audit: 'securite', sauvegarde: 'securite',
+  sshd: 'securite', 'sshd-session': 'securite', ssh: 'securite', sudo: 'securite', su: 'securite', login: 'securite',
+  moderation: 'moderation',
+  tickets: 'communaute', etoiles: 'communaute', synchro: 'communaute', anniversaires: 'communaute', rappels: 'communaute', vocal: 'communaute', vote: 'communaute', debat: 'communaute',
+};
 const LEVEL_ICONS = { emerg: '🚨', alert: '🚨', crit: '🚨', err: '❌', warning: '⚠️' };
 const HINTS = [
   [/Unknown Member/i, 'le membre a déjà quitté le serveur'],
@@ -76,20 +84,29 @@ export function hintFor(message) {
   return HINTS.find(([pattern]) => pattern.test(message))?.[1] ?? null;
 }
 
+const departing = (entry) => entry.component === 'membres' && / est partie?(?=\s|$)/.test(entry.message);
+
+export function colorOf(entry) {
+  if (severity(entry.level) <= severity('err')) return PALETTE.erreur;
+  if (entry.level === 'warning') return PALETTE.alerte;
+  if (entry.component === 'membres') return departing(entry) ? PALETTE.depart : PALETTE.arrivee;
+  return PALETTE[GROUPS[entry.component]] ?? PALETTE.systeme;
+}
+
 export function smartLine(entry) {
   const alarming = severity(entry.level) <= severity('warning');
-  const icon = LEVEL_ICONS[entry.level] ?? (entry.component === 'membres' ? (/ est partie?(?=\s|$)/.test(entry.message) ? '🚶' : '👋') : ICONS[entry.component] ?? '•');
+  const icon = LEVEL_ICONS[entry.level] ?? (entry.component === 'membres' ? (departing(entry) ? '🚶' : '👋') : ICONS[entry.component] ?? '•');
   const label = alarming || entry.host !== 'magi' ? `**${entry.host === 'magi' ? entry.component : `${entry.host} ${entry.component}`}** · ` : '';
   const place = entry.channel ? `<#${entry.channel.id}> · ` : '';
   const hint = alarming ? hintFor(entry.message) : null;
-  return `${stamp(entry.at)} ${icon} ${label}${place}${sanitize(entry.message)}${hint ? ` *(${hint})*` : ''}`;
+  return `${icon} ${label}${place}${sanitize(entry.message)}${hint ? ` *(${hint})*` : ''}`;
 }
 
 export const MERGERS = {
   config: {
     window: 5 * 60_000,
     parse: (entry) => {
-      const m = entry.message.match(/^([\s\S]*) par (\S+)$/);
+      const m = entry.message.match(/^([\s\S]*) par (.+)$/);
       return m && { key: m[2], who: m[2], change: m[1] };
     },
     start: (p) => ({ who: p.who, changes: [p.change] }),
@@ -112,28 +129,22 @@ function send(channel, payload) {
   return channel.send(payload).catch((err) => console.error(`${timestamp()} magi log: err: envoi dans #${channel.name} impossible : ${err.message}`));
 }
 
+export const card = (text, color, at) => ({ description: clip(text), color, timestamp: new Date(at).toISOString() });
+
 export async function flush(channelId) {
   const batch = pending.get(channelId);
   if (!batch) return;
   pending.delete(channelId);
   clearTimeout(batch.timer);
-  const lines = batch.lines.map((l) => clip(l.count > 1 ? `${l.text} *(×${l.count})*` : l.text));
-  let chunk = [];
-  for (const line of lines) {
-    if (chunk.length && [...chunk, line].join('\n').length > LIMIT) {
-      await send(batch.channel, { content: chunk.join('\n'), ...silent });
-      chunk = [];
-    }
-    chunk.push(line);
-  }
-  if (chunk.length) await send(batch.channel, { content: chunk.join('\n'), ...silent });
+  const embeds = batch.lines.map((l) => card(l.count > 1 ? `${l.text} *(×${l.count})*` : l.text, l.color, l.at));
+  for (let i = 0; i < embeds.length; i += 10) await send(batch.channel, { embeds: embeds.slice(i, i + 10), ...silent });
 }
 
 export function flushAll() {
   return Promise.all([...pending.keys()].map(flush));
 }
 
-function queue(channel, key, text) {
+function queue(channel, key, text, color, at) {
   let batch = pending.get(channel.id);
   if (!batch) {
     batch = { channel, lines: [], timer: null };
@@ -141,7 +152,7 @@ function queue(channel, key, text) {
   }
   const last = batch.lines.at(-1);
   if (last?.key === key) last.count++;
-  else batch.lines.push({ key, text, count: 1 });
+  else batch.lines.push({ key, text, color, at, count: 1 });
   batch.timer ??= setTimeout(() => flush(channel.id), FLUSH_DELAY);
 }
 
@@ -149,17 +160,18 @@ async function merge(channel, merger, parsed, entry) {
   const key = `${channel.id}|${entry.component}|${parsed.key}`;
   const now = new Date(entry.at).getTime();
   const open = merged.get(key);
-  const content = (record) => clip(`${stamp(record.at)} ${merger.render(record.state)}`);
+  const payload = (record) => ({ embeds: [card(merger.render(record.state), colorOf(entry), record.last ?? record.at)], ...silent });
   if (open && now < open.until) {
     open.state = merger.add(open.state, parsed, entry);
     open.until = now + merger.window;
+    open.last = entry.at;
     const message = await open.message;
-    await message?.edit({ content: content(open), ...silent }).catch(() => {});
+    await message?.edit(payload(open)).catch(() => {});
     return;
   }
   await flush(channel.id);
   const record = { state: merger.start(parsed, entry), until: now + merger.window, at: entry.at };
-  record.message = send(channel, { content: content(record), ...silent });
+  record.message = send(channel, payload(record));
   merged.set(key, record);
   await record.message;
 }
@@ -174,11 +186,11 @@ export async function deliver(guild, entry) {
   const parsed = merger?.parse(entry);
   if (parsed) return merge(channel, merger, parsed, entry);
   const text = smartLine(entry);
-  if (!entry.mention && !entry.components) return queue(channel, `${entry.host} ${entry.component} ${entry.level} ${entry.channel?.id} ${entry.message}`, text);
+  if (!entry.mention && !entry.components) return queue(channel, `${entry.host} ${entry.component} ${entry.level} ${entry.channel?.id} ${entry.message}`, text, colorOf(entry), entry.at);
   await flush(channel.id);
   const { users = [], roles = [] } = entry.mention ?? {};
   const pings = [...users.map((id) => `<@${id}>`), ...roles.map((id) => `<@&${id}>`)].join(' ');
-  await send(channel, { content: clip(`${pings ? `${pings}\n` : ''}${text}`), allowedMentions: { users, roles }, components: entry.components ?? [] });
+  await send(channel, { content: pings || undefined, embeds: [card(text, colorOf(entry), entry.at)], allowedMentions: { users, roles }, components: entry.components ?? [] });
 }
 
 export const ownerGuilds = (client) => (ownerId ? [...client.guilds.cache.values()].filter((g) => g.ownerId === ownerId) : []);

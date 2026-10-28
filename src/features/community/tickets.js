@@ -54,7 +54,7 @@ async function open(interaction) {
   } catch {}
   await thread.send({ content: `${operators ?? ''} <@${member.id}>\n> ${subject.replace(/\n/g, '\n> ')}`.slice(0, 2000), allowedMentions: { users: [member.id], roles: operators ? [operators.id] : [] } });
   await speak(thread, persona, text, { components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}fermer`).setLabel('Fermer le ticket').setStyle(ButtonStyle.Secondary))] });
-  log.notice('tickets', `ticket ouvert par ${member.user.tag} : ${subject.slice(0, 120)}`, { guild, channel: thread });
+  log.notice('tickets', `${member} a ouvert un ticket : « ${subject.replace(/\s+/g, ' ').slice(0, 120)} »`, { guild, channel: thread });
   await interaction.editReply({ content: `Ticket ouvert : ${thread}` });
 }
 
@@ -65,7 +65,7 @@ async function close(interaction) {
   await thread.send({ content: `Ticket fermé par ${interaction.member.displayName}.`, allowedMentions: { parse: [] } });
   await thread.setLocked(true).catch(() => {});
   await thread.setArchived(true, `MAGI : fermé par ${interaction.user.tag}`).catch(() => {});
-  log.notice('tickets', `ticket ${thread.name} fermé par ${interaction.user.tag}`, { guild: interaction.guild });
+  log.notice('tickets', `${thread} fermé par ${interaction.member}`, { guild: interaction.guild });
 }
 
 export async function handleTicketInteraction(interaction) {

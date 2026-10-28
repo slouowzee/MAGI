@@ -55,7 +55,7 @@ client.once(Events.ClientReady, async (c) => {
   const stopped = Number(setting('global', 'last_stop') ?? 0);
   const offline = stopped && Date.now() - stopped < 30 * 60_000 ? Math.max(1, Math.round((Date.now() - stopped) / 1000)) : null;
   setSetting('global', 'last_stop', null);
-  log.notice('bot', `${offline ? `Redémarré après ${offline} s hors ligne` : 'Démarré'} · ${c.user.tag}, ${c.guilds.cache.size} serveur(s), LLM ${llmChain() || 'aucun'}`);
+  log.notice('bot', `${offline ? `Redémarré, ${offline} s d'interruption` : 'En ligne'} · modèles : ${llmChain() || 'aucun'}`);
   startDigest(c, { channelOf: (guild) => logChannels(guild).logs, ownerGuilds });
   followHostJournal();
   await catchUp(c).catch((err) => log.err('rattrapage', `échec : ${err.message}`));
@@ -76,7 +76,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
     if (await gateMember(member, { lockdown: raid })) return;
     await welcome(member);
   } catch (err) {
-    log.err('membres', `échec arrivée de ${member.user.tag} : ${err.message}`, { guild: member.guild });
+    log.err('membres', `arrivée de ${member} mal traitée : ${err.message}`, { guild: member.guild });
   }
 });
 client.on(Events.ChannelCreate, (channel) => channel.guild && hideNewChannel(channel).catch(() => {}));
@@ -89,7 +89,7 @@ client.on(Events.InteractionCreate, (interaction) => {
   if (isCommand(interaction)) return handleCommand(interaction);
   const id = interaction.customId ?? '';
   const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : isSecurityButton(id) ? handleSecurityButton : isTicketInteraction(id) ? handleTicketInteraction : isWriteModal(id) ? handleWriteModal : handleInteraction;
-  handler(interaction).catch((err) => log.err('interaction', `${id} : ${err.message}`, { guild: interaction.guild, channel: interaction.channel }));
+  handler(interaction).catch((err) => log.err('interaction', `un bouton ou menu a échoué (${id.split(':').slice(0, 2).join(':')}) : ${err.message}`, { guild: interaction.guild, channel: interaction.channel }));
 });
 client.on(Events.MessageCreate, async (message) => {
   if (await moderate(message).catch((err) => log.err('moderation', err.message, { guild: message.guild, channel: message.channel }))) return;

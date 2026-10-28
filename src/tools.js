@@ -54,10 +54,17 @@ async function execute(tool, args, { member, message, persona = null, actions = 
   try {
     const output = await tool.run({ guild: member.guild, member, message, persona, args, reason, offer });
     if (tool.panel) await refreshPanel(member.guild).catch(() => {});
-    log[tool.readonly ? 'info' : 'notice']('outils', `${tool.name} par ${member.user.tag}`, { guild: member.guild, channel: message.channel });
+    const result = String(output ?? '')
+      .split('\n')[0]
+      .split(/(?<=[.!?])\s+/)
+      .filter((sentence) => !/^(Recopie|Confirme|Dis |Présente|Invite|Propose|Pour corriger|Un bouton)/.test(sentence))
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .slice(0, 160);
+    log[tool.readonly ? 'info' : 'notice']('outils', `${member} a utilisé **${tool.name.replaceAll('_', ' ')}**${result ? ` : ${result}` : ''}`, { guild: member.guild, channel: message.channel });
     return output;
   } catch (err) {
-    log.warning('outils', `échec ${tool.name} par ${member.user.tag} : ${err.message}`, { guild: member.guild, channel: message.channel });
+    log.warning('outils', `**${tool.name.replaceAll('_', ' ')}** a échoué pour ${member} : ${err.message}`, { guild: member.guild, channel: message.channel });
     return `Échec de ${tool.name} : ${err.message}`;
   }
 }

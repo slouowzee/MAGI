@@ -67,9 +67,9 @@ export async function watchAuditLog(entry, guild) {
   log.alert(
     'antinuke',
     [
-      `${kind} en masse par <@${entry.executorId}> en moins d'1 min`,
-      `mesures : ${done.length ? done.join(', ') : 'aucune, rôle au-dessus de MAGI'}`,
-      'sauvegardes gelées 7 j',
+      `Destruction en masse par <@${entry.executorId}> : ${kind} en moins d'une minute.`,
+      `Mesures : ${done.length ? done.join(', ') : 'aucune, son rôle est au-dessus de MAGI'}.`,
+      'Sauvegardes figées 7 jours pour garder la dernière version saine.',
     ].join('\n'),
     {
       guild,

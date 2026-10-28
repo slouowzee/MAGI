@@ -23,7 +23,7 @@ async function cancelSanction(interaction, userId) {
   const revoked = revokeLastInfraction(guild.id, userId);
   if (member?.communicationDisabledUntilTimestamp > Date.now()) await member.timeout(null, `MAGI, annulé par ${interaction.user.tag}`);
   const unbanned = !member && (await guild.bans.fetch(userId).catch(() => null)) ? await guild.members.unban(userId, `MAGI, annulé par ${interaction.user.tag}`).then(() => true).catch(() => false) : false;
-  log.notice('moderation', `sanction de <@${userId}> annulée${unbanned ? ', bannissement levé' : ''}${revoked ? '' : ' (aucune infraction en cours)'} par ${interaction.user.tag}`, { guild });
+  log.notice('moderation', `${interaction.member} a annulé la sanction de <@${userId}>${unbanned ? ' et levé son bannissement' : ''}`, { guild });
   await done(interaction, 'Sanction annulée');
 }
 
@@ -35,7 +35,7 @@ async function release(interaction, userId) {
   if (roles.length) await member.roles.add(roles, `MAGI, quarantaine levée par ${interaction.user.tag}`);
   if (member.communicationDisabledUntilTimestamp > Date.now()) await member.timeout(null, `MAGI, quarantaine levée par ${interaction.user.tag}`);
   setSetting(guild.id, `quarantine:${userId}`, null);
-  log.notice('antinuke', `quarantaine de ${member.user.tag} levée par ${interaction.user.tag}, ${roles.length} rôle(s) rendu(s)`, { guild });
+  log.notice('antinuke', `${interaction.member} a levé la quarantaine de ${member} · ${roles.length} rôle${roles.length > 1 ? 's' : ''} rendu${roles.length > 1 ? 's' : ''}`, { guild });
   await done(interaction, 'Quarantaine levée');
 }
 

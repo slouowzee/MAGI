@@ -50,14 +50,14 @@ test('sur Discord : lignes lisibles, heure locale, icône, erreurs expliquées',
   const { guild } = fakeGuild('g-texte');
   expect(plain('**Ban** de <@42> par <@&7>, arrivé le <t:1793021041>', guild)).toBe('Ban de @Slou par @Opérateur MAGI, arrivé le 2026-10-26 14:24');
   const at = new Date('2026-10-26T13:24:01Z');
-  expect(smartLine({ at, host: 'magi', component: 'tickets', level: 'notice', message: 'ticket ouvert par yui' })).toBe('<t:1793021041:T> 🎫 ticket ouvert par yui');
-  expect(smartLine({ at, host: 'magi', component: 'moderation', level: 'err', message: 'échec exclusion : Unknown Member' })).toBe('<t:1793021041:T> ❌ **moderation** · échec exclusion : Unknown Member *(le membre a déjà quitté le serveur)*');
-  expect(smartLine({ at, host: 'vps', component: 'sudo', level: 'notice', message: '# titre' })).toBe('<t:1793021041:T> 🔐 **vps sudo** · \\# titre');
+  expect(smartLine({ at, host: 'magi', component: 'tickets', level: 'notice', message: '<@1> a ouvert un ticket' })).toBe('🎫 <@1> a ouvert un ticket');
+  expect(smartLine({ at, host: 'magi', component: 'moderation', level: 'err', message: 'échec exclusion : Unknown Member' })).toBe('❌ **moderation** · échec exclusion : Unknown Member *(le membre a déjà quitté le serveur)*');
+  expect(smartLine({ at, host: 'vps', component: 'sudo', level: 'notice', message: '# titre' })).toBe('🔐 **vps sudo** · \\# titre');
   expect(smartLine({ at, host: 'magi', component: 'membres', level: 'notice', message: 'yui est partie · membre depuis peu' })).toContain('🚶');
   const { guild: g, sent } = fakeGuild('g-blanc');
   await deliver(g, { at, host: 'magi', level: 'err', component: 'llm', message: 'a\nb', guild: g, channel: null, mention: null });
   await flush('g-blanc-magi-système');
-  expect(sent['magi-système'][0].content).toBe('<t:1793021041:T> ❌ **llm** · a\nb');
+  expect(sent['magi-système'][0].embeds).toEqual([{ description: '❌ **llm** · a\nb', color: 0xe24b4a, timestamp: '2026-10-26T13:24:01.000Z' }]);
 });
 
 test('sur Discord : regroupées par salon, répétitions comptées, sous le seuil ignorées', async () => {
@@ -70,16 +70,19 @@ test('sur Discord : regroupées par salon, répétitions comptées, sous le seui
   await deliver(guild, { ...entry('notice', 'outils', 'invisible'), quiet: true });
   await flush(`g-lots-magi-logs`);
   await flush(`g-lots-magi-système`);
+  const text = (name, i = 0) => sent[name][i].embeds.map((e) => e.description).join('\n');
   expect(sent['magi-logs']).toHaveLength(1);
-  expect(sent['magi-logs'][0].content).toContain('<#g-lots-général> · personas → casper');
-  expect(sent['magi-logs'][0].content).not.toContain('invisible');
-  expect(sent['magi-système'][0].content.match(/gemini lent/g)).toHaveLength(1);
-  expect(sent['magi-système'][0].content).toContain('*(×2)*');
-  expect(sent['magi-système'][0].content).not.toContain('trop détaillé');
+  expect(text('magi-logs')).toContain('<#g-lots-général> · personas → casper');
+  expect(sent['magi-logs'][0].embeds[0].color).toBe(0x378add);
+  expect(text('magi-logs')).not.toContain('invisible');
+  expect(text('magi-système').match(/gemini lent/g)).toHaveLength(1);
+  expect(text('magi-système')).toContain('*(×2)*');
+  expect(sent['magi-système'][0].embeds[0].color).toBe(0xef9f27);
+  expect(text('magi-système')).not.toContain('trop détaillé');
   setSetting('g-lots', 'log_level', 'info');
   await deliver(guild, entry('info', 'conversation', 'détaillé'));
   await flush(`g-lots-magi-système`);
-  expect(sent['magi-système'][1].content).toContain('détaillé');
+  expect(text('magi-système', 1)).toContain('détaillé');
 });
 
 test('sur Discord : changements de config et connexions SSH fusionnés dans un même message', async () => {
@@ -88,7 +91,7 @@ test('sur Discord : changements de config et connexions SSH fusionnés dans un m
   const original = guild.channels.cache.get('g-fusion-magi-logs').send;
   guild.channels.cache.get('g-fusion-magi-logs').send = async (payload) => {
     await original(payload);
-    return { edit: async (p) => edits.push(p.content) };
+    return { edit: async (p) => edits.push(p.embeds[0].description) };
   };
   const at = new Date('2026-10-26T13:24:01Z');
   const config = (message, delay) => deliver(guild, { at: new Date(at.getTime() + delay), host: 'magi', level: 'notice', component: 'config', message, guild, channel: null, mention: null });
@@ -96,7 +99,7 @@ test('sur Discord : changements de config et connexions SSH fusionnés dans un m
   await config('critères du filtre = tous par slouowze', 30_000);
   await config('âge minimal à l’arrivée = 7 par slouowze', 60_000);
   expect(sent['magi-logs']).toHaveLength(1);
-  expect(edits.at(-1)).toBe('<t:1793021041:T> ⚙️ **slouowze** a modifié la configuration : critères du filtre = tous ; âge minimal à l’arrivée = 7 *(2 changements)*');
+  expect(edits.at(-1)).toBe('⚙️ **slouowze** a modifié la configuration : critères du filtre = tous ; âge minimal à l’arrivée = 7 *(2 changements)*');
   const { MERGERS } = await import('./discord.js');
   const ssh = MERGERS.sshd;
   const e = (min) => ({ at: new Date(at.getTime() + min * 60_000), host: 'vps', message: 'Accepted publickey for slouowze from 1.2.3.4 port 5 ssh2' });
@@ -107,7 +110,8 @@ test('sur Discord : changements de config et connexions SSH fusionnés dans un m
 test('sur Discord : une alerte avec mention part seule et notifie', async () => {
   const { guild, sent } = fakeGuild('g-alerte');
   await deliver(guild, { at: new Date(), host: 'magi', level: 'alert', component: 'antinuke', message: 'trop de suppressions', guild, channel: null, mention: { users: ['42'], roles: ['7'] } });
-  expect(sent['magi-sécurité'][0].content).toMatch(/^<@42> <@&7>\n<t:\d+:T> 🚨 \*\*antinuke\*\* · trop de suppressions$/);
+  expect(sent['magi-sécurité'][0].content).toBe('<@42> <@&7>');
+  expect(sent['magi-sécurité'][0].embeds[0]).toMatchObject({ description: '🚨 **antinuke** · trop de suppressions', color: 0xe24b4a });
   expect(sent['magi-sécurité'][0].allowedMentions).toEqual({ users: ['42'], roles: ['7'] });
 });
 
@@ -116,7 +120,7 @@ test('journal du VPS : connexions, sudo et mémoire saturée classés', () => {
   expect(j('sshd-session', 'Accepted publickey for slouowze from 1.2.3.4 port 5555 ssh2')).toMatchObject({ level: 'notice', component: 'sshd' });
   expect(j('sshd-session', 'Invalid user admin from 5.6.7.8 port 22')).toMatchObject({ level: 'info', failedFrom: '5.6.7.8' });
   expect(j('sshd-session', 'Connection closed by 5.6.7.8 port 22 [preauth]')).toMatchObject({ level: 'debug' });
-  expect(j('sudo', 'slouowze : TTY=pts/0 ; PWD=/home/slouowze ; USER=root ; COMMAND=/usr/bin/systemctl restart docker', '5')).toMatchObject({ level: 'notice', component: 'sudo' });
+  expect(j('sudo', 'slouowze : TTY=pts/0 ; PWD=/home/slouowze ; USER=root ; COMMAND=/usr/bin/systemctl restart docker', '5')).toMatchObject({ level: 'notice', component: 'sudo', message: 'slouowze a lancé en root : systemctl restart docker' });
   expect(j('kernel', 'Out of memory: Killed process 1234 (ollama)', '3')).toMatchObject({ level: 'crit', component: 'kernel' });
   expect(j('systemd', 'docker.service: Failed with result \'exit-code\'.', '4')).toMatchObject({ level: 'err' });
   expect(j('CRON', 'pam_unix(cron:session): session opened', '6')).toMatchObject({ level: 'info', component: 'CRON' });
@@ -140,7 +144,7 @@ test('journal du VPS : doublons ignorés, échecs SSH résumés', () => {
   ]);
   const summary = reportFailures();
   expect(summary.level).toBe('warning');
-  expect(summary.message).toBe("3 échec(s) d'authentification en 10 min, 2 IP, max 5.6.7.8 (2)");
+  expect(summary.message).toBe('3 connexions SSH refusées en 10 min, depuis 2 adresses (surtout 5.6.7.8, 2 fois)');
   expect(reportFailures()).toBeNull();
 });
 
@@ -165,7 +169,7 @@ test('résumé quotidien : compteurs tirés des logs, texte lisible', async () =
   e('membres', '<@1> est arrivé · yui · compte créé il y a 1 h');
   e('membres', '<@2> est arrivé · lea · compte créé il y a 2 ans');
   e('membres', 'yui est parti');
-  e('tickets', 'ticket ouvert par yui : partenariat');
+  e('tickets', '<@1> a ouvert un ticket : « partenariat »');
   e('conversation', 'slou → casper, conv 3, gemini-3.5-flash-lite, 1.2 s', 'info');
   e('conversation', 'slou → melchior, conv 4, openai/gpt-oss-120b, 4.0 s', 'info');
   e('llm', 'HTTP 503', 'err');

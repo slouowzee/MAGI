@@ -26,6 +26,8 @@ export function classify(raw) {
     return { level: level === 'info' ? 'debug' : level, component: 'sshd', message };
   }
   if (component === 'sudo') {
+    const run = message.match(/^\s*(\S+) : .*USER=(\S+) ; COMMAND=(.+)$/);
+    if (run) return { level: 'notice', component, message: `${run[1]} a lancé en ${run[2]} : ${run[3].replace(/^\/(?:usr\/)?s?bin\//, '')}` };
     if (message.includes('COMMAND=')) return { level: 'notice', component, message };
     if (/authentication failure|incorrect password/.test(message)) return { level: 'warning', component, message };
     return { level: 'debug', component, message };
@@ -43,7 +45,7 @@ export function reportFailures() {
   const [ip, count] = [...failures].sort((a, b) => b[1] - a[1])[0];
   const addresses = failures.size;
   failures.clear();
-  return log.warning('sshd', `${total} échec(s) d'authentification en 10 min, ${addresses} IP, max ${ip} (${count})`, { host: 'vps' });
+  return log.warning('sshd', `${total} connexion${total > 1 ? 's' : ''} SSH refusée${total > 1 ? 's' : ''} en 10 min, depuis ${addresses} adresse${addresses > 1 ? 's' : ''}${addresses > 1 ? ` (surtout ${ip}, ${count} fois)` : ` (${ip})`}`, { host: 'vps' });
 }
 
 export function handleLine(line) {

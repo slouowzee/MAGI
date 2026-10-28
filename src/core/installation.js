@@ -147,7 +147,8 @@ export async function installAndReport(guild) {
   try {
     const result = await install(guild);
     const admin = result.ok ? 'administration activée' : `administration désactivée : placer ${result.role} au-dessus de ${guild.members.me.roles.highest} (Paramètres → Rôles)`;
-    if (result.created.length || !result.ok) log.notice('installation', `${result.created.length ? `créé : ${result.created.join(', ')}` : 'à jour'}, ${admin}`, { guild });
+    if (result.created.length) log.notice('installation', `Installation : ${result.created.join(', ')}`, { guild });
+    if (!result.ok) log.warning('installation', `Outils d'administration coupés : place ${result.role} au-dessus de ${guild.members.me.roles.highest} (Paramètres du serveur → Rôles)`, { guild });
     else log.info('installation', `à jour, ${admin}`, { guild });
     return result;
   } catch (err) {

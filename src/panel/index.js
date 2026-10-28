@@ -151,7 +151,7 @@ export async function setupGuild(guild) {
   await refreshHoneypot(guild).catch((err) => log.err('honeypot', `échec mise à jour du honeypot : ${err.message}`, { guild }));
   await resyncAutomod(guild);
   await restylePublications(guild)
-    .then((count) => count && log.notice('publications', `${count} publication(s) remise(s) en forme`, { guild }))
+    .then((count) => count && log.notice('publications', `${count} publication${count > 1 ? 's' : ''} remise${count > 1 ? 's' : ''} au nouveau style`, { guild }))
     .catch((err) => log.err('publications', `échec remise en forme : ${err.message}`, { guild }));
 }
 
@@ -237,7 +237,7 @@ export async function handlePanelInteraction(interaction) {
   const show = (page) =>
     interaction.message?.flags.has(MessageFlags.Ephemeral) ? interaction.update(panelPage(guild, page, { live: true })) : openPanel(interaction, page);
   const changed = (summary) => {
-    log.notice('config', `${summary} par ${member.user.tag}`, { guild });
+    log.notice('config', `${summary} par ${member.displayName}`, { guild });
     refreshPanel(guild).catch(() => {});
   };
 

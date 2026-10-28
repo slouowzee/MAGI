@@ -18,6 +18,8 @@ export function logsSection(guild) {
   return [
     text(Object.entries(LOG_PURPOSES).map(([source, purpose]) => `${targets[source] ?? 'salon manquant'} : ${purpose}`).join('\n')),
     separator(),
+    text('**Couleurs** : 🟥 erreur · 🟧 avertissement · 🟪 sécurité · 🟫 modération · 🟦 configuration et outils · 🟩 arrivée · ⬜ départ · 🩷 communauté · ⬛ système'),
+    separator(),
     text(`**Niveau minimal** : ${level} et au-dessus\n-# Les alertes qui mentionnent passent quel que soit le niveau.`),
     row(
       new StringSelectMenuBuilder()

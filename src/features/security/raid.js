@@ -42,7 +42,7 @@ export async function lockdown(guild, count, now = Date.now()) {
   setSetting(guild.id, 'raid_lock_until', now + LOCK);
   schedule(guild, LOCK);
   const operators = operatorRole(guild);
-  log.alert('antiraid', `${count} arrivées en moins d'1 min : ${locked.length} salon(s) verrouillé(s) 30 min, nouveaux membres envoyés au filtre s'il est actif`, {
+  log.alert('antiraid', `Raid probable : ${count} arrivées en moins d'une minute. ${locked.length} salon${locked.length > 1 ? 's' : ''} verrouillé${locked.length > 1 ? 's' : ''} pendant 30 min.`, {
     guild,
     mention: { users: [guild.ownerId], roles: operators ? [operators.id] : [] },
     components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('magi-sec:deverrouiller').setLabel('Lever le verrouillage').setStyle(ButtonStyle.Secondary))],
@@ -63,7 +63,7 @@ export async function unlock(guild, by) {
   }
   setSettingList(guild.id, 'raid_locked', []);
   setSetting(guild.id, 'raid_lock_until', null);
-  log.notice('antiraid', `verrouillage levé (${by}), ${ids.length} salon(s) rouvert(s)`, { guild });
+  log.notice('antiraid', `Salons rouverts (${by}) · ${ids.length} salon${ids.length > 1 ? 's' : ''}`, { guild });
   return ids.length;
 }
 
