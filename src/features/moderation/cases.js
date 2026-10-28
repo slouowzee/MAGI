@@ -33,24 +33,23 @@ export function stateLine(c) {
 const button = (action, id, label, style = ButtonStyle.Secondary) => new ButtonBuilder().setCustomId(`magi-mod:${action}:${id}`).setLabel(label).setStyle(style);
 
 export function caseButtons(c) {
-  const rows = [];
-  if (!c.observing && c.status !== 'annulee') {
-    const undo = [
-      excludedOf(c) && button('cas-lever', c.id, 'Unmute'),
-      c.banned && button('cas-debannir', c.id, 'Débannir'),
-      counted(c) && button('cas-infraction', c.id, "Retirer l'infraction"),
-    ].filter(Boolean);
-    if (undo.length > 1) undo.push(button('cas-annuler', c.id, 'Tout annuler', ButtonStyle.Primary));
-    if (undo.length) rows.push(new ActionRowBuilder().addComponents(undo));
-  }
   const open = c.status !== 'annulee';
+  const undo = !c.observing && open
+    ? [
+        excludedOf(c) && button('cas-lever', c.id, 'Unmute', ButtonStyle.Success),
+        c.banned && button('cas-debannir', c.id, 'Débannir', ButtonStyle.Success),
+        counted(c) && button('cas-infraction', c.id, "Retirer l'infraction", ButtonStyle.Success),
+      ].filter(Boolean)
+    : [];
+  if (undo.length > 1) undo.push(button('cas-annuler', c.id, 'Tout annuler', ButtonStyle.Primary));
   const more = [
     open && !c.banned && !excludedOf(c) && button('cas-exclure', c.id, 'Mute 24 h'),
     open && !c.banned && button('cas-bannir', c.id, 'Bannir', ButtonStyle.Danger),
     button('historique', c.userId, 'Historique'),
   ].filter(Boolean);
-  rows.push(new ActionRowBuilder().addComponents(more));
-  return rows;
+  const all = [...undo, ...more];
+  if (all.length <= 5) return [new ActionRowBuilder().addComponents(all)];
+  return [new ActionRowBuilder().addComponents(undo), new ActionRowBuilder().addComponents(more)];
 }
 
 export function caseCard(c, { avatar = null, joinedAt = null, createdAt = null } = {}) {

@@ -63,3 +63,12 @@ test('vote de ban : une icône par unité', async () => {
   assert.equal(shortVote([{ persona: 'melchior', verdict: 'APPROUVÉ' }, { persona: 'balthasar', verdict: 'APPROUVÉ' }, { persona: 'casper', verdict: 'REFUSÉ' }]), 'Melchior ✅ · Balthasar ✅ · Casper ❌');
   assert.equal(shortVote([{ persona: 'casper', verdict: 'ABSTENTION' }]), 'Casper ➖');
 });
+
+test('boutons de carte : une seule rangée quand ils tiennent, annulations en vert', () => {
+  const rows = (c) => caseCard(c).toJSON().components.filter((x) => x.type === 1);
+  const base = { id: 9, userId: 'yui', kind: 'spam', reasons: ['x'], action: 'avertissement', deleted: 1, infraction: 1, infractionId: 4, status: 'active', events: [] };
+  const single = rows(base);
+  assert.equal(single.length, 1);
+  assert.deepEqual(single[0].components.map((b) => [b.label, b.style]), [["Retirer l'infraction", 3], ['Mute 24 h', 2], ['Bannir', 4], ['Historique', 2]]);
+  assert.equal(rows({ ...base, excluded: true, banned: true }).length, 2);
+});
