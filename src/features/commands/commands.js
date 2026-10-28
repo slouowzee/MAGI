@@ -11,6 +11,8 @@ import { memoryContext } from '../memory/context.js';
 import { log } from '../../core/log/log.js';
 import { openPanel } from '../../panel/index.js';
 import { clear, openWrite, WRITE_COMMANDS } from './write.js';
+import { MANUAL_COMMANDS, MANUAL_NAMES, runManual } from '../moderation/manual.js';
+import { LOOKUP_COMMANDS, showLookup, showProfile } from '../moderation/lookup.js';
 
 const ASK = {
   'Vérifier (Melchior)': { persona: 'melchior', instruction: "Vérifie les affirmations factuelles de ce message : dis ce qui est vrai, faux ou invérifiable, sans rien inventer. S'il n'y a rien de factuel à vérifier, dis-le." },
@@ -51,10 +53,12 @@ export const COMMANDS = [
     },
   },
   ...WRITE_COMMANDS,
+  ...LOOKUP_COMMANDS,
+  ...MANUAL_COMMANDS,
 ];
 
 export async function syncCommands(guild) {
-  const wanted = COMMANDS.filter((c) => !c.module || moduleEnabled(guild.id, c.module)).map((c) => ({ ...c.data, default_member_permissions: TIERS[c.tier] }));
+  const wanted = COMMANDS.filter((c) => !c.module || moduleEnabled(guild.id, c.module)).map((c) => ({ ...c.data, default_member_permissions: c.perms ?? TIERS[c.tier] }));
   await guild.commands.set(wanted);
 }
 
@@ -139,7 +143,13 @@ export async function handleCommand(interaction) {
               ? () => openWrite(interaction)
               : interaction.commandName === 'clear'
                 ? () => clear(interaction)
-                : null;
+                : interaction.commandName === 'profil'
+                  ? () => showProfile(interaction)
+                  : interaction.commandName === 'lookup'
+                    ? () => showLookup(interaction)
+                    : MANUAL_NAMES.has(interaction.commandName)
+                      ? () => runManual(interaction)
+                      : null;
   if (!run) return;
   try {
     await run();

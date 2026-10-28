@@ -3,7 +3,7 @@ import { logChannels } from '../../core/installation.js';
 import { bumpStat } from '../../core/log/digest.js';
 import { casesOf, createCase, getCase, saveCase } from './store.js';
 
-const KINDS = { spam: 'Spam', indesirable: 'Contenu indésirable', flagrant: 'Infraction flagrante', honeypot: 'Honeypot' };
+export const KINDS = { spam: 'Spam', indesirable: 'Contenu indésirable', flagrant: 'Infraction flagrante', honeypot: 'Honeypot', manuel: 'Sanction manuelle' };
 const COLORS = { observation: 0x888780, avertissement: 0xef9f27, exclusion: 0xd85a30, ban: 0xe24b4a, annulee: 0x1d9e75 };
 const UPDATE_EVERY = 2_000;
 const timers = new Map();
@@ -54,10 +54,10 @@ export function caseButtons(c) {
 }
 
 export function caseCard(c, { avatar = null, joinedAt = null, createdAt = null } = {}) {
-  const who = [`<@${c.userId}>`, createdAt && `compte créé ${stamp(createdAt)}`, joinedAt && `arrivé ${stamp(joinedAt)}`, c.channelId && `<#${c.channelId}>`].filter(Boolean).join(' · ');
+  const who = [`<@${c.userId}>`, createdAt && `compte créé ${stamp(createdAt)}`, joinedAt && `arrivé ${stamp(joinedAt)}`, c.channelId && `<#${c.channelId}>`, c.by && `par <@${c.by}>`].filter(Boolean).join(' · ');
   const header = `### Cas #${c.id} · ${KINDS[c.kind] ?? c.kind}${c.observing ? ' (observation)' : ''}\n${who}`;
   const lines = [
-    `**Motif** : ${c.reasons.join(', ')}${c.verdict && c.verdict !== 'flagrant' ? ` · avis du modèle : ${c.verdict}` : ''}`,
+    `**Motif** : ${c.reasons.join(', ') || 'non précisé'}${c.verdict && c.verdict !== 'flagrant' ? ` · avis du modèle : ${c.verdict}` : ''}`,
     `**${c.observing ? 'Aurait fait' : 'Sanction'}** : ${c.action}${c.deleted > 1 ? ` · ${c.deleted} messages ${c.observing ? 'concernés' : 'supprimés'}` : ''}`,
     !c.observing && `**En cours** : ${stateLine(c)}`,
     c.sample && `> ${c.sample.replace(/\s+/g, ' ').slice(0, 300)}${c.deleted > 1 ? ` *(et ${c.deleted - 1} autre${c.deleted > 2 ? 's' : ''})*` : ''}`,
@@ -123,4 +123,15 @@ export function history(guildId, userId) {
   const list = casesOf(guildId, userId, 10);
   if (!list.length) return `Aucun cas pour <@${userId}>.`;
   return [`**Historique de <@${userId}>** (${list.length} dernier${list.length > 1 ? 's' : ''} cas)`, ...list.map((c) => `- #${c.id} · ${stamp(c.at, 'd')} · ${KINDS[c.kind] ?? c.kind} · ${c.action}${c.status === 'annulee' ? ' · **annulée**' : c.observing ? ' · observation' : ''}`)].join('\n');
+}
+
+export function sanctionOf(c) {
+  if (c.banned || /\bban/i.test(c.action)) return 'Ban';
+  if (c.kicked) return 'Expulsion';
+  if (excludedOf(c) || /exclusion/i.test(c.action)) return 'Exclusion';
+  return 'Avertissement';
+}
+
+export function latestCase(guildId, userId, test) {
+  return casesOf(guildId, userId, 20).find(test) ?? null;
 }
