@@ -20,6 +20,18 @@ export const TOOLS = [
   ...COMMUNITY_TOOLS,
 ];
 
+const WHO = { operator: 'opérateurs MAGI', owner: 'propriétaire du serveur' };
+
+export function deniedNote(member) {
+  const denied = TOOLS.filter((tool) => (!tool.module || moduleEnabled(member.guild.id, tool.module)) && WHO[tool.access] && !canUse(tool, member));
+  if (!denied.length) return '';
+  const groups = Object.entries(WHO)
+    .map(([access, who]) => [who, denied.filter((t) => t.access === access).map((t) => t.name)])
+    .filter(([, names]) => names.length)
+    .map(([who, names]) => `${names.join(', ')} (réservé aux ${who})`);
+  return `Actions que ${member.displayName} n'a pas le droit de demander : ${groups.join(' ; ')}. Si sa demande en relève (publier un message au nom de MAGI, gérer salons, rôles ou membres, modérer, configurer le serveur…), dis-lui clairement qu'il n'a pas les droits et qui peut le faire, sans répondre à côté ni faire semblant de t'en occuper.`;
+}
+
 export function canUse(tool, member) {
   if (tool.module && !moduleEnabled(member.guild.id, tool.module)) return false;
   if (tool.access === 'everyone') return true;

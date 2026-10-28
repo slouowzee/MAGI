@@ -8,7 +8,8 @@ const KINDS = { annonce: 'Annonce', reglement: 'Règlement', information: 'Infor
 const STYLE_VERSION = '2';
 const textArgs = {
   type: { type: 'string', enum: Object.keys(KINDS), description: "Nature du message, affichée en en-tête avec le nom du serveur. Déduis-la de la demande." },
-  titre: { type: 'string', description: 'Titre affiché en haut (256 caractères au plus).' },
+  titre: { type: 'string', description: 'Titre affiché en haut (256 caractères au plus). Vide si le texte contient déjà son titre en #.' },
+  entete: { type: 'boolean', description: "En-tête « Nature · Serveur » au-dessus, true par défaut ; false si la personne n'en veut pas." },
   texte: {
     type: 'string',
     description:
@@ -30,9 +31,10 @@ function kindOf(message) {
   return Object.keys(KINDS).find((k) => KINDS[k] === label) ?? guessKind(message.embeds[0]?.title ?? '');
 }
 
-export function publicationEmbed(guild, { titre, texte, type }, fallback = 'information') {
+export function publicationEmbed(guild, { titre, texte, type, entete = true }, fallback = 'information') {
   if (!texte?.trim()) throw new Error('le texte est vide');
-  return framed(guild, { label: KINDS[type] ?? KINDS[fallback], title: titre?.trim(), text: texte.trim() });
+  const embed = framed(guild, { label: KINDS[type] ?? KINDS[fallback], title: titre?.trim(), text: texte.trim() });
+  return entete ? embed : embed.setAuthor(null);
 }
 
 export async function restylePublications(guild) {

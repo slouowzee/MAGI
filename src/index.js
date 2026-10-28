@@ -20,6 +20,7 @@ import { watchAuditLog } from './features/security/antinuke.js';
 import { startBackups } from './features/security/backup.js';
 import { catchUp } from './features/conversation/catch-up.js';
 import { handleCommand, isCommand } from './features/commands/commands.js';
+import { handleWriteModal, isWriteModal } from './features/commands/write.js';
 import { noteMessage, startPresence } from './features/presence/presence.js';
 import { log } from './core/log/log.js';
 import { llmChain } from './core/llm/client.js';
@@ -80,7 +81,7 @@ client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => watchAuditLog(entry
 client.on(Events.InteractionCreate, (interaction) => {
   if (isCommand(interaction)) return handleCommand(interaction);
   const id = interaction.customId ?? '';
-  const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : isSecurityButton(id) ? handleSecurityButton : isTicketInteraction(id) ? handleTicketInteraction : handleInteraction;
+  const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : isSecurityButton(id) ? handleSecurityButton : isTicketInteraction(id) ? handleTicketInteraction : isWriteModal(id) ? handleWriteModal : handleInteraction;
   handler(interaction).catch((err) => log.err('interaction', `${id} : ${err.message}`, { guild: interaction.guild, channel: interaction.channel }));
 });
 client.on(Events.MessageCreate, async (message) => {

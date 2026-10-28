@@ -31,6 +31,7 @@ export function describe(msg, text = msg.content) {
   const parts = [text.replace(REPLY_HEADER, '').replace(GIF_LINK, '[gif]').replace(CUSTOM_EMOJI, ':$1:').trim()];
   for (const attachment of msg.attachments?.values() ?? []) parts.push(`[${kind(attachment, msg)}]`);
   for (const sticker of msg.stickers?.values() ?? []) parts.push(`[sticker ${sticker.name}]`);
+  if (msg.webhookId || msg.author?.bot) for (const embed of msg.embeds ?? []) if (embed.description) parts.push(`[aperçu${embed.title ? ` titré « ${embed.title} »` : ''} : ${embed.description.slice(0, 1500)}]`);
   return parts.filter(Boolean).join(' ');
 }
 

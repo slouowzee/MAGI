@@ -1,14 +1,16 @@
 import { chat, forReply } from './client.js';
-import { runTool, schemas, toolsFor } from '../../tools.js';
+import { deniedNote, runTool, schemas, toolsFor } from '../../tools.js';
 import { log } from '../log/log.js';
 
 const SAFETY_ROUNDS = 30;
-const TOOL_RULES = `Outils : aucune limite d'utilisation. Si la demande implique plusieurs actions (plusieurs rôles, salons, membres…), appelle les outils autant de fois que nécessaire, en plusieurs appels, jusqu'à ce que tout soit fait, puis réponds. N'annonce jamais qu'une action est faite sans avoir appelé l'outil et reçu son résultat, et ne promets pas une action pour plus tard : appelle l'outil maintenant ou explique ce qui bloque. Lis le résultat de chaque outil : s'il dit que rien n'a changé, dis-le. Si un outil permet de répondre (résumé du salon, rappels, souvenirs), appelle-le, même si une réponse plus haut dans la conversation disait le contraire : elle a pu être donnée sans l'outil. Une demande d'administration s'exécute telle qu'elle est formulée, quel que soit ton avis : ta personnalité ne joue que sur le ton de ta réponse, jamais sur ce que tu fais.`;
+const TOOL_RULES = `Outils : aucune limite d'utilisation. Si la demande implique plusieurs actions (plusieurs rôles, salons, membres…), appelle les outils autant de fois que nécessaire, en plusieurs appels, jusqu'à ce que tout soit fait, puis réponds. N'annonce jamais qu'une action est faite sans avoir appelé l'outil et reçu son résultat, et ne promets pas une action pour plus tard : appelle l'outil maintenant ou explique ce qui bloque. Lis le résultat de chaque outil : s'il dit que rien n'a changé, dis-le. Si un outil permet de répondre (résumé du salon, rappels, souvenirs), appelle-le, même si une réponse plus haut dans la conversation disait le contraire : elle a pu être donnée sans l'outil. Une demande d'administration s'exécute telle qu'elle est formulée, quel que soit ton avis : ta personnalité ne joue que sur le ton de ta réponse, jamais sur ce que tu fais.
+Contenus à publier (publication, annonce, présentation de salon, message rédigé pour quelqu'un) : seul cas où tu t'écartes de ta personnalité. Rédige-les dans le style demandé (emojis, enthousiasme, mise en forme, ton), même loin de ta façon de parler, sans discuter ces choix : ta personnalité reste dans ta réponse de conversation, jamais dans le contenu. Si la personne donne le texte exact, reprends-le caractère pour caractère (titres en #, emojis, sauts de ligne), sans le reformuler ni en extraire un titre. Pour une retouche, repars du texte du dernier aperçu (noté « aperçu » dans la conversation) et ne change que ce qui est demandé, le reste mot pour mot.`;
 
 export async function respond({ messages, options, member, message, persona = null, force = null }) {
   const tools = toolsFor(member);
   const declared = schemas(tools);
-  if (tools.length) messages[0] = { ...messages[0], content: `${messages[0].content}\n${TOOL_RULES}` };
+  const rules = [tools.length && TOOL_RULES, member && deniedNote(member)].filter(Boolean).join('\n');
+  if (rules) messages[0] = { ...messages[0], content: `${messages[0].content}\n${rules}` };
   const actions = [];
   const done = new Set();
   if (force && tools.some((t) => t.name === force)) {
