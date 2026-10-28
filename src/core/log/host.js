@@ -6,7 +6,7 @@ import { setSetting, setting } from '../settings.js';
 const PATH = process.env.HOST_JOURNAL ?? 'data/host-journal.fifo';
 const SSH_WINDOW = 10 * 60_000;
 const SSH = new Set(['sshd', 'sshd-session']);
-const NOISE = [/Duplicate line for path/, /Foreign process '.+' changed sysctl/];
+const NOISE = [/Duplicate line for path/, /Foreign process '.+' changed sysctl/, /^veth\w*: Could not set /, /^veth\w*: .*No such device/];
 const failures = new Map();
 let failureTimer = null;
 let lastAt = Number(setting('global', 'host_journal_at') ?? 0);
