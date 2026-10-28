@@ -146,9 +146,16 @@ async function sync(guild) {
   for (const { triggerType, ...rule } of wanted) {
     const existing = mine.find((r) => r.name === rule.name);
     const adopted = !existing && SINGLE.has(triggerType) ? rules.find((r) => r.triggerType === triggerType && !r.name.startsWith(PREFIX)) : null;
-    if (adopted) log.notice('automod', `règle « ${adopted.name} » reprise par MAGI sous le nom ${rule.name}`, { guild });
-    const target = existing ?? adopted;
-    await attempt(guild, rule.name, () => (target ? target.edit(rule) : guild.autoModerationRules.create({ ...rule, triggerType, reason: 'MAGI : AutoMod' })));
+    if (adopted) {
+      await attempt(guild, rule.name, async () => {
+        await adopted.edit(rule).catch((err) => {
+          throw err.status === 404 ? new Error(`« ${adopted.name} » ne peut pas être modifiée par une app, coupe-la dans Paramètres du serveur → AutoMod pour que MAGI la remplace`) : err;
+        });
+        log.notice('automod', `règle « ${adopted.name} » reprise par MAGI sous le nom ${rule.name}`, { guild });
+      });
+      continue;
+    }
+    await attempt(guild, rule.name, () => (existing ? existing.edit(rule) : guild.autoModerationRules.create({ ...rule, triggerType, reason: 'MAGI : AutoMod' })));
   }
 }
 
