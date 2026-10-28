@@ -1,11 +1,11 @@
-import { activePersonas, channelSetting, moduleEnabled } from '../../core/config.js';
+import { activePersonas, channelSetting, isMuted, moduleEnabled } from '../../core/config.js';
 import { saveSynchro, synchroOf } from './store.js';
 import { setting } from '../../core/settings.js';
 import { speak } from '../../core/discord/webhooks.js';
 import { log } from '../../core/log/log.js';
 
 const COOLDOWN = 60_000;
-const MILESTONES = [25, 50, 75, 100, 150, 200, 300, 400];
+export const MILESTONES = [25, 50, 75, 100, 150, 200, 300, 400];
 
 export const rateOf = (points) => Math.min(400, Math.floor(Math.sqrt(points) * 4));
 
@@ -34,9 +34,9 @@ export async function trackActivity(message, now = message.createdTimestamp) {
     .filter((role) => role?.editable && !member.roles.cache.has(role.id));
   if (earned.length) await member.roles.add(earned, `MAGI : taux de synchronisation ${after} %`).catch(() => {});
   const persona = activePersonas(guild.id).includes('melchior') ? 'melchior' : activePersonas(guild.id)[0];
-  const channel = channelSetting(guild, 'synchro_channel') ?? message.channel;
+  const channel = channelSetting(guild, 'synchro_channel') ?? (isMuted(message.channel) ? null : message.channel);
   const role = earned.length ? `, accès ${earned.map((r) => r.name).join(', ')} accordé` : '';
-  await speak(channel, persona, `Taux de synchronisation de <@${member.id}> : ${reached.at(-1)} %${role}.`, { mentions: [member.id] }).catch(() => {});
+  if (channel) await speak(channel, persona, `Taux de synchronisation de <@${member.id}> : ${reached.at(-1)} %${role}.`, { mentions: [member.id] }).catch(() => {});
   log.info('synchro', `${member.user.tag} atteint ${reached.at(-1)} %${role}`, { guild });
   return reached.at(-1);
 }

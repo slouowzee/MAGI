@@ -2,7 +2,7 @@ import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { ChannelType, Collection } from 'discord.js';
 
-const { gateReasons } = await import('./gate.js');
+const { gateReasons, hideNewChannel } = await import('./gate.js');
 const { isLocked, trackJoin, unlock } = await import('./raid.js');
 const { setSettingList } = await import('../../core/config.js');
 const { setSetting } = await import('../../core/settings.js');
@@ -54,4 +54,19 @@ test('anti-raid : verrouille au seuil, épargne les salons de MAGI, rouvre tout'
   assert.deepEqual(edits.at(-1), ['general', null]);
   assert.equal(isLocked(guild, now + 60_000), false);
   detach();
+});
+
+test('filtre : un nouveau salon est masqué aux non vérifiés, sauf le salon de vérification', async () => {
+  setSetting('g-cache', 'gate_role', 'nv');
+  const edits = [];
+  const role = { id: 'nv' };
+  const channel = (id, allowed) => ({
+    id,
+    isThread: () => false,
+    guild: { id: 'g-cache', roles: { cache: new Map([['nv', role]]) }, channels: { cache: new Map() } },
+    permissionOverwrites: { cache: new Map(allowed ? [['nv', { allow: { has: () => true } }]] : []), edit: async () => edits.push(id) },
+  });
+  await hideNewChannel(channel('general', false));
+  await hideNewChannel(channel('verification', true));
+  assert.deepEqual(edits, ['general']);
 });

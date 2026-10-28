@@ -41,6 +41,10 @@ async function open(interaction) {
   await thread.members.add(member.id);
   setSetting(guild.id, `ticket:${thread.id}`, member.id);
   const operators = operatorRole(guild);
+  if (operators) {
+    await guild.members.fetch().catch(() => {});
+    for (const id of [...operators.members.keys()].slice(0, 20)) await thread.members.add(id).catch(() => {});
+  }
   const persona = activePersonas(guild.id).includes('balthasar') ? 'balthasar' : activePersonas(guild.id)[0];
   let text = `J'ai noté ta demande, un opérateur va passer.`;
   try {

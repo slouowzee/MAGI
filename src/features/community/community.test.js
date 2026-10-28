@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ChannelType, Collection } from 'discord.js';
 
 const { crossed, rateOf } = await import('./synchro.js');
-const { celebrate, parisDay } = await import('./birthdays.js');
+const { celebrate, datesToCelebrate, parisDay } = await import('./birthdays.js');
 const { handleVoiceState, isTemporary } = await import('./voice.js');
 const { COMMUNITY_TOOLS } = await import('./tools.js');
 const { setBirthday } = await import('./store.js');
@@ -29,6 +29,8 @@ test("anniversaires : une fois par jour, à partir de 9 h à Paris", async () =>
   assert.equal(await celebrate(guild, Date.parse('2026-10-27T06:30:00Z')), 0);
   const webhooks = await import('../../core/discord/webhooks.js');
   assert.ok(webhooks.speak);
+  assert.deepEqual(datesToCelebrate({ year: 2027, month: 2, day: 28 }), [[2, 28], [2, 29]]);
+  assert.deepEqual(datesToCelebrate({ year: 2028, month: 2, day: 28 }), [[2, 28]]);
 });
 
 test('salons vocaux temporaires : créé en rejoignant le générateur, supprimé vide', async () => {

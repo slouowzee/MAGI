@@ -12,7 +12,12 @@ const PARIS = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris', year:
 
 export function parisDay(now = Date.now()) {
   const p = Object.fromEntries(PARIS.formatToParts(now).map(({ type, value }) => [type, value]));
-  return { key: `${p.year}-${p.month}-${p.day}`, month: Number(p.month), day: Number(p.day), hour: Number(p.hour) };
+  return { key: `${p.year}-${p.month}-${p.day}`, year: Number(p.year), month: Number(p.month), day: Number(p.day), hour: Number(p.hour) };
+}
+
+export function datesToCelebrate({ year, month, day }) {
+  const leap = new Date(Date.UTC(year, 1, 29)).getUTCMonth() === 1;
+  return month === 2 && day === 28 && !leap ? [[2, 28], [2, 29]] : [[month, day]];
 }
 
 export async function celebrate(guild, now = Date.now()) {
@@ -23,7 +28,7 @@ export async function celebrate(guild, now = Date.now()) {
   if (!channel) return 0;
   const persona = activePersonas(guild.id).includes('balthasar') ? 'balthasar' : activePersonas(guild.id)[0];
   let sent = 0;
-  for (const userId of birthdaysToday(guild.id, today.month, today.day)) {
+  for (const userId of datesToCelebrate(today).flatMap(([month, day]) => birthdaysToday(guild.id, month, day))) {
     const member = await guild.members.fetch(userId).catch(() => null);
     if (!member) continue;
     let text = 'Joyeux anniversaire.';

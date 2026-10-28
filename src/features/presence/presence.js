@@ -121,8 +121,10 @@ export function startPresence(client) {
     client.user.setPresence({ status: next.status, activities: next.text ? [{ type: ActivityType.Custom, name: 'statut', state: next.text }] : [] });
   };
   refresh = () => {
-    clearTimeout(timer);
-    timer = setTimeout(apply, DEBOUNCE);
+    timer ??= setTimeout(() => {
+      timer = null;
+      apply();
+    }, DEBOUNCE);
   };
   const rotate = async () => {
     const guild = main();

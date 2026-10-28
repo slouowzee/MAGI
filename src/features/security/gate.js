@@ -31,7 +31,7 @@ function verifyMessage() {
 
 async function hideEverywhere(guild, role, gate) {
   for (const channel of guild.channels.cache.values()) {
-    if (channel.id === gate.id || channel.isThread?.() || (channel.parentId && channel.permissionsLocked)) continue;
+    if (channel.id === gate.id || channel.isThread?.()) continue;
     if (channel.permissionOverwrites.cache.get(role.id)?.deny.has(P.ViewChannel)) continue;
     await channel.permissionOverwrites.edit(role, { ViewChannel: false }, { reason: REASON }).catch(() => {});
   }
@@ -66,7 +66,7 @@ export async function ensureGate(guild) {
 
 export async function hideNewChannel(channel) {
   const role = gateRole(channel.guild);
-  if (!role || channel.id === gateChannel(channel.guild)?.id || channel.isThread?.() || (channel.parentId && channel.permissionsLocked)) return;
+  if (!role || channel.isThread?.() || channel.permissionOverwrites.cache.get(role.id)?.allow.has(P.ViewChannel)) return;
   await channel.permissionOverwrites.edit(role, { ViewChannel: false }, { reason: REASON }).catch(() => {});
 }
 

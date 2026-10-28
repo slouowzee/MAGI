@@ -37,7 +37,10 @@ export async function handleStar(reaction) {
     const { content } = await chat({ messages: buildMessages(persona, [{ role: 'user', content: prompt }], 'courte'), options: { num_predict: MAX_TOKENS.courte }, ...forReply() });
     comment = cleanReply(content) || comment;
   } catch {}
-  const posted = await speak(wall, persona, comment, { embeds: [starEmbed(message)] });
+  const posted = await speak(wall, persona, comment, { embeds: [starEmbed(message)] }).catch((err) => {
+    setSetting(guild.id, `star:${message.id}`, null);
+    throw err;
+  });
   setSetting(guild.id, `star:${message.id}`, posted.id);
   log.info('etoiles', `message de ${message.author.tag} sur le mur (${reaction.count} ${STAR})`, { channel: message.channel });
 }

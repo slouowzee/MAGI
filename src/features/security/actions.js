@@ -20,7 +20,8 @@ async function cancelSanction(interaction, userId) {
   const member = await guild.members.fetch(userId).catch(() => null);
   const revoked = revokeLastInfraction(guild.id, userId);
   if (member?.communicationDisabledUntilTimestamp > Date.now()) await member.timeout(null, `MAGI, annulé par ${interaction.user.tag}`);
-  log.notice('moderation', `sanction de <@${userId}> annulée${revoked ? '' : ' (aucune infraction en cours)'} par ${interaction.user.tag}`, { guild });
+  const unbanned = !member && (await guild.bans.fetch(userId).catch(() => null)) ? await guild.members.unban(userId, `MAGI, annulé par ${interaction.user.tag}`).then(() => true).catch(() => false) : false;
+  log.notice('moderation', `sanction de <@${userId}> annulée${unbanned ? ', bannissement levé' : ''}${revoked ? '' : ' (aucune infraction en cours)'} par ${interaction.user.tag}`, { guild });
   await done(interaction, 'Sanction annulée');
 }
 

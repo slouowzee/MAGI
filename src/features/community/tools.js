@@ -3,11 +3,10 @@ import { isOperator } from '../../core/installation.js';
 import { setSetting } from '../../core/settings.js';
 import { deleteBirthday, setBirthday, synchroOf, synchroTop } from './store.js';
 import { addReminder } from '../reminders/store.js';
-import { paliers, rateOf } from './synchro.js';
+import { MILESTONES, paliers, rateOf } from './synchro.js';
 import { DANGEROUS } from '../admin/role-panels.js';
 import { findChannel, targetRole } from '../admin/resolve.js';
 
-const MILESTONES = [25, 50, 75, 100, 150, 200, 300, 400];
 const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 function eventDraft(guild, args) {
