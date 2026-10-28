@@ -8,13 +8,25 @@ const count = db.query('SELECT count(*) AS n FROM infractions WHERE guild_id = ?
 const list = db.query('SELECT reason, created_at FROM infractions WHERE guild_id = ? AND user_id = ? AND revoked = 0 AND created_at > ? ORDER BY created_at DESC');
 const lastId = db.query('SELECT id FROM infractions WHERE guild_id = ? AND user_id = ? AND revoked = 0 ORDER BY created_at DESC, id DESC LIMIT 1');
 const revoke = db.query('UPDATE infractions SET revoked = 1 WHERE id = ?');
+const insertCase = db.query('INSERT INTO cases (guild_id, user_id, data, created_at) VALUES (?, ?, ?, ?)');
+const getCaseQuery = db.query('SELECT * FROM cases WHERE id = ?');
+const updateCase = db.query('UPDATE cases SET data = ? WHERE id = ?');
+const casesOfQuery = db.query('SELECT * FROM cases WHERE guild_id = ? AND user_id = ? ORDER BY id DESC LIMIT ?');
 const getMode = db.query('SELECT mode, since FROM moderation WHERE guild_id = ?');
 const setModeQuery = db.query(`INSERT INTO moderation (guild_id, mode, since) VALUES (?1, ?2, ?3)
   ON CONFLICT(guild_id) DO UPDATE SET mode = ?2, since = ?3`);
 
 export function addInfraction(guildId, userId, reason, now = Date.now()) {
-  insert.run(guildId, userId, reason, now);
-  return count.get(guildId, userId, now - WINDOW).n;
+  return recordInfraction(guildId, userId, reason, now).count;
+}
+
+export function recordInfraction(guildId, userId, reason, now = Date.now()) {
+  const { lastInsertRowid } = insert.run(guildId, userId, reason, now);
+  return { id: Number(lastInsertRowid), count: count.get(guildId, userId, now - WINDOW).n };
+}
+
+export function revokeInfraction(id) {
+  return revoke.run(id).changes > 0;
 }
 
 export function activeInfractions(guildId, userId, now = Date.now()) {
@@ -38,4 +50,22 @@ export function moderationMode(guildId, now = Date.now()) {
 export function setModerationMode(guildId, mode, now = Date.now()) {
   if (!MODES.includes(mode)) throw new Error(`mode inconnu : ${mode}`);
   setModeQuery.run(guildId, mode, now);
+}
+
+const parse = (row) => row && { id: row.id, guildId: row.guild_id, userId: row.user_id, at: row.created_at, ...JSON.parse(row.data) };
+
+export function createCase(guildId, userId, data, now = Date.now()) {
+  return Number(insertCase.run(guildId, userId, JSON.stringify(data), now).lastInsertRowid);
+}
+
+export function getCase(id) {
+  return parse(getCaseQuery.get(id));
+}
+
+export function saveCase({ id, guildId, userId, at, ...data }) {
+  updateCase.run(JSON.stringify(data), id);
+}
+
+export function casesOf(guildId, userId, limit = 10) {
+  return casesOfQuery.all(guildId, userId, limit).map(parse);
 }

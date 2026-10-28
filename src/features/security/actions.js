@@ -1,6 +1,8 @@
 import { MessageFlags } from 'discord.js';
 import { isOperator } from '../../core/installation.js';
-import { revokeLastInfraction } from '../moderation/store.js';
+import { getCase, revokeInfraction, revokeLastInfraction } from '../moderation/store.js';
+import { cardPayload, history, updateCase } from '../moderation/cases.js';
+import { bumpStat } from '../../core/log/digest.js';
 import { setSetting, setting } from '../../core/settings.js';
 import { welcome } from '../welcome/welcome.js';
 import { verifyMember } from './gate.js';
@@ -43,11 +45,48 @@ async function verify(interaction) {
   if (ok) await welcome(interaction.member).catch(() => {});
 }
 
+const DAY = 86_400_000;
+
+async function caseAction(interaction, action, id) {
+  const { guild } = interaction;
+  const c = getCase(Number(id));
+  if (!c || c.guildId !== guild.id) return ephemeral(interaction, 'Cas introuvable.');
+  const by = interaction.member.displayName;
+  const reason = `MAGI, cas #${c.id}, par ${interaction.user.tag}`;
+  const member = await guild.members.fetch(c.userId).catch(() => null);
+  let change = {};
+  let event;
+  if (action === 'cas-annuler') {
+    if (c.infractionId) revokeInfraction(c.infractionId);
+    if (member?.communicationDisabledUntilTimestamp > Date.now()) await member.timeout(null, reason).catch(() => {});
+    const unbanned = !member && (await guild.bans.fetch(c.userId).catch(() => null)) ? await guild.members.unban(c.userId, reason).then(() => true).catch(() => false) : false;
+    change = { status: 'annulee', banned: false };
+    event = `sanction annulée par ${by}${unbanned ? ', bannissement levé' : ''}`;
+    bumpStat(guild.id, 'cas_annules');
+  } else if (action === 'cas-exclure') {
+    if (!member) return ephemeral(interaction, "Ce membre n'est plus sur le serveur.");
+    const ok = await member.timeout(DAY, reason).then(() => true).catch((err) => ephemeral(interaction, `Impossible : ${err.message}`).then(() => false));
+    if (!ok) return;
+    change = { status: 'exclu' };
+    event = `exclu 24 h par ${by}`;
+  } else if (action === 'cas-bannir') {
+    const ok = await guild.members.ban(c.userId, { reason, deleteMessageSeconds: 86_400 }).then(() => true).catch((err) => ephemeral(interaction, `Impossible : ${err.message}`).then(() => false));
+    if (!ok) return;
+    change = { banned: true };
+    event = `banni par ${by}`;
+  }
+  const updated = updateCase(guild, c.id, change, { event });
+  log.notice('moderation', `cas #${c.id} : ${event}`, { guild, quiet: true });
+  return interaction.update(await cardPayload(guild, updated));
+}
+
 export async function handleSecurityButton(interaction) {
   const [scope, action, target] = interaction.customId.split(':');
   if (scope === 'magi-sec' && action === 'verifier') return verify(interaction);
   if (!isOperator(interaction.member)) return ephemeral(interaction, 'Réservé aux opérateurs MAGI.');
   if (scope === 'magi-mod' && action === 'annuler') return cancelSanction(interaction, target);
+  if (scope === 'magi-mod' && action === 'historique') return ephemeral(interaction, history(interaction.guild.id, target));
+  if (scope === 'magi-mod' && action.startsWith('cas-')) return caseAction(interaction, action, target);
   if (action === 'liberer') return release(interaction, target);
   if (action === 'deverrouiller') {
     const count = await unlock(interaction.guild, `par ${interaction.user.tag}`);

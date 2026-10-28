@@ -2,7 +2,7 @@ import { afterAll, expect, test } from 'bun:test';
 
 process.env.DB_PATH = ':memory:';
 const { addSink, log, serverLine, timestamp } = await import('./log.js');
-const { deliver, flush, plain, sourceOf, textLine } = await import('./discord.js');
+const { deliver, flush, plain, smartLine, sourceOf } = await import('./discord.js');
 const { classify, handleLine, reportFailures } = await import('./host.js');
 const { db } = await import('../db.js');
 const { setSetting } = await import('../settings.js');
@@ -46,31 +46,35 @@ test('les sources Discord suivent le composant', () => {
   expect([sourceOf('moderation'), sourceOf('sshd'), sourceOf('antinuke'), sourceOf('config'), sourceOf('llm'), sourceOf('kernel')]).toEqual(['moderation', 'securite', 'securite', 'logs', 'systeme', 'systeme']);
 });
 
-test('sur Discord : mentions en clair, markdown retiré, texte blanc', async () => {
+test('sur Discord : lignes lisibles, heure locale, icône, erreurs expliquées', async () => {
   const { guild } = fakeGuild('g-texte');
   expect(plain('**Ban** de <@42> par <@&7>, arrivé le <t:1793021041>', guild)).toBe('Ban de @Slou par @Opérateur MAGI, arrivé le 2026-10-26 14:24');
-  const line = textLine({ at: new Date('2026-10-26T13:24:01Z'), host: 'vps', component: 'sshd', level: 'warning', message: 'échec' }, guild);
-  expect(line).toBe('14:24:01 vps sshd: warning: échec');
+  const at = new Date('2026-10-26T13:24:01Z');
+  expect(smartLine({ at, host: 'magi', component: 'tickets', level: 'notice', message: 'ticket ouvert par yui' })).toBe('<t:1793021041:T> 🎫 ticket ouvert par yui');
+  expect(smartLine({ at, host: 'magi', component: 'moderation', level: 'err', message: 'échec exclusion : Unknown Member' })).toBe('<t:1793021041:T> ❌ **moderation** · échec exclusion : Unknown Member *(le membre a déjà quitté le serveur)*');
+  expect(smartLine({ at, host: 'vps', component: 'sudo', level: 'notice', message: '# titre' })).toBe('<t:1793021041:T> 🔐 **vps sudo** · \\# titre');
+  expect(smartLine({ at, host: 'magi', component: 'membres', level: 'notice', message: 'yui est partie · membre depuis peu' })).toContain('🚶');
   const { guild: g, sent } = fakeGuild('g-blanc');
-  await deliver(g, { at: new Date('2026-10-26T13:24:01Z'), host: 'magi', level: 'err', component: 'llm', message: 'a\nb', guild: g, channel: null, mention: null });
+  await deliver(g, { at, host: 'magi', level: 'err', component: 'llm', message: 'a\nb', guild: g, channel: null, mention: null });
   await flush('g-blanc-magi-système');
-  expect(sent['magi-système'][0].content).toBe('```\n14:24:01 llm: err: a\nb\n```');
+  expect(sent['magi-système'][0].content).toBe('<t:1793021041:T> ❌ **llm** · a\nb');
 });
 
 test('sur Discord : regroupées par salon, répétitions comptées, sous le seuil ignorées', async () => {
   const { guild, sent, general } = fakeGuild('g-lots');
   const entry = (level, component, message) => ({ at: new Date(), host: 'magi', level, component, message, guild, channel: general, mention: null });
-  await deliver(guild, entry('notice', 'config', 'personas → casper'));
+  await deliver(guild, entry('notice', 'outils', 'personas → casper'));
   await deliver(guild, entry('warning', 'llm', 'gemini lent'));
   await deliver(guild, entry('warning', 'llm', 'gemini lent'));
   await deliver(guild, entry('info', 'conversation', 'trop détaillé'));
+  await deliver(guild, { ...entry('notice', 'outils', 'invisible'), quiet: true });
   await flush(`g-lots-magi-logs`);
   await flush(`g-lots-magi-système`);
   expect(sent['magi-logs']).toHaveLength(1);
-  expect(sent['magi-logs'][0].content).toStartWith('```\n');
-  expect(sent['magi-logs'][0].content).toContain('#général personas → casper');
+  expect(sent['magi-logs'][0].content).toContain('<#g-lots-général> · personas → casper');
+  expect(sent['magi-logs'][0].content).not.toContain('invisible');
   expect(sent['magi-système'][0].content.match(/gemini lent/g)).toHaveLength(1);
-  expect(sent['magi-système'][0].content).toContain('(×2)');
+  expect(sent['magi-système'][0].content).toContain('*(×2)*');
   expect(sent['magi-système'][0].content).not.toContain('trop détaillé');
   setSetting('g-lots', 'log_level', 'info');
   await deliver(guild, entry('info', 'conversation', 'détaillé'));
@@ -78,10 +82,32 @@ test('sur Discord : regroupées par salon, répétitions comptées, sous le seui
   expect(sent['magi-système'][1].content).toContain('détaillé');
 });
 
+test('sur Discord : changements de config et connexions SSH fusionnés dans un même message', async () => {
+  const { guild, sent } = fakeGuild('g-fusion');
+  const edits = [];
+  const original = guild.channels.cache.get('g-fusion-magi-logs').send;
+  guild.channels.cache.get('g-fusion-magi-logs').send = async (payload) => {
+    await original(payload);
+    return { edit: async (p) => edits.push(p.content) };
+  };
+  const at = new Date('2026-10-26T13:24:01Z');
+  const config = (message, delay) => deliver(guild, { at: new Date(at.getTime() + delay), host: 'magi', level: 'notice', component: 'config', message, guild, channel: null, mention: null });
+  await config('critères du filtre = avatar par slouowze', 0);
+  await config('critères du filtre = tous par slouowze', 30_000);
+  await config('âge minimal à l’arrivée = 7 par slouowze', 60_000);
+  expect(sent['magi-logs']).toHaveLength(1);
+  expect(edits.at(-1)).toBe('<t:1793021041:T> ⚙️ **slouowze** a modifié la configuration : critères du filtre = tous ; âge minimal à l’arrivée = 7 *(2 changements)*');
+  const { MERGERS } = await import('./discord.js');
+  const ssh = MERGERS.sshd;
+  const e = (min) => ({ at: new Date(at.getTime() + min * 60_000), host: 'vps', message: 'Accepted publickey for slouowze from 1.2.3.4 port 5 ssh2' });
+  const state = ssh.add(ssh.add(ssh.start(ssh.parse(e(0)), e(0)), ssh.parse(e(5)), e(5)), ssh.parse(e(9)), e(9));
+  expect(ssh.render(state)).toBe('🔑 **vps** · slouowze connecté en SSH depuis 1.2.3.4 ×3 (<t:1793021041:t> → <t:1793021581:t>)');
+});
+
 test('sur Discord : une alerte avec mention part seule et notifie', async () => {
   const { guild, sent } = fakeGuild('g-alerte');
   await deliver(guild, { at: new Date(), host: 'magi', level: 'alert', component: 'antinuke', message: 'trop de suppressions', guild, channel: null, mention: { users: ['42'], roles: ['7'] } });
-  expect(sent['magi-sécurité'][0].content).toStartWith('<@42> <@&7>\n```\n');
+  expect(sent['magi-sécurité'][0].content).toMatch(/^<@42> <@&7>\n<t:\d+:T> 🚨 \*\*antinuke\*\* · trop de suppressions$/);
   expect(sent['magi-sécurité'][0].allowedMentions).toEqual({ users: ['42'], roles: ['7'] });
 });
 
@@ -129,4 +155,25 @@ test('le niveau minimal côté serveur se règle avec LOG_LEVEL', () => {
   console.log = original;
   expect(printed).toHaveLength(1);
   expect(printed[0]).toEndWith('magi test: notice: visible');
+});
+
+test('résumé quotidien : compteurs tirés des logs, texte lisible', async () => {
+  const { countEntry, digestText, statsOf } = await import('./digest.js');
+  const at = Date.parse('2026-10-27T15:00:00Z');
+  const guild = { id: 'g-resume' };
+  const e = (component, message, level = 'notice', g = guild) => countEntry({ component, message, level, guild: g }, at);
+  e('membres', '<@1> est arrivé · yui · compte créé il y a 1 h');
+  e('membres', '<@2> est arrivé · lea · compte créé il y a 2 ans');
+  e('membres', 'yui est parti');
+  e('tickets', 'ticket ouvert par yui : partenariat');
+  e('conversation', 'slou → casper, conv 3, gemini-3.5-flash-lite, 1.2 s', 'info');
+  e('conversation', 'slou → melchior, conv 4, openai/gpt-oss-120b, 4.0 s', 'info');
+  e('llm', 'HTTP 503', 'err');
+  e('bot', 'Redémarré après 6 s hors ligne · MAGI', 'notice', null);
+  const stats = statsOf('g-resume', '2026-10-27');
+  expect(stats).toEqual({ arrivees: 2, departs: 1, tickets: 1, reponses: 2, relais: 1, erreurs: 1 });
+  expect(digestText('2026-10-27', { ...stats, cas: 2, cas_annules: 1 }, statsOf('global', '2026-10-27'))).toBe(
+    '📊 **Résumé du mardi 27 octobre** · 2 arrivées, 1 départ · 2 cas de modération (1 annulé) · 1 ticket · 2 réponses des unités, dont 1 via le relais · 1 redémarrage · ❌ 1 erreur, voir #magi-systeme',
+  );
+  expect(digestText('2026-10-27', {}, null)).toBe('📊 **Résumé du mardi 27 octobre** · aucune erreur');
 });

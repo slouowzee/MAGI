@@ -54,6 +54,7 @@ function emit(level, component, message, context = {}) {
     channel: context.channel ?? null,
     mention: context.mention ?? null,
     components: context.components ?? null,
+    quiet: Boolean(context.quiet),
   };
   if (entry.host === 'magi' && severity(level) <= serverThreshold()) {
     (severity(level) <= severity('warning') ? console.error : console.log)(serverLine(entry));

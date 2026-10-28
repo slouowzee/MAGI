@@ -246,6 +246,12 @@ export async function handlePanelInteraction(interaction) {
     return PAGES[page] ? show(page) : ephemeral('Page inconnue.');
   }
   if (SERVER_ACTIONS[field]) return SERVER_ACTIONS[field](interaction);
+  if (field === 'digest') {
+    const on = setting(guild.id, 'digest') === 'off';
+    setSetting(guild.id, 'digest', on ? 'on' : 'off');
+    await show('logs');
+    return changed(`résumé quotidien ${on ? 'activé' : 'coupé'}`);
+  }
   if (field.startsWith('module:')) {
     const key = field.slice('module:'.length);
     if (!MODULES[key]) return ephemeral('Module inconnu.');

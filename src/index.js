@@ -24,7 +24,10 @@ import { handleWriteModal, isWriteModal } from './features/commands/write.js';
 import { noteMessage, startPresence } from './features/presence/presence.js';
 import { log } from './core/log/log.js';
 import { llmChain } from './core/llm/client.js';
-import { attachDiscord, flushAll } from './core/log/discord.js';
+import { attachDiscord, flushAll, ownerGuilds } from './core/log/discord.js';
+import { startDigest } from './core/log/digest.js';
+import { logChannels } from './core/installation.js';
+import { setSetting, setting } from './core/settings.js';
 import { followHostJournal } from './core/log/host.js';
 
 const token = process.env.DISCORD_TOKEN;
@@ -49,7 +52,11 @@ const client = new Client({
 client.once(Events.ClientReady, async (c) => {
   await attachDiscord(c);
   for (const guild of c.guilds.cache.values()) await setupGuild(guild);
-  log.notice('bot', `démarré : ${c.user.tag}, ${c.guilds.cache.size} serveur(s), LLM ${llmChain() || 'aucun'}`);
+  const stopped = Number(setting('global', 'last_stop') ?? 0);
+  const offline = stopped && Date.now() - stopped < 30 * 60_000 ? Math.max(1, Math.round((Date.now() - stopped) / 1000)) : null;
+  setSetting('global', 'last_stop', null);
+  log.notice('bot', `${offline ? `Redémarré après ${offline} s hors ligne` : 'Démarré'} · ${c.user.tag}, ${c.guilds.cache.size} serveur(s), LLM ${llmChain() || 'aucun'}`);
+  startDigest(c, { channelOf: (guild) => logChannels(guild).logs, ownerGuilds });
   followHostJournal();
   await catchUp(c).catch((err) => log.err('rattrapage', `échec : ${err.message}`));
   startReminders(c);
@@ -95,7 +102,8 @@ client.on(Events.VoiceStateUpdate, (before, after) => handleVoiceState(before, a
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {
-    log.notice('bot', `arrêt (${signal})`);
+    setSetting('global', 'last_stop', Date.now());
+    log.notice('bot', `arrêt (${signal})`, { quiet: true });
     await flushAll();
     await client.destroy();
     db.close();

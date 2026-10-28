@@ -14,7 +14,7 @@ function welcomeChannel(guild) {
 }
 
 export function logArrival(member) {
-  log.notice('membres', `arrivée ${member.user.tag} (${member.id}), compte du <t:${Math.floor(member.user.createdTimestamp / 1000)}>`, { guild: member.guild });
+  log.notice('membres', `${member} est arrivé · ${member.user.tag} · compte créé <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, { guild: member.guild });
 }
 
 export async function welcome(member) {
@@ -48,6 +48,6 @@ export async function welcome(member) {
 
 export async function farewell(member) {
   const { guild } = member;
-  const since = member.joinedTimestamp ? `, membre depuis le <t:${Math.floor(member.joinedTimestamp / 1000)}>` : '';
-  log.notice('membres', `départ ${member.user.tag} (${member.id})${since}`, { guild });
+  const since = member.joinedTimestamp ? ` · membre depuis <t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : '';
+  log.notice('membres', `${member.user.tag} est parti${since}`, { guild });
 }
