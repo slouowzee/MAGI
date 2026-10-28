@@ -70,5 +70,7 @@ test('boutons de carte : une seule rangée quand ils tiennent, annulations en ve
   const single = rows(base);
   assert.equal(single.length, 1);
   assert.deepEqual(single[0].components.map((b) => [b.label, b.style]), [["Retirer l'infraction", 3], ['Mute 24 h', 2], ['Bannir', 4], ['Historique', 2]]);
-  assert.equal(rows({ ...base, excluded: true, banned: true }).length, 2);
+  const full = rows({ ...base, excluded: true, banned: true });
+  assert.equal(full.length, 1);
+  assert.deepEqual(full[0].components.map((b) => b.label), ['Unmute', 'Débannir', "Retirer l'infraction", 'Tout annuler', 'Historique']);
 });
