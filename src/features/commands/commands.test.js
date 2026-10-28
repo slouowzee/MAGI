@@ -42,3 +42,21 @@ test('les actions réservées sont annoncées au modèle pour qui ne peut pas le
   assert.match(note, /publier/);
   assert.match(note, /opérateurs MAGI/);
 });
+
+test('clear : par paquets de 100, filtre MAGI, s’arrête aux messages de plus de 14 jours', async () => {
+  const { fromMagi, sweep } = await import('./write.js');
+  const now = Date.parse('2026-10-28T21:00:00Z');
+  const messages = Array.from({ length: 250 }, (_, i) => ({ id: String(1000 - i), createdTimestamp: now - (i < 230 ? i * 60_000 : 20 * 86_400_000), author: { id: i % 2 ? 'slou' : 'magi' }, applicationId: null }));
+  const removed = [];
+  const channel = {
+    messages: { fetch: async ({ before }) => new Map(messages.filter((m) => !before || Number(m.id) < Number(before)).slice(0, 100).map((m) => [m.id, m])) },
+    bulkDelete: async (list) => {
+      removed.push(...list.map((m) => m.id));
+      return new Map(list.map((m) => [m.id, m]));
+    },
+  };
+  assert.deepEqual(await sweep(channel, 150, () => true, now), { deleted: 150, old: 0 });
+  removed.length = 0;
+  assert.deepEqual(await sweep(channel, 1000, (m) => fromMagi(m, 'magi'), now), { deleted: 115, old: 10 });
+  assert.ok(fromMagi({ author: { id: 'webhook' }, applicationId: 'magi' }, 'magi'));
+});

@@ -31,8 +31,9 @@ export const WRITE_COMMANDS = [
       type: ApplicationCommandType.ChatInput,
       description: 'Supprimer les derniers messages du salon',
       options: [
-        { type: O.Integer, name: 'nombre', description: 'Combien de messages, de 1 à 100', required: true, min_value: 1, max_value: 100 },
+        { type: O.Integer, name: 'nombre', description: 'Combien de messages, de 1 à 1000', required: true, min_value: 1, max_value: 1000 },
         { type: O.User, name: 'membre', description: 'Seulement les messages de ce membre' },
+        { type: O.Boolean, name: 'magi', description: 'Seulement les messages de MAGI et de ses trois unités' },
       ],
     },
   },
@@ -89,6 +90,28 @@ export async function handleWriteModal(interaction) {
   return interaction.reply({ content: `Publié : ${sent.url}`, ...ephemeral });
 }
 
+const TWO_WEEKS = 14 * 86_400_000 - 60_000;
+const MAX_PAGES = 20;
+
+export const fromMagi = (message, botId) => message.author.id === botId || message.applicationId === botId;
+
+export async function sweep(channel, count, keep, now = Date.now()) {
+  let before;
+  let deleted = 0;
+  let old = 0;
+  for (let page = 0; page < MAX_PAGES && deleted + old < count; page++) {
+    const batch = [...(await channel.messages.fetch({ limit: 100, before })).values()];
+    if (!batch.length) break;
+    before = batch.at(-1).id;
+    const wanted = batch.filter(keep).slice(0, count - deleted - old);
+    const fresh = wanted.filter((m) => now - m.createdTimestamp < TWO_WEEKS);
+    old += wanted.length - fresh.length;
+    if (fresh.length) deleted += (await channel.bulkDelete(fresh, true)).size;
+    if (fresh.length < wanted.length || batch.length < 100) break;
+  }
+  return { deleted, old };
+}
+
 export async function clear(interaction) {
   const { channel, member } = interaction;
   if (!member.permissionsIn(channel).has(P.ManageMessages) && !isOperator(member)) return interaction.reply({ content: "Tu n'as pas les droits : il faut pouvoir gérer les messages de ce salon.", ...ephemeral });
@@ -96,10 +119,9 @@ export async function clear(interaction) {
   await interaction.deferReply(ephemeral);
   const count = interaction.options.getInteger('nombre');
   const author = interaction.options.getUser('membre');
-  const recent = [...(await channel.messages.fetch({ limit: 100 })).values()];
-  const picked = recent.filter((m) => !author || m.author.id === author.id).slice(0, count);
-  const deleted = picked.length ? await channel.bulkDelete(picked, true) : new Map();
-  const old = picked.length - deleted.size;
-  log.notice('commandes', `clear : ${deleted.size} message(s)${author ? ` de ${author.tag}` : ''} supprimé(s) par ${interaction.user.tag}`, { channel });
-  return interaction.editReply({ content: `${deleted.size} message(s) supprimé(s)${author ? ` de ${author}` : ''}.${old ? ` ${old} trop ancien(s) (plus de 14 jours), laissé(s) : Discord ne permet pas de les supprimer en lot.` : ''}` });
+  const onlyMagi = interaction.options.getBoolean('magi');
+  const { deleted, old } = await sweep(channel, count, (m) => (!author || m.author.id === author.id) && (!onlyMagi || fromMagi(m, interaction.client.user.id)));
+  const who = `${author ? ` de ${author}` : ''}${onlyMagi ? ' de MAGI' : ''}`;
+  log.notice('commandes', `clear : ${deleted} message(s)${author ? ` de ${author.tag}` : ''}${onlyMagi ? ' de MAGI' : ''} supprimé(s) par ${interaction.user.tag}`, { channel });
+  return interaction.editReply({ content: `${deleted} message(s) supprimé(s)${who}.${old ? ` ${old} trop ancien(s) (plus de 14 jours) laissé(s) : Discord ne permet pas de les supprimer en lot.` : ''}` });
 }
