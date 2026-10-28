@@ -32,6 +32,8 @@ export const OPTIONS = {
   gate_min_age: { default: '7', values: ['0', '1', '3', '7', '30'] },
   raid_threshold: { default: '10', values: ['5', '10', '20', '30'] },
   automod_mentions: { default: '5', values: ['3', '5', '10', '20'] },
+  presence_night: { default: '1-8', values: ['aucune', '23-7', '0-8', '1-8', '2-9'] },
+  presence_idle: { default: '30', values: ['0', '15', '30', '60'] },
 };
 
 const list = (guildId, key) => setting(guildId, key)?.split(',').filter(Boolean) ?? [];

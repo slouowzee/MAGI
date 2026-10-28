@@ -3,6 +3,7 @@ import { chat, forReply } from '../llm/client.js';
 import { cleanReply, systemPrompt } from '../llm/prompts.js';
 import { speak } from '../discord/webhooks.js';
 import { log } from '../logging/log.js';
+import { announce } from '../server/presence.js';
 
 export const VERDICTS = ['APPROUVÉ', 'REFUSÉ', 'ABSTENTION'];
 
@@ -76,10 +77,12 @@ export function formatVote({ avis, verdict }) {
 export async function runVote(message, question, personas = Object.keys(PERSONAS)) {
   const typing = setInterval(() => message.channel.sendTyping().catch(() => {}), 8_000);
   message.channel.sendTyping().catch(() => {});
+  const live = announce(message.channel, `Vote en cours : ${question.replace(/\s+/g, ' ')}`);
   try {
     const votes = await Promise.all(personas.map((persona) => castVote(persona, question)));
     for (const [i, vote] of votes.entries()) await speak(message.channel, vote.persona, formatVote(vote), { replyTo: i === 0 ? message : undefined });
     const result = tally(votes);
+    live.set(`Vote : ${result.pour} pour, ${result.contre} contre`);
     log.info('vote', `${votes.map((v) => `${v.persona}=${v.verdict}`).join(' ')} → ${result.outcome}`, { channel: message.channel });
     await message.channel.send({ content: announcement(result), allowedMentions: { parse: [] } });
     for (const persona of result.minority) {
@@ -88,5 +91,6 @@ export async function runVote(message, question, personas = Object.keys(PERSONAS
     }
   } finally {
     clearInterval(typing);
+    live.done();
   }
 }

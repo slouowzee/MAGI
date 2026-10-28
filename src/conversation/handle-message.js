@@ -3,7 +3,9 @@ import { addMessage, answered, awaitingAnswer, closeConversation, followUpConver
 import { activePersonas, isMuted, moduleEnabled, personaForChannel } from '../server/config.js';
 import { memoryContext, summarizeConversation } from './memory.js';
 import { floodCheck, quickReaction } from './rules.js';
+import { PERSONAS } from '../personas.js';
 import { runVote } from './vote.js';
+import { announce } from '../server/presence.js';
 import { runDebate, wantsDebate } from './debate.js';
 import { maybeIntervene } from './spontaneous.js';
 import { addressedPersonas, detect, VOTE_INTENT, wantsDetail, wantsSummary } from './triggers.js';
@@ -101,6 +103,7 @@ export async function handleMessage(message, { catchUp = false } = {}) {
   const length = wantsDetail(trigger.text) ? 'detaillee' : 'courte';
   const typing = setInterval(() => message.channel.sendTyping().catch(() => {}), 8_000);
   message.channel.sendTyping().catch(() => {});
+  const live = announce(message.channel, `${PERSONAS[persona].name} répond à ${message.member?.displayName ?? message.author.username}`);
   try {
     const { turns, participants, target, included } = await conversationFor(message, persona, message.content, current, (id) => isClaimed(channelId, id));
     for (const id of included) addMessage(current, id, null, Date.now());
@@ -130,5 +133,6 @@ export async function handleMessage(message, { catchUp = false } = {}) {
     if (err instanceof LLMUnavailable) await speak(message.channel, 'melchior', 'Unité hors ligne.').catch(() => {});
   } finally {
     clearInterval(typing);
+    live.done();
   }
 }

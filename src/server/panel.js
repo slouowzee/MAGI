@@ -34,12 +34,14 @@ import { automodAllowList, automodPresets, automodRules, lockedRule, PRESET_LABE
 import { postTicketPanel } from '../community/tickets.js';
 import { createHub } from '../community/voice.js';
 import { DISCORD_LEVELS, discordLevel } from '../logging/discord.js';
+import { PRESENCE_ITEMS } from './presence.js';
 import { atLeast, currentLevel, inviteUrl, LEVELS } from './permissions.js';
 
 const PREFIX = 'magi-config:';
 const PAGES = {
   accueil: 'Accueil',
   conversation: 'Conversation',
+  statut: 'Statut du bot',
   personas: 'Personas et salons',
   communaute: 'Communauté',
   services: 'Services',
@@ -50,7 +52,8 @@ const PAGES = {
   permissions: 'Permissions',
 };
 export const PAGE_MODULES = {
-  conversation: ['interventions', 'memoire', 'rappels', 'vote', 'debat', 'commandes', 'vocaux', 'statut'],
+  conversation: ['interventions', 'memoire', 'rappels', 'vote', 'debat', 'commandes', 'vocaux'],
+  statut: ['statut'],
   communaute: ['etoiles', 'anniversaires', 'synchro', 'sondages', 'evenements'],
   services: ['tickets', 'vocal_temporaire'],
   arrivees: ['bienvenue', 'filtre_arrivee', 'anti_raid'],
@@ -65,7 +68,7 @@ const HINTS = {
   debat: 'Les unités débattent quand on le demande.',
   commandes: 'Clic droit sur un message, /chuchoter.',
   vocaux: 'Écoute les messages vocaux.',
-  statut: "Le statut du bot montre ce qu'il fait.",
+  statut: 'Pastille et texte du profil : ce que fait MAGI, infos du serveur, veille la nuit.',
   administration: 'Gestion du serveur à la demande des opérateurs.',
   etoiles: 'Copie les messages qui reçoivent assez de 🔥 dans un salon.',
   anniversaires: 'Souhaite les anniversaires à 9 h.',
@@ -178,6 +181,29 @@ function conversationSection(guild) {
     channelSelect('interventions', 'Salons des interventions spontanées', interventions, 25),
     separator(),
     ...PAGE_MODULES.conversation.slice(1).map((key) => feature(guild, key)),
+  ];
+}
+
+function statusSection(guild) {
+  const items = settingList(guild.id, 'presence_items').filter((key) => PRESENCE_ITEMS[key]);
+  const chosen = items.length ? items : Object.keys(PRESENCE_ITEMS);
+  const night = option(guild.id, 'presence_night');
+  const idle = option(guild.id, 'presence_idle');
+  return [
+    feature(guild, 'statut', `${chosen.length} info(s) en rotation · veille ${night === 'aucune' ? 'jamais la nuit' : `de ${night.replace('-', ' h à ')} h`}`),
+    separator(),
+    text('**En rotation toutes les 3 min**\n-# Pendant une réponse, un débat ou un vote, le statut montre ce qui se passe.'),
+    row(
+      new StringSelectMenuBuilder()
+        .setCustomId(id('presence_items'))
+        .setPlaceholder('Infos en rotation')
+        .setMinValues(1)
+        .setMaxValues(Object.keys(PRESENCE_ITEMS).length)
+        .addOptions(Object.entries(PRESENCE_ITEMS).map(([value, label]) => ({ label, value, default: chosen.includes(value) }))),
+    ),
+    text('**Veille** (pastille lune)\n-# MAGI répond quand même : il repasse au vert dès qu’on lui parle.'),
+    choice(guild, 'presence_night', 'Veille la nuit', (v) => (v === 'aucune' ? 'Pas de veille la nuit' : `La nuit, de ${v.replace('-', ' h à ')} h`)),
+    choice(guild, 'presence_idle', 'Veille sans messages', (v) => (v === '0' ? 'Jamais faute de messages' : `Après ${v} min sans message sur le serveur`)),
   ];
 }
 
@@ -373,6 +399,7 @@ function permissionsSection(guild) {
 const BUILDERS = {
   accueil: homeSection,
   conversation: conversationSection,
+  statut: statusSection,
   personas: personasSection,
   communaute: communitySection,
   services: servicesSection,
@@ -496,6 +523,9 @@ const FIELD_LABELS = {
   gate_rules: 'critères du filtre',
   raid_threshold: 'seuil anti-raid',
   automod_presets: 'filtres AutoMod',
+  presence_items: 'infos du statut',
+  presence_night: 'veille la nuit',
+  presence_idle: 'veille sans messages',
   automod_rules: 'règles AutoMod',
   automod_mentions: 'mentions AutoMod',
 };
@@ -521,6 +551,9 @@ const APPLY = {
   automod_rules: { page: 'automod', apply: (guild, values) => setAutomodRules(guild.id, values) },
   automod_mentions: { page: 'automod', apply: single('automod_mentions') },
   log_level: { page: 'logs', apply: single('log_level') },
+  presence_items: { page: 'statut', apply: (guild, values) => setSettingList(guild.id, 'presence_items', values) },
+  presence_night: { page: 'statut', apply: single('presence_night') },
+  presence_idle: { page: 'statut', apply: single('presence_idle') },
 };
 
 export async function handlePanelInteraction(interaction) {

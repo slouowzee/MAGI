@@ -3,6 +3,7 @@ import { speak } from '../discord/webhooks.js';
 import { chat, forReply } from '../llm/client.js';
 import { buildMessages, cleanReply, MAX_TOKENS } from '../llm/prompts.js';
 import { runVote } from './vote.js';
+import { announce } from '../server/presence.js';
 import { log } from '../logging/log.js';
 
 const DEBATE = /(?<![\p{L}])d[ée]bat(?:s|tez|tre|tons|ez)?(?![\p{L}])/iu;
@@ -24,6 +25,7 @@ export async function runDebate(message, topic, personas, { vote = false } = {})
   const typing = setInterval(() => message.channel.sendTyping().catch(() => {}), 8_000);
   message.channel.sendTyping().catch(() => {});
   const said = [];
+  const live = announce(message.channel, `Débat en cours : ${topic.replace(/\s+/g, ' ')}`);
   try {
     for (let round = 1; round <= ROUNDS; round++) {
       for (const persona of personas) {
@@ -37,6 +39,7 @@ export async function runDebate(message, topic, personas, { vote = false } = {})
     log.info('debat', `${personas.join(', ')} sur « ${topic.slice(0, 80)} » demandé par ${message.author.tag}${vote ? ', puis vote' : ''}`, { channel: message.channel });
   } finally {
     clearInterval(typing);
+    live.done();
   }
   if (vote) await runVote(message, topic, personas);
 }

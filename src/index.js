@@ -20,7 +20,7 @@ import { watchAuditLog } from './security/antinuke.js';
 import { startBackups } from './security/backup.js';
 import { catchUp } from './conversation/catch-up.js';
 import { handleCommand, isCommand } from './conversation/commands.js';
-import { startPresence } from './server/presence.js';
+import { noteMessage, startPresence } from './server/presence.js';
 import { log } from './logging/log.js';
 import { llmChain } from './llm/client.js';
 import { attachDiscord, flushAll } from './logging/discord.js';
@@ -85,6 +85,7 @@ client.on(Events.InteractionCreate, (interaction) => {
 });
 client.on(Events.MessageCreate, async (message) => {
   if (await moderate(message).catch((err) => log.err('moderation', err.message, { guild: message.guild, channel: message.channel }))) return;
+  noteMessage(message);
   trackActivity(message).catch((err) => log.err('synchro', err.message, { guild: message.guild }));
   await handleMessage(message);
 });
