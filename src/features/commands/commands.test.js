@@ -14,6 +14,9 @@ test('commandes enregistrées selon le module, /magi, /ecrire et /clear toujours
   await syncCommands(guild);
   assert.deepEqual(sent.map((c) => c.name), ['magi', 'ecrire', 'clear']);
   assert.ok(COMMANDS.every((c) => c.data.name.length <= 32));
+  const perms = Object.fromEntries(sent.map((c) => [c.name, c.default_member_permissions]));
+  assert.deepEqual(perms, { magi: '32', ecrire: '32', clear: '8192' });
+  assert.ok(COMMANDS.every((c) => c.tier in { membres: 1, moderation: 1, operateurs: 1 }));
 });
 
 test('statut des modèles lisible', () => {

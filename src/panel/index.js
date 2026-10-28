@@ -91,7 +91,7 @@ export function panelPage(guild, name = 'accueil', { live = false } = {}) {
 }
 
 export function openPanel(interaction, page = 'accueil') {
-  if (!isOperator(interaction.member)) return interaction.reply({ content: 'Réservé aux opérateurs MAGI.', flags: MessageFlags.Ephemeral, ...silent });
+  if (!isOperator(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits : le panneau de configuration est réservé aux opérateurs MAGI.", flags: MessageFlags.Ephemeral, ...silent });
   return interaction.reply({ ...panelPage(interaction.guild, page, { live: true }), flags: PRIVATE, ...silent });
 }
 

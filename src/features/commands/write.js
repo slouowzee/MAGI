@@ -12,6 +12,7 @@ const FORMS = { publication: 'Publication encadrée', message: 'Message simple d
 
 export const WRITE_COMMANDS = [
   {
+    tier: 'operateurs',
     data: {
       name: 'ecrire',
       type: ApplicationCommandType.ChatInput,
@@ -24,11 +25,11 @@ export const WRITE_COMMANDS = [
     },
   },
   {
+    tier: 'moderation',
     data: {
       name: 'clear',
       type: ApplicationCommandType.ChatInput,
       description: 'Supprimer les derniers messages du salon',
-      default_member_permissions: String(P.ManageMessages),
       options: [
         { type: O.Integer, name: 'nombre', description: 'Combien de messages, de 1 à 100', required: true, min_value: 1, max_value: 100 },
         { type: O.User, name: 'membre', description: 'Seulement les messages de ce membre' },

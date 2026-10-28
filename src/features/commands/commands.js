@@ -1,4 +1,4 @@
-import { ApplicationCommandOptionType, ApplicationCommandType, MessageFlags } from 'discord.js';
+import { ApplicationCommandOptionType, ApplicationCommandType, MessageFlags, PermissionFlagsBits as P } from 'discord.js';
 import { PERSONAS } from '../../core/personas.js';
 import { activePersonas, isMuted, moduleEnabled } from '../../core/config.js';
 import { isOperator } from '../../core/installation.js';
@@ -20,11 +20,14 @@ const ASK = {
 const SUMMARY = 'Résumer depuis ici';
 const ephemeral = { flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } };
 
+export const TIERS = { membres: null, moderation: String(P.ManageMessages), operateurs: String(P.ManageGuild) };
+
 export const COMMANDS = [
-  ...Object.keys(ASK).map((name) => ({ module: 'commandes', data: { name, type: ApplicationCommandType.Message } })),
-  { module: 'commandes', data: { name: SUMMARY, type: ApplicationCommandType.Message } },
+  ...Object.keys(ASK).map((name) => ({ module: 'commandes', tier: 'membres', data: { name, type: ApplicationCommandType.Message } })),
+  { module: 'commandes', tier: 'membres', data: { name: SUMMARY, type: ApplicationCommandType.Message } },
   {
     module: 'commandes',
+    tier: 'membres',
     data: {
       name: 'chuchoter',
       type: ApplicationCommandType.ChatInput,
@@ -36,6 +39,7 @@ export const COMMANDS = [
     },
   },
   {
+    tier: 'operateurs',
     data: {
       name: 'magi',
       type: ApplicationCommandType.ChatInput,
@@ -50,7 +54,7 @@ export const COMMANDS = [
 ];
 
 export async function syncCommands(guild) {
-  const wanted = COMMANDS.filter((c) => !c.module || moduleEnabled(guild.id, c.module)).map((c) => c.data);
+  const wanted = COMMANDS.filter((c) => !c.module || moduleEnabled(guild.id, c.module)).map((c) => ({ ...c.data, default_member_permissions: TIERS[c.tier] }));
   await guild.commands.set(wanted);
 }
 
@@ -111,7 +115,7 @@ export function statusReport(status = llmStatus(), now = Date.now(), uptime = pr
 }
 
 async function status(interaction) {
-  if (!isOperator(interaction.member)) return interaction.reply({ content: 'Réservé aux opérateurs MAGI.', ...ephemeral });
+  if (!isOperator(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits : /magi statut est réservé aux opérateurs MAGI.", ...ephemeral });
   await interaction.reply({ content: statusReport(), ...ephemeral });
 }
 
