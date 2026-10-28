@@ -7,7 +7,7 @@ import { chat, forReply } from '../llm/client.js';
 import { buildMessages, cleanReply, MAX_TOKENS } from '../llm/prompts.js';
 import { log } from '../logging/log.js';
 
-const STAR = '⭐';
+const STAR = '🎉';
 
 export function starEmbed(message) {
   const embed = new EmbedBuilder()
@@ -33,7 +33,7 @@ export async function handleStar(reaction) {
   const persona = activePersonas(guild.id).includes('casper') ? 'casper' : activePersonas(guild.id)[0];
   let comment = `${reaction.count} ${STAR} pour ${displayName(message)}.`;
   try {
-    const prompt = `Ce message de ${displayName(message)} vient d'entrer sur le mur des étoiles du serveur avec ${reaction.count} ${STAR} :\n« ${describe(message).slice(0, 800)} »\nCommente-le en une phrase, avec ta voix.`;
+    const prompt = `Ce message de ${displayName(message)} vient d'entrer sur le mur des confettis du serveur avec ${reaction.count} ${STAR} :\n« ${describe(message).slice(0, 800)} »\nCommente-le en une phrase, avec ta voix.`;
     const { content } = await chat({ messages: buildMessages(persona, [{ role: 'user', content: prompt }], 'courte'), options: { num_predict: MAX_TOKENS.courte }, ...forReply() });
     comment = cleanReply(content) || comment;
   } catch {}

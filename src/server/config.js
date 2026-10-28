@@ -13,7 +13,7 @@ export const MODULES = {
   commandes: 'Clic droit et /chuchoter',
   vocaux: 'Écoute des messages vocaux',
   debat: 'Débats entre unités',
-  etoiles: 'Mur des étoiles',
+  etoiles: 'Mur des confettis',
   sondages: 'Sondages',
   evenements: 'Événements',
   anniversaires: 'Anniversaires',
