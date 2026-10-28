@@ -36,7 +36,7 @@ export function caseButtons(c) {
   const rows = [];
   if (!c.observing && c.status !== 'annulee') {
     const undo = [
-      excludedOf(c) && button('cas-lever', c.id, "Lever l'exclusion"),
+      excludedOf(c) && button('cas-lever', c.id, 'Unmute'),
       c.banned && button('cas-debannir', c.id, 'Débannir'),
       counted(c) && button('cas-infraction', c.id, "Retirer l'infraction"),
     ].filter(Boolean);
@@ -45,7 +45,7 @@ export function caseButtons(c) {
   }
   const open = c.status !== 'annulee';
   const more = [
-    open && !c.banned && !excludedOf(c) && button('cas-exclure', c.id, 'Exclure 24 h'),
+    open && !c.banned && !excludedOf(c) && button('cas-exclure', c.id, 'Mute 24 h'),
     open && !c.banned && button('cas-bannir', c.id, 'Bannir', ButtonStyle.Danger),
     button('historique', c.userId, 'Historique'),
   ].filter(Boolean);

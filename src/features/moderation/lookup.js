@@ -146,7 +146,7 @@ export async function lookupCard(guild, userId) {
   const button = (action, label, style = ButtonStyle.Secondary) => new ButtonBuilder().setCustomId(`${PREFIX}${action}:${userId}`).setLabel(label).setStyle(style);
   container.addActionRowComponents(
     new ActionRowBuilder().addComponents(
-      [member && button('warn', 'Avertir'), member && button('mute', 'Exclure'), member && button('kick', 'Expulser'), !banned && button('ban', 'Bannir', ButtonStyle.Danger), button('note', 'Ajouter une note', ButtonStyle.Primary)].filter(Boolean),
+      [member && button('warn', 'Warn'), member && button('mute', 'Mute'), member && button('kick', 'Expulser'), !banned && button('ban', 'Bannir', ButtonStyle.Danger), button('note', 'Ajouter une note', ButtonStyle.Primary)].filter(Boolean),
     ),
   );
   container.addActionRowComponents(new ActionRowBuilder().addComponents(button('purge', 'Purger les sanctions', ButtonStyle.Danger)));
@@ -169,7 +169,7 @@ function modal(action, userId) {
     if (value) input.setValue(value);
     return new ActionRowBuilder().addComponents(input);
   };
-  const titles = { warn: 'Avertir', mute: 'Exclure', kick: 'Expulser', ban: 'Bannir', note: 'Ajouter une note' };
+  const titles = { warn: 'Warn', mute: 'Mute', kick: 'Expulser', ban: 'Bannir', note: 'Ajouter une note' };
   const rows = [];
   if (action === 'mute') rows.push(field('duree', 'Durée', TextInputStyle.Short, true, Object.keys(DURATIONS).join(', '), '1h'));
   if (action === 'ban') rows.push(field('messages', 'Supprimer ses messages', TextInputStyle.Short, true, Object.keys(PURGES).join(', '), 'aucun'));
