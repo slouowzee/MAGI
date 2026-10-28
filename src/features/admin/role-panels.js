@@ -50,6 +50,11 @@ function buttons(roles, unique) {
   return rows;
 }
 
+export function rolePanel(guild, args) {
+  const { roles, embed } = panel(guild, args);
+  return { embeds: [embed], components: buttons(roles, args.unique), ...silent };
+}
+
 export const ROLE_PANEL_TOOLS = [
   {
     name: 'panneau_roles',

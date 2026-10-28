@@ -33,7 +33,8 @@ src/
     community/            Hall of Fame, anniversaires, synchronisation, tickets, vocaux temporaires
     moderation/           détection et sanctions
     security/             anti-nuke, AutoMod, audit, sauvegardes, filtre, anti-raid, honeypot
-    admin/                outils d'administration (salons, membres, rôles, publications, scaffold)
+    admin/                outils d'administration (salons, membres, rôles, publications)
+    server/               mise en place du serveur : styles, plan, application, annulation, modèles, audit
     presence/             statut du bot
     welcome/              arrivées et départs
 ```

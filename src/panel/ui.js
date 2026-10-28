@@ -26,6 +26,7 @@ export const PAGES = {
   arrivees: 'Arrivées',
   securite: 'Sécurité',
   automod: 'AutoMod',
+  serveur: 'Serveur',
   logs: 'Logs',
   permissions: 'Permissions',
 };

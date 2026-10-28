@@ -37,6 +37,8 @@ import { servicesSection } from './pages/services.js';
 import { arrivalsSection } from './pages/arrivees.js';
 import { securitySection } from './pages/securite.js';
 import { automodSection } from './pages/automod.js';
+import { serverSection } from './pages/serveur.js';
+import { SERVER_ACTIONS } from './server-actions.js';
 import { logsSection } from './pages/logs.js';
 import { permissionsSection } from './pages/permissions.js';
 
@@ -56,6 +58,7 @@ const BUILDERS = {
   arrivees: arrivalsSection,
   securite: securitySection,
   automod: automodSection,
+  serveur: serverSection,
   logs: logsSection,
   permissions: permissionsSection,
 };
@@ -176,6 +179,13 @@ const FIELD_LABELS = {
   presence_items: 'infos du statut',
   presence_night: 'veille la nuit',
   presence_idle: 'veille sans messages',
+  server_style: 'style du serveur',
+  server_mode: 'mode de mise en place',
+  server_sep: 'séparateur',
+  server_case: 'casse',
+  server_decor: 'décor des catégories',
+  server_naming: 'options de nommage',
+  server_features: 'éléments à mettre en place',
   automod_rules: 'règles AutoMod',
   automod_mentions: 'mentions AutoMod',
 };
@@ -204,6 +214,19 @@ const APPLY = {
   presence_items: { page: 'statut', apply: (guild, values) => setSettingList(guild.id, 'presence_items', values) },
   presence_night: { page: 'statut', apply: single('presence_night') },
   presence_idle: { page: 'statut', apply: single('presence_idle') },
+  server_style: { page: 'serveur', apply: single('server_style') },
+  server_mode: { page: 'serveur', apply: single('server_mode') },
+  server_sep: { page: 'serveur', apply: single('server_sep') },
+  server_case: { page: 'serveur', apply: single('server_case') },
+  server_decor: { page: 'serveur', apply: single('server_decor') },
+  server_naming: {
+    page: 'serveur',
+    apply: (guild, values) => {
+      setSetting(guild.id, 'server_emoji', values.includes('emoji') ? 'oui' : 'non');
+      setSetting(guild.id, 'server_lang', values.includes('en') ? 'en' : 'fr');
+    },
+  },
+  server_features: { page: 'serveur', apply: (guild, values) => setSetting(guild.id, 'server_features', values.join(',') || 'aucune') },
 };
 
 export async function handlePanelInteraction(interaction) {
@@ -222,6 +245,7 @@ export async function handlePanelInteraction(interaction) {
     const page = field === 'page' ? interaction.values?.[0] : field.slice('page:'.length);
     return PAGES[page] ? show(page) : ephemeral('Page inconnue.');
   }
+  if (SERVER_ACTIONS[field]) return SERVER_ACTIONS[field](interaction);
   if (field.startsWith('module:')) {
     const key = field.slice('module:'.length);
     if (!MODULES[key]) return ephemeral('Module inconnu.');

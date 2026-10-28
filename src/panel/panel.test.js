@@ -8,7 +8,7 @@ const { alerts, PAGE_MODULES } = await import('./ui.js');
 const { MODULES, setModules, setMutedChannels } = await import('../core/config.js');
 
 const guild = { id: 'panel-test', client: { user: { id: '1' } }, members: { me: { permissions: new PermissionsBitField() } }, channels: { cache: new Collection() } };
-const pages = ['accueil', 'conversation', 'statut', 'personas', 'communaute', 'services', 'arrivees', 'securite', 'automod', 'logs', 'permissions'];
+const pages = ['accueil', 'conversation', 'statut', 'personas', 'communaute', 'services', 'arrivees', 'securite', 'automod', 'serveur', 'logs', 'permissions'];
 
 const walk = (node) => [node, ...(node.components ?? []).flatMap(walk), ...(node.accessory ? [node.accessory] : [])];
 
