@@ -22,14 +22,16 @@ export const MODULES = {
   tickets: 'Tickets',
   filtre_arrivee: "Filtre à l'arrivée",
   anti_raid: 'Anti-raid',
+  automod: 'AutoMod Discord',
   statut: 'Statut dynamique',
 };
-const OFF_BY_DEFAULT = new Set(['bienvenue', 'etoiles', 'anniversaires', 'synchro', 'vocal_temporaire', 'tickets', 'filtre_arrivee']);
+const OFF_BY_DEFAULT = new Set(['bienvenue', 'etoiles', 'anniversaires', 'synchro', 'vocal_temporaire', 'tickets', 'filtre_arrivee', 'automod']);
 
 export const OPTIONS = {
   stars_threshold: { default: '5', values: ['3', '5', '7', '10', '15'] },
   gate_min_age: { default: '7', values: ['0', '1', '3', '7', '30'] },
   raid_threshold: { default: '10', values: ['5', '10', '20', '30'] },
+  automod_mentions: { default: '5', values: ['3', '5', '10', '20'] },
 };
 
 const list = (guildId, key) => setting(guildId, key)?.split(',').filter(Boolean) ?? [];

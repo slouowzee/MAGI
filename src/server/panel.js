@@ -26,6 +26,7 @@ import { installAndReport, isOperator, logChannels, magiCategory, operatorRole }
 import { log } from '../logging/log.js';
 import { COMMANDS, statusReport, syncCommands } from '../conversation/commands.js';
 import { ensureGate } from '../security/gate.js';
+import { automodPresets, PRESET_LABELS, syncAutomod } from '../security/automod.js';
 import { postTicketPanel } from '../community/tickets.js';
 import { createHub } from '../community/voice.js';
 import { DISCORD_LEVELS, discordLevel } from '../logging/discord.js';
@@ -48,7 +49,7 @@ export const PAGE_MODULES = {
   communaute: ['etoiles', 'anniversaires', 'synchro', 'sondages', 'evenements'],
   services: ['tickets', 'vocal_temporaire'],
   arrivees: ['bienvenue', 'filtre_arrivee', 'anti_raid'],
-  securite: ['administration', 'antinuke', 'sauvegardes'],
+  securite: ['administration', 'antinuke', 'sauvegardes', 'automod'],
 };
 const HINTS = {
   interventions: 'MAGI prend la parole de lui-même dans les salons choisis.',
@@ -72,6 +73,7 @@ const HINTS = {
   anti_raid: "Verrouille les salons en cas d'afflux d'arrivées.",
   antinuke: 'Met en quarantaine qui supprime ou bannit en masse.',
   sauvegardes: 'Sauvegarde quotidienne de la structure du serveur.',
+  automod: 'Règles AutoMod natives : bloque avant publication, alerte dans #magi-moderation.',
 };
 const NEEDS = {
   sondages: [P.SendPolls],
@@ -81,6 +83,7 @@ const NEEDS = {
   filtre_arrivee: [P.ManageRoles, P.ManageChannels],
   anti_raid: [P.ManageRoles, P.ManageChannels],
   antinuke: [P.ViewAuditLog, P.ManageRoles, P.ModerateMembers],
+  automod: [P.ManageGuild],
 };
 const MISSING_CHANNEL = {
   interventions: (guild) => !interventionChannels(guild.id).length && 'aucun salon choisi',
@@ -255,6 +258,7 @@ function securitySection(guild) {
   const trap = honeypotOf(guild);
   const backup = latestBackup(guild.id);
   const { mode } = moderationMode(guild.id);
+  const presets = automodPresets(guild.id);
   return [
     text('**Modération automatique**\n-# Spam, liens et insultes : observer seulement, agir, ou rien.'),
     row(
@@ -267,6 +271,17 @@ function securitySection(guild) {
     feature(guild, 'administration'),
     feature(guild, 'antinuke'),
     feature(guild, 'sauvegardes', `dernière ${backup ? `<t:${Math.floor(backup.createdAt / 1000)}:R>` : 'jamais'}`),
+    separator(),
+    feature(guild, 'automod', `${presets.map((p) => PRESET_LABELS[p].toLowerCase()).join(', ')} · ${option(guild.id, 'automod_mentions')} mentions max · spam · arnaques`),
+    row(
+      new StringSelectMenuBuilder()
+        .setCustomId(id('automod_presets'))
+        .setPlaceholder('Filtres prédéfinis')
+        .setMinValues(1)
+        .setMaxValues(Object.keys(PRESET_LABELS).length)
+        .addOptions(Object.entries(PRESET_LABELS).map(([value, label]) => ({ label, value, default: presets.includes(value) }))),
+    ),
+    choice(guild, 'automod_mentions', 'Mentions par message', (v) => `Bloquer au-delà de ${v} mentions`),
     new SectionBuilder()
       .addTextDisplayComponents(text(`**Honeypot**\n${trap ? `Actif · ${trap}` : 'Aucun'}\n-# Salon piège : tout message posté dedans entraîne un bannissement.`))
       .setButtonAccessory(
@@ -419,6 +434,7 @@ export async function setupGuild(guild) {
   await syncCommands(guild).catch((err) => log.err('commandes', `échec enregistrement des commandes : ${err.message}`, { guild }));
   await ensureGate(guild).catch((err) => log.err('filtre', `échec mise en place du filtre : ${err.message}`, { guild }));
   await refreshHoneypot(guild).catch((err) => log.err('honeypot', `échec mise à jour du honeypot : ${err.message}`, { guild }));
+  await resyncAutomod(guild);
   await restylePublications(guild)
     .then((count) => count && log.notice('publications', `${count} publication(s) remise(s) en forme`, { guild }))
     .catch((err) => log.err('publications', `échec remise en forme : ${err.message}`, { guild }));
@@ -444,8 +460,11 @@ const FIELD_LABELS = {
   gate_min_age: 'âge minimal à l’arrivée',
   gate_rules: 'critères du filtre',
   raid_threshold: 'seuil anti-raid',
+  automod_presets: 'filtres AutoMod',
+  automod_mentions: 'mentions AutoMod',
 };
 const single = (key) => (guild, values) => setSetting(guild.id, key, values[0] ?? null);
+const resyncAutomod = (guild) => syncAutomod(guild).catch((err) => log.err('automod', `échec synchronisation : ${err.message}`, { guild }));
 
 const APPLY = {
   personas: { page: 'personas', apply: (guild, values) => setActivePersonas(guild.id, values) },
@@ -462,6 +481,8 @@ const APPLY = {
   gate_rules: { page: 'arrivees', apply: (guild, values) => setSettingList(guild.id, 'gate_rules', values) },
   raid_threshold: { page: 'arrivees', apply: single('raid_threshold') },
   moderation: { page: 'securite', apply: (guild, values) => setModerationMode(guild.id, values[0]) },
+  automod_presets: { page: 'securite', apply: (guild, values) => setSettingList(guild.id, 'automod_presets', values) },
+  automod_mentions: { page: 'securite', apply: single('automod_mentions') },
   log_level: { page: 'logs', apply: single('log_level') },
 };
 
@@ -487,6 +508,7 @@ export async function handlePanelInteraction(interaction) {
     const on = !moduleEnabled(guild.id, key);
     setModule(guild.id, key, on);
     if (COMMANDS.some((c) => c.module === key)) await syncCommands(guild).catch((err) => log.err('commandes', `échec enregistrement des commandes : ${err.message}`, { guild }));
+    if (key === 'automod') resyncAutomod(guild);
     if (key === 'filtre_arrivee') ensureGate(guild).catch((err) => log.err('filtre', `échec mise en place du filtre : ${err.message}`, { guild }));
     await show(pageOf(key));
     return changed(`${MODULES[key]} ${on ? 'activé' : 'coupé'}`);
@@ -501,6 +523,7 @@ export async function handlePanelInteraction(interaction) {
   if (APPLY[field]) {
     const { page, apply } = APPLY[field];
     apply(guild, interaction.values ?? []);
+    if (field.startsWith('automod_')) resyncAutomod(guild);
     await show(page);
     const values = (interaction.values ?? []).map((v) => (interaction.isChannelSelectMenu?.() ? `<#${v}>` : v));
     return changed(`${FIELD_LABELS[field] ?? field} = ${values.join(', ') || 'aucun'}`);
@@ -527,6 +550,7 @@ export async function handlePanelInteraction(interaction) {
     const existed = Boolean(honeypotOf(guild));
     if (existed) await disableHoneypot(guild, reason);
     else await enableHoneypot(guild, reason);
+    resyncAutomod(guild);
     await show('securite');
     return changed(existed ? 'honeypot supprimé' : 'honeypot créé');
   }

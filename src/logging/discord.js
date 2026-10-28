@@ -16,6 +16,7 @@ const SOURCES = {
   antinuke: 'securite',
   honeypot: 'securite',
   antiraid: 'securite',
+  automod: 'securite',
   filtre: 'securite',
   audit: 'securite',
   sauvegarde: 'securite',
