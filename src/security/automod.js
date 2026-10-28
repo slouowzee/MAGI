@@ -153,9 +153,10 @@ async function sync(guild) {
 }
 
 async function adopt(guild, other, rule, triggerType) {
+  const previous = other.name;
   try {
     await other.edit(rule);
-    log.notice('automod', `règle « ${other.name} » reprise par MAGI sous le nom ${rule.name}`, { guild });
+    log.notice('automod', `règle « ${previous} » reprise par MAGI sous le nom ${rule.name}`, { guild });
   } catch (err) {
     if (err.status !== 404 && err.status !== 403) return log.warning('automod', `${rule.name} : ${err.message}`, { guild });
     setSetting(guild.id, `automod_locked:${triggerType}`, other.name);
