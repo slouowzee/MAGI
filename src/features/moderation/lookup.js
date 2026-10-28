@@ -57,7 +57,7 @@ export function infractionLine(guildId, userId, now = Date.now()) {
   if (!active.length) return 'Aucune infraction sur les 30 derniers jours.';
   const next = decide('suspect', active.length + 1).label;
   const oldest = Math.min(...active.map((i) => i.created_at));
-  return `${active.length} infraction${active.length > 1 ? 's' : ''} sur 30 jours · prochaine sanction : ${next} · la plus ancienne s'efface ${stamp(oldest + WINDOW)}`;
+  return [`- ${active.length} infraction${active.length > 1 ? 's' : ''} sur les 30 derniers jours`, `- Prochaine sanction : ${next}`, `- La plus ancienne s'efface ${stamp(oldest + WINDOW)}`].join('\n');
 }
 
 function synchroLine(guild, userId) {
@@ -138,7 +138,7 @@ export async function lookupCard(guild, userId) {
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addTextDisplayComponents(text(`**État** : ${state.length ? state.join(' · ') : 'rien à signaler'}\n**Rôles** : ${roles.length ? clipList(roles.map(String), 15).join(' ') : 'aucun'}${perms.length ? `\n**Permissions** : ${perms.join(', ')}` : ''}`));
   container.addSeparatorComponents(new SeparatorBuilder());
-  container.addTextDisplayComponents(text(`**Infractions** : ${infractionLine(guild.id, userId)}\n**Cas de modération**\n${cases.length ? clipList(cases, 8).join('\n') : 'Aucun.'}`));
+  container.addTextDisplayComponents(text(`**Infractions**\n${infractionLine(guild.id, userId)}\n**Cas de modération**\n${cases.length ? clipList(cases, 8).join('\n') : 'Aucun.'}`));
   if (audit.length) container.addTextDisplayComponents(text(`**Journal d'audit**\n${clipList(audit, 5).join('\n')}`));
   if (tickets.length) container.addTextDisplayComponents(text(`**Tickets** : ${clipList(tickets, 8).join(' ')}`));
   container.addSeparatorComponents(new SeparatorBuilder());

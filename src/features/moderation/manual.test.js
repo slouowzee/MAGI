@@ -56,7 +56,7 @@ test('sanctions manuelles : droits, hiérarchie, carte de cas et infraction comp
   await assert.rejects(punish({ guild: w.guild, moderator: w.mod, userId: 'boss', action: 'warn', reason: 'x' }), /rôle est égal ou supérieur/);
   await assert.rejects(punish({ guild: w.guild, moderator: w.mod, userId: 'yui', action: 'ban', reason: 'x' }), /Bannir des membres/);
   await assert.rejects(punish({ guild: w.guild, moderator: w.mod, userId: 'mod', action: 'warn', reason: 'x' }), /rôle est égal ou supérieur/);
-  assert.match(infractionLine('g-manuel', 'yui'), /^2 infractions sur 30 jours · prochaine sanction : suppression \+ exclusion 24 h \+ vote de ban/);
+  assert.match(infractionLine('g-manuel', 'yui'), /^- 2 infractions sur les 30 derniers jours\n- Prochaine sanction : suppression \+ exclusion 24 h \+ vote de ban\n- La plus ancienne s'efface <t:\d+:R>$/);
   assert.equal(parseDuration('7 d')[0], '7 j');
   assert.equal(parseDuration('2h'), null);
 });
