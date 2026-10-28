@@ -30,7 +30,7 @@ test('statut dynamique : en délibération, relais, hors ligne', async () => {
   assert.deepEqual(presenceText(1, [m('a')]), { text: 'En délibération…', status: 'online' });
   assert.deepEqual(presenceText(0, [m('a'), m('b')]), { text: 'Prêt', status: 'online' });
   assert.deepEqual(presenceText(0, [m('gemini-3.5-flash-lite', 1), m('gemini-3.1-flash-lite')]), { text: 'gemini-3.5-flash-lite saturé, relais gemini-3.1-flash-lite', status: 'idle' });
-  assert.equal(presenceText(0, [m('a', 1)]).status, 'idle');
+  assert.equal(presenceText(0, [m('a', 1)]).status, 'dnd');
 });
 
 test('persona par défaut selon le salon, fils compris', async () => {

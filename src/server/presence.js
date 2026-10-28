@@ -7,7 +7,7 @@ const DEBOUNCE = 1_500;
 export function presenceText(busy, status) {
   if (busy) return { text: 'En délibération…', status: 'online' };
   const available = status.filter((s) => !s.paused);
-  if (!available.length) return { text: 'Unités hors ligne, reprise dans un instant', status: 'idle' };
+  if (!available.length) return { text: 'Unités hors ligne, reprise dans un instant', status: 'dnd' };
   if (status[0]?.paused) return { text: `${status[0].model} saturé, relais ${available[0].model}`, status: 'idle' };
   return { text: 'Prêt', status: 'online' };
 }
