@@ -1,5 +1,8 @@
 import {
   ActionRowBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   ButtonBuilder,
   ButtonStyle,
   ChannelSelectMenuBuilder,
@@ -26,7 +29,7 @@ import { installAndReport, isOperator, logChannels, magiCategory, operatorRole }
 import { log } from '../logging/log.js';
 import { COMMANDS, statusReport, syncCommands } from '../conversation/commands.js';
 import { ensureGate } from '../security/gate.js';
-import { automodPresets, PRESET_LABELS, syncAutomod } from '../security/automod.js';
+import { automodAllowList, automodPresets, automodRules, PRESET_LABELS, RULE_LABELS, setAutomodAllowList, setAutomodRules, syncAutomod } from '../security/automod.js';
 import { postTicketPanel } from '../community/tickets.js';
 import { createHub } from '../community/voice.js';
 import { DISCORD_LEVELS, discordLevel } from '../logging/discord.js';
@@ -41,6 +44,7 @@ const PAGES = {
   services: 'Services',
   arrivees: 'Arrivées',
   securite: 'Sécurité',
+  automod: 'AutoMod',
   logs: 'Logs',
   permissions: 'Permissions',
 };
@@ -49,7 +53,8 @@ export const PAGE_MODULES = {
   communaute: ['etoiles', 'anniversaires', 'synchro', 'sondages', 'evenements'],
   services: ['tickets', 'vocal_temporaire'],
   arrivees: ['bienvenue', 'filtre_arrivee', 'anti_raid'],
-  securite: ['administration', 'antinuke', 'sauvegardes', 'automod'],
+  securite: ['administration', 'antinuke', 'sauvegardes'],
+  automod: ['automod'],
 };
 const HINTS = {
   interventions: 'MAGI prend la parole de lui-même dans les salons choisis.',
@@ -73,7 +78,7 @@ const HINTS = {
   anti_raid: "Verrouille les salons en cas d'afflux d'arrivées.",
   antinuke: 'Met en quarantaine qui supprime ou bannit en masse.',
   sauvegardes: 'Sauvegarde quotidienne de la structure du serveur.',
-  automod: 'Règles AutoMod natives : bloque avant publication, alerte dans #magi-moderation.',
+  automod: 'Règles natives de Discord : le message est bloqué avant publication, alerte dans #magi-moderation.',
 };
 const NEEDS = {
   sondages: [P.SendPolls],
@@ -258,7 +263,6 @@ function securitySection(guild) {
   const trap = honeypotOf(guild);
   const backup = latestBackup(guild.id);
   const { mode } = moderationMode(guild.id);
-  const presets = automodPresets(guild.id);
   return [
     text('**Modération automatique**\n-# Spam, liens et insultes : observer seulement, agir, ou rien.'),
     row(
@@ -272,16 +276,6 @@ function securitySection(guild) {
     feature(guild, 'antinuke'),
     feature(guild, 'sauvegardes', `dernière ${backup ? `<t:${Math.floor(backup.createdAt / 1000)}:R>` : 'jamais'}`),
     separator(),
-    feature(guild, 'automod', `${presets.map((p) => PRESET_LABELS[p].toLowerCase()).join(', ')} · ${option(guild.id, 'automod_mentions')} mentions max · spam · arnaques`),
-    row(
-      new StringSelectMenuBuilder()
-        .setCustomId(id('automod_presets'))
-        .setPlaceholder('Filtres prédéfinis')
-        .setMinValues(1)
-        .setMaxValues(Object.keys(PRESET_LABELS).length)
-        .addOptions(Object.entries(PRESET_LABELS).map(([value, label]) => ({ label, value, default: presets.includes(value) }))),
-    ),
-    choice(guild, 'automod_mentions', 'Mentions par message', (v) => `Bloquer au-delà de ${v} mentions`),
     new SectionBuilder()
       .addTextDisplayComponents(text(`**Honeypot**\n${trap ? `Actif · ${trap}` : 'Aucun'}\n-# Salon piège : tout message posté dedans entraîne un bannissement.`))
       .setButtonAccessory(
@@ -294,6 +288,40 @@ function securitySection(guild) {
       new ButtonBuilder().setCustomId(id('audit')).setLabel('Lancer l’audit').setStyle(ButtonStyle.Primary),
       new ButtonBuilder().setCustomId(id('backup')).setLabel('Sauvegarder maintenant').setStyle(ButtonStyle.Secondary),
     ]),
+  ];
+}
+
+function automodSection(guild) {
+  const rules = automodRules(guild.id);
+  const presets = automodPresets(guild.id);
+  const allow = automodAllowList(guild.id);
+  return [
+    feature(guild, 'automod', `${rules.length + 3}/${Object.keys(RULE_LABELS).length + 3} règles`),
+    separator(),
+    text('**Arnaques et pseudos**\n-# Message bloqué, alerte, exclusion 10 min. Pseudo suspect : le membre ne peut plus écrire tant qu’il ne l’a pas changé.'),
+    row(
+      new StringSelectMenuBuilder()
+        .setCustomId(id('automod_rules'))
+        .setPlaceholder('Aucune règle anti-arnaque')
+        .setMinValues(0)
+        .setMaxValues(Object.keys(RULE_LABELS).length)
+        .addOptions(Object.entries(RULE_LABELS).map(([value, label]) => ({ label, value, default: rules.includes(value) }))),
+    ),
+    text('**Filtres prédéfinis**\n-# Listes de Discord, efficaces surtout en anglais.'),
+    row(
+      new StringSelectMenuBuilder()
+        .setCustomId(id('automod_presets'))
+        .setPlaceholder('Filtres prédéfinis')
+        .setMinValues(1)
+        .setMaxValues(Object.keys(PRESET_LABELS).length)
+        .addOptions(Object.entries(PRESET_LABELS).map(([value, label]) => ({ label, value, default: presets.includes(value) }))),
+    ),
+    text('**Spam de mentions et spam**\n-# Le spam détecté par Discord est toujours bloqué.'),
+    choice(guild, 'automod_mentions', 'Mentions par message', (v) => `Bloquer au-delà de ${v} mentions`),
+    separator(),
+    new SectionBuilder()
+      .addTextDisplayComponents(text(`**Liste blanche**\n${allow.length ? allow.join(', ').slice(0, 500) : 'Aucun mot'}\n-# Mots et expressions qui ne déclenchent jamais les règles.`))
+      .setButtonAccessory(new ButtonBuilder().setCustomId(id('automod_allow')).setLabel('Modifier').setStyle(ButtonStyle.Secondary)),
   ];
 }
 
@@ -344,6 +372,7 @@ const BUILDERS = {
   services: servicesSection,
   arrivees: arrivalsSection,
   securite: securitySection,
+  automod: automodSection,
   logs: logsSection,
   permissions: permissionsSection,
 };
@@ -461,6 +490,7 @@ const FIELD_LABELS = {
   gate_rules: 'critères du filtre',
   raid_threshold: 'seuil anti-raid',
   automod_presets: 'filtres AutoMod',
+  automod_rules: 'règles AutoMod',
   automod_mentions: 'mentions AutoMod',
 };
 const single = (key) => (guild, values) => setSetting(guild.id, key, values[0] ?? null);
@@ -481,8 +511,9 @@ const APPLY = {
   gate_rules: { page: 'arrivees', apply: (guild, values) => setSettingList(guild.id, 'gate_rules', values) },
   raid_threshold: { page: 'arrivees', apply: single('raid_threshold') },
   moderation: { page: 'securite', apply: (guild, values) => setModerationMode(guild.id, values[0]) },
-  automod_presets: { page: 'securite', apply: (guild, values) => setSettingList(guild.id, 'automod_presets', values) },
-  automod_mentions: { page: 'securite', apply: single('automod_mentions') },
+  automod_presets: { page: 'automod', apply: (guild, values) => setSettingList(guild.id, 'automod_presets', values) },
+  automod_rules: { page: 'automod', apply: (guild, values) => setAutomodRules(guild.id, values) },
+  automod_mentions: { page: 'automod', apply: single('automod_mentions') },
   log_level: { page: 'logs', apply: single('log_level') },
 };
 
@@ -527,6 +558,18 @@ export async function handlePanelInteraction(interaction) {
     await show(page);
     const values = (interaction.values ?? []).map((v) => (interaction.isChannelSelectMenu?.() ? `<#${v}>` : v));
     return changed(`${FIELD_LABELS[field] ?? field} = ${values.join(', ') || 'aucun'}`);
+  }
+  if (field === 'automod_allow') {
+    const input = new TextInputBuilder().setCustomId('mots').setLabel('Un mot ou une expression par ligne').setStyle(TextInputStyle.Paragraph).setMaxLength(4000).setRequired(false);
+    const current = automodAllowList(guild.id).join('\n');
+    if (current) input.setValue(current);
+    return interaction.showModal(new ModalBuilder().setCustomId(id('automod_allow_set')).setTitle('Liste blanche AutoMod').addComponents(row(input)));
+  }
+  if (field === 'automod_allow_set' && interaction.isModalSubmit()) {
+    const words = setAutomodAllowList(guild.id, interaction.fields.getTextInputValue('mots'));
+    resyncAutomod(guild);
+    await show('automod');
+    return changed(`liste blanche AutoMod = ${words.length} mot(s)`);
   }
   if (field === 'audit') return ephemeral(auditReport(guild));
   if (field === 'tickets_post') {
