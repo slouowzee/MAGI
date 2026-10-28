@@ -145,7 +145,7 @@ async function sync(guild) {
   for (const rule of mine) if (!wanted.some((w) => w.name === rule.name)) await attempt(guild, rule.name, () => rule.delete('MAGI : règle AutoMod retirée'));
   for (const { triggerType, ...rule } of wanted) {
     const existing = mine.find((r) => r.name === rule.name);
-    const adopted = !existing && SINGLE.has(triggerType) ? rules.find((r) => r.triggerType === triggerType && !r.name.startsWith(PREFIX)) : null;
+    const adopted = !existing && SINGLE.has(triggerType) ? rules.find((r) => r.triggerType === triggerType && r.enabled && !r.name.startsWith(PREFIX)) : null;
     if (adopted) {
       await attempt(guild, rule.name, async () => {
         await adopted.edit(rule).catch((err) => {

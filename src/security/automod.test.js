@@ -68,7 +68,7 @@ test('AutoMod : règles voulues, choix des familles, honeypot exempté, exclusio
 test('AutoMod : crée, met à jour, reprend la règle de mentions existante, supprime quand coupé', async () => {
   const existing = [
     { name: 'MAGI · Filtres', creatorId: 'magi', triggerType: T.KeywordPreset },
-    { name: 'Block Mention Spam', creatorId: 'owner', triggerType: T.MentionSpam },
+    { name: 'Block Mention Spam', creatorId: 'owner', triggerType: T.MentionSpam, enabled: true },
   ];
   const { guild, calls } = fakeGuild('g-sync', [P.ManageGuild], existing);
   setModule('g-sync', 'automod', true);
