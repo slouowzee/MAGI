@@ -15,7 +15,7 @@ function welcomeChannel(guild) {
 
 export function logArrival(member) {
   const young = Date.now() - member.user.createdTimestamp < 7 * 86_400_000;
-  log.notice('membres', `${member} est arrivé · compte créé <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>${young ? ' ⚠️ compte récent' : ''}`, { guild: member.guild });
+  log.notice('membres', `${member} est arrivé · compte créé <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>${young ? ' ⚠️' : ''}`, { guild: member.guild });
 }
 
 export async function welcome(member) {
