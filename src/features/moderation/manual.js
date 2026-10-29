@@ -4,6 +4,7 @@ import { speak } from '../../core/discord/webhooks.js';
 import { log } from '../../core/log/log.js';
 import { recordInfraction } from './store.js';
 import { excludedOf, latestCase, openCase, updateCase } from './cases.js';
+import { notifySanction } from './appeal.js';
 
 export const DURATIONS = { '10m': ['10 min', 10 * 60_000], '1h': ['1 h', 3_600_000], '6h': ['6 h', 6 * 3_600_000], '24h': ['24 h', 86_400_000], '7j': ['7 j', 7 * 86_400_000], '28j': ['28 j', 28 * 86_400_000] };
 export const PURGES = { aucun: ['Aucun', 0], '24h': ['Dernières 24 h', 86_400], '7j': ['7 derniers jours', 604_800] };
@@ -68,16 +69,20 @@ export async function punish({ guild, moderator, userId, action, reason, duratio
   let c;
   if (action === 'warn') {
     c = await openCase(guild, userId, { ...base, action: 'avertissement', ...infraction(guild, userId, reason) });
+    notifySanction(guild, userId, `avertissement de la modération, cas #${c.id}. Motif : ${reason}.`);
     if (channel && target && channel.permissionsFor?.(target)?.has(P.ViewChannel)) await speak(channel, 'balthasar', `<@${userId}>, avertissement de la modération : ${reason}`, { mentions: [userId] }).catch(() => {});
   } else if (action === 'mute') {
     if (!target.moderatable) throw new Error('MAGI ne peut pas exclure ce membre (rôle trop haut ou permission manquante)');
     await target.timeout(duration[1], audit);
     c = await openCase(guild, userId, { ...base, action: `exclusion ${duration[0]}`, excluded: true, excludedUntil: Date.now() + duration[1], ...infraction(guild, userId, reason) });
+    notifySanction(guild, userId, `exclu ${duration[0]} par la modération, cas #${c.id}. Motif : ${reason}.`);
   } else if (action === 'ban') {
+    if (target) await notifySanction(guild, userId, `banni par la modération. Motif : ${reason}.`);
     await guild.members.ban(userId, { reason: audit, deleteMessageSeconds: purge });
     c = await openCase(guild, userId, { ...base, action: 'ban', banned: true, ...infraction(guild, userId, reason) });
   } else if (action === 'kick') {
     if (!target.kickable) throw new Error('MAGI ne peut pas expulser ce membre (rôle trop haut ou permission manquante)');
+    await notifySanction(guild, userId, `expulsé par la modération. Motif : ${reason}.`);
     await target.kick(audit);
     c = await openCase(guild, userId, { ...base, action: 'expulsion', kicked: true, ...infraction(guild, userId, reason) });
   } else if (action === 'unmute') {

@@ -3,6 +3,7 @@ import { isOperator } from '../../core/installation.js';
 import { getCase, revokeInfraction, revokeLastInfraction } from '../moderation/store.js';
 import { cardPayload, history, updateCase } from '../moderation/cases.js';
 import { bumpStat } from '../../core/log/digest.js';
+import { answerAppeal, notifySanction } from '../moderation/appeal.js';
 import { setSetting, setting } from '../../core/settings.js';
 import { welcome } from '../welcome/welcome.js';
 import { verifyMember } from './gate.js';
@@ -81,17 +82,22 @@ async function caseAction(interaction, action, id) {
       if (c.infractionId) revokeInfraction(c.infractionId);
       change = { infractionRevoked: true };
       event = `infraction retirée par ${by}`;
-    } else if (action === 'cas-annuler') {
+    } else if (action === 'cas-annuler' || action === 'appel-ok') {
       const done = [(await liftTimeout(member, reason)) && 'exclusion levée', (await liftBan(guild, c.userId, reason)) && 'débanni', c.infractionId && !c.infractionRevoked && revokeInfraction(c.infractionId) && 'infraction retirée'].filter(Boolean);
-      change = { status: 'annulee', excluded: false, excludedUntil: null, banned: false, infractionRevoked: true };
-      event = `tout annulé par ${by}${done.length ? ` : ${done.join(', ')}` : ''}`;
+      change = { status: 'annulee', excluded: false, excludedUntil: null, banned: false, infractionRevoked: true, ...(action === 'appel-ok' && { appeal: { ...c.appeal, state: 'acceptée' } }) };
+      event = `${action === 'appel-ok' ? 'contestation acceptée' : 'tout annulé'} par ${by}${done.length ? ` : ${done.join(', ')}` : ''}`;
       bumpStat(guild.id, 'cas_annules');
+    } else if (action === 'appel-non') {
+      change = { appeal: { ...c.appeal, state: 'refusée' } };
+      event = `contestation refusée par ${by}`;
     } else if (action === 'cas-exclure') {
       if (!member) return ephemeral(interaction, "Ce membre n'est plus sur le serveur.");
       await member.timeout(DAY, reason);
+      notifySanction(guild, c.userId, `exclu 24 h par la modération (cas #${c.id}).`);
       change = { excluded: true, excludedUntil: Date.now() + DAY, status: 'active' };
       event = `exclu 24 h par ${by}`;
     } else if (action === 'cas-bannir') {
+      await notifySanction(guild, c.userId, `banni par la modération (cas #${c.id}).`);
       await guild.members.ban(c.userId, { reason, deleteMessageSeconds: 86_400 });
       change = { banned: true, status: 'active' };
       event = `banni par ${by}`;
@@ -101,6 +107,7 @@ async function caseAction(interaction, action, id) {
   }
   const updated = updateCase(guild, c.id, change, { event });
   log.notice('moderation', `cas #${c.id} : ${event}`, { guild, quiet: true });
+  if (action.startsWith('appel-')) answerAppeal(guild, c, action === 'appel-ok');
   return interaction.update(await cardPayload(guild, updated));
 }
 
@@ -110,7 +117,7 @@ export async function handleSecurityButton(interaction) {
   if (!isOperator(interaction.member)) return ephemeral(interaction, 'Réservé aux opérateurs MAGI.');
   if (scope === 'magi-mod' && action === 'annuler') return cancelSanction(interaction, target);
   if (scope === 'magi-mod' && action === 'historique') return ephemeral(interaction, history(interaction.guild.id, target));
-  if (scope === 'magi-mod' && action.startsWith('cas-')) return caseAction(interaction, action, target);
+  if (scope === 'magi-mod' && (action.startsWith('cas-') || action.startsWith('appel-'))) return caseAction(interaction, action, target);
   if (action === 'liberer') return release(interaction, target);
   if (action === 'deverrouiller') {
     const count = await unlock(interaction.guild, `par ${interaction.user.tag}`);

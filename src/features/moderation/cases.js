@@ -48,8 +48,9 @@ export function caseButtons(c) {
     button('historique', c.userId, 'Historique'),
   ].filter(Boolean);
   const all = [...undo, ...more];
-  if (all.length <= 5) return [new ActionRowBuilder().addComponents(all)];
-  return [new ActionRowBuilder().addComponents(undo), new ActionRowBuilder().addComponents(more)];
+  const rows = all.length <= 5 ? [new ActionRowBuilder().addComponents(all)] : [new ActionRowBuilder().addComponents(undo), new ActionRowBuilder().addComponents(more)];
+  if (c.appeal?.state === 'en attente') rows.push(new ActionRowBuilder().addComponents(button('appel-ok', c.id, 'Accepter la contestation', ButtonStyle.Success), button('appel-non', c.id, 'Refuser la contestation', ButtonStyle.Danger)));
+  return rows;
 }
 
 export function caseCard(c, { avatar = null, joinedAt = null, createdAt = null } = {}) {
@@ -59,6 +60,7 @@ export function caseCard(c, { avatar = null, joinedAt = null, createdAt = null }
     `**Motif** : ${c.reasons.join(', ') || 'non précisé'}${c.verdict && c.verdict !== 'flagrant' ? ` · avis du modèle : ${c.verdict}` : ''}`,
     `**${c.observing ? 'Aurait fait' : 'Sanction'}** : ${c.action}${c.deleted > 1 ? ` · ${c.deleted} messages ${c.observing ? 'concernés' : 'supprimés'}` : ''}`,
     !c.observing && `**En cours** : ${stateLine(c)}`,
+    c.appeal && `**Contestation** (${c.appeal.state}) : « ${c.appeal.text.replace(/\s+/g, ' ').slice(0, 500)} »`,
     c.sample && `> ${c.sample.replace(/\s+/g, ' ').slice(0, 300)}${c.deleted > 1 ? ` *(et ${c.deleted - 1} autre${c.deleted > 2 ? 's' : ''})*` : ''}`,
   ].filter(Boolean);
   const container = new ContainerBuilder().setAccentColor(COLORS[severityOf(c)]);

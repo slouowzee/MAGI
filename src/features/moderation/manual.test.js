@@ -120,6 +120,41 @@ test('profil : la mémoire est visible et le membre peut tout oublier, lui seule
   assert.deepEqual(await factsAbout('g-oubli', 'yui'), []);
 });
 
+test('contestation : DM avec bouton, fenêtre, carte du cas, refus et réponse au membre', async () => {
+  const { handleAppealInteraction } = await import('./appeal.js');
+  const { handleSecurityButton } = await import('../security/actions.js');
+  const w = world('g-appel');
+  const dms = [];
+  w.guild.client = { users: { fetch: async (uid) => ({ id: uid, send: async (p) => (dms.push([uid, p]), {}) }) }, guilds: { cache: new Map([['g-appel', w.guild]]) } };
+  await punish({ guild: w.guild, moderator: w.mod, userId: 'yui', action: 'warn', reason: 'flood' });
+  await Bun.sleep(5);
+  const [to, dm] = dms[0];
+  assert.equal(to, 'yui');
+  assert.match(dm.content, /avertissement de la modération, cas #(\d+)\. Motif : flood/);
+  const id = Number(dm.content.match(/cas #(\d+)/)[1]);
+  const out = [];
+  const click = (customId, extra = {}) => handleAppealInteraction({ customId, client: w.guild.client, user: { id: 'yui' }, reply: async (p) => out.push(['reply', p]), update: async (p) => out.push(['update', p]), showModal: async (m) => out.push(['modal', m.toJSON()]), message: { content: dm.content }, ...extra });
+  await click(dm.components[0].toJSON().components[0].custom_id);
+  assert.equal(out.at(-1)[1].custom_id, `magi-appeal:send:g-appel:${id}`);
+  await click(`magi-appeal:send:g-appel:${id}`, { fields: { getTextInputValue: () => 'Je répondais à un ami, pas du flood.' } });
+  assert.match(out.at(-1)[1].content, /Contestation envoyée/);
+  assert.equal(out.at(-1)[1].components[0].toJSON().components[0].custom_id, `magi-appeal:state:g-appel:${id}`);
+  assert.equal(getCase(id).appeal.state, 'en attente');
+  await click(`magi-appeal:send:g-appel:${id}`, { fields: { getTextInputValue: () => 'encore une fois' } });
+  assert.match(out.at(-1)[1].content, /en attente/);
+  const owner = { ...w.mod, id: 'owner', displayName: 'Slou', permissions: { has: () => true } };
+  const cards = [];
+  await handleSecurityButton({ customId: `magi-mod:appel-non:${id}`, guild: w.guild, member: owner, user: { tag: 'owner' }, update: async (p) => cards.push(p) });
+  assert.equal(getCase(id).appeal.state, 'refusée');
+  assert.ok(!JSON.stringify(cards[0].components[0].toJSON()).includes('appel-ok'));
+  await Bun.sleep(5);
+  assert.match(dms.at(-1)[1].content, /refusée : la sanction est maintenue/);
+  await click(`magi-appeal:state:g-appel:${id}`);
+  assert.match(out.at(-1)[1].content, /refusée/);
+  await click(`magi-appeal:state:g-appel:${id}`, { user: { id: 'mod' } });
+  assert.equal(out.at(-1)[1].content, 'Cas introuvable.');
+});
+
 test('lookup : la fenêtre Mute applique la sanction', async () => {
   const { handleLookupInteraction } = await import('./lookup.js');
   const w = world('g-fenetre');

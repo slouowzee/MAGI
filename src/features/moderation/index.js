@@ -10,6 +10,7 @@ import { alertCase, openCase, updateCase } from './cases.js';
 import { setting } from '../../core/settings.js';
 import { createTracker, detect } from './detect.js';
 import { countTrigger } from '../security/honeypot.js';
+import { notifySanction } from './appeal.js';
 
 const HOUR = 3600_000;
 const track = createTracker();
@@ -69,6 +70,7 @@ async function voteBan(guild, c, member, reasons, count, sample) {
   const votes = await Promise.all(['melchior', 'balthasar', 'casper'].map((p) => castVote(p, question)));
   const result = tally(votes);
   if (result.outcome === 'adoptée') {
+    await notifySanction(guild, c.userId, `banni après un vote des unités (${result.pour} contre ${result.contre}), cas #${c.id}.`);
     const banned = await guild.members.ban(c.userId, { reason: `MAGI, modération automatique : ${count} infractions, vote ${result.pour} contre ${result.contre}`, deleteMessageSeconds: 86_400 }).then(() => true).catch(() => false);
     updateCase(guild, c.id, banned ? { banned: true, action: `${c.action}, banni par vote` } : {}, { event: banned ? `vote de ban : ${shortVote(votes)} → banni` : `vote de ban : ${shortVote(votes)} → adopté, mais le ban a échoué` });
     log.notice('moderation', `cas #${c.id} : <@${c.userId}> banni par vote ${result.pour} contre ${result.contre}`, { guild, quiet: true });
@@ -81,6 +83,7 @@ async function voteBan(guild, c, member, reasons, count, sample) {
 async function trapped(message) {
   const { guild, member } = message;
   await message.delete().catch(() => {});
+  await notifySanction(guild, member.id, 'banni : message posté dans un salon piège, réservé aux comptes piratés et aux bots.');
   const banned = await guild.members
     .ban(member, { reason: 'MAGI : message dans le honeypot', deleteMessageSeconds: 86_400 })
     .then(() => true)
@@ -119,6 +122,7 @@ async function sanction(message, finding, observing) {
   if (observing) return c;
   const reason = `MAGI, modération automatique (cas #${c.id}) : ${finding.reasons.join(' ; ')}`;
   await message.delete().catch(() => {});
+  notifySanction(guild, member.id, `ton message a été retiré (${finding.reasons.join(', ')}). Sanction : ${action.label.replace('suppression + ', '')}, cas #${c.id}.`);
   if (action.timeout) await member.timeout(action.timeout, reason).catch((err) => updateCase(guild, c.id, { excluded: false, excludedUntil: null }, { event: `exclusion impossible : ${err.message}` }));
   if (action.warn) {
     await speak(message.channel, 'balthasar', `<@${member.id}>, ton message a été retiré : ${finding.reasons[0]}. Premier avertissement, la prochaine fois ce sera une exclusion temporaire.`, { mentions: [member.id] }).catch(() => {});
