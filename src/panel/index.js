@@ -101,13 +101,8 @@ export function panelPage(guild, page = 'accueil', { live = false, viewer = null
 export async function openPanel(interaction, page = 'accueil') {
   if (!isOperator(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits : le panneau de configuration est réservé aux opérateurs MAGI.", flags: MessageFlags.Ephemeral, ...silent });
   const { guild } = interaction;
-  if (interaction.isChatInputCommand?.() && interaction.channelId === setting(guild.id, 'config_channel')) {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    await refreshPanel(guild, { repost: true });
-    return interaction.deleteReply();
-  }
-  if (interaction.isChatInputCommand?.()) refreshPanel(guild, { repost: true }).catch((err) => log.err('config', `échec panneau : ${err.message}`, { guild }));
-  return interaction.reply({ ...panelPage(interaction.guild, page, { live: true, viewer: interaction.user.id }), flags: PRIVATE, ...silent });
+  if (interaction.isChatInputCommand?.()) await Promise.race([refreshPanel(guild, { repost: true }).catch((err) => log.err('config', `échec panneau : ${err.message}`, { guild })), Bun.sleep(2_000)]);
+  return interaction.reply({ ...panelPage(guild, page, { live: true, viewer: interaction.user.id }), flags: PRIVATE, ...silent });
 }
 
 function configChannel(guild) {
