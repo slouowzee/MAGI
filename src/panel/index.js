@@ -100,6 +100,7 @@ export function panelPage(guild, page = 'accueil', { live = false, viewer = null
 
 export function openPanel(interaction, page = 'accueil') {
   if (!isOperator(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits : le panneau de configuration est réservé aux opérateurs MAGI.", flags: MessageFlags.Ephemeral, ...silent });
+  if (interaction.isChatInputCommand?.()) refreshPanel(interaction.guild, { repost: true }).catch((err) => log.err('config', `échec panneau : ${err.message}`, { guild: interaction.guild }));
   return interaction.reply({ ...panelPage(interaction.guild, page, { live: true, viewer: interaction.user.id }), flags: PRIVATE, ...silent });
 }
 
