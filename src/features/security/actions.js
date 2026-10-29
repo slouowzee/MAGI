@@ -93,11 +93,11 @@ async function caseAction(interaction, action, id) {
     } else if (action === 'cas-exclure') {
       if (!member) return ephemeral(interaction, "Ce membre n'est plus sur le serveur.");
       await member.timeout(DAY, reason);
-      notifySanction(guild, c.userId, { sanction: 'Exclusion 24 h', reason: c.reasons.join(', '), caseId: c.id, until: Date.now() + DAY });
+      notifySanction(guild, c.userId, { sanction: 'Exclusion 24 h', reason: c.reasons.join(', ') });
       change = { excluded: true, excludedUntil: Date.now() + DAY, status: 'active' };
       event = `exclu 24 h par ${by}`;
     } else if (action === 'cas-bannir') {
-      await notifySanction(guild, c.userId, { sanction: 'Ban', reason: c.reasons.join(', '), caseId: c.id });
+      await notifySanction(guild, c.userId, { sanction: 'Ban', reason: c.reasons.join(', ') });
       await guild.members.ban(c.userId, { reason, deleteMessageSeconds: 86_400 });
       change = { banned: true, status: 'active' };
       event = `banni par ${by}`;

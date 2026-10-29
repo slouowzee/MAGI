@@ -70,7 +70,7 @@ async function voteBan(guild, c, member, reasons, count, sample) {
   const votes = await Promise.all(['melchior', 'balthasar', 'casper'].map((p) => castVote(p, question)));
   const result = tally(votes);
   if (result.outcome === 'adoptée') {
-    await notifySanction(guild, c.userId, { sanction: 'Ban', reason: reasons.join(', '), caseId: c.id, note: `Décidé par un vote des unités de MAGI (${result.pour} pour, ${result.contre} contre) après ${count} infractions en 30 jours.` });
+    await notifySanction(guild, c.userId, { sanction: 'Ban', reason: reasons.join(', ') });
     const banned = await guild.members.ban(c.userId, { reason: `MAGI, modération automatique : ${count} infractions, vote ${result.pour} contre ${result.contre}`, deleteMessageSeconds: 86_400 }).then(() => true).catch(() => false);
     updateCase(guild, c.id, banned ? { banned: true, action: `${c.action}, banni par vote` } : {}, { event: banned ? `vote de ban : ${shortVote(votes)} → banni` : `vote de ban : ${shortVote(votes)} → adopté, mais le ban a échoué` });
     log.notice('moderation', `cas #${c.id} : <@${c.userId}> banni par vote ${result.pour} contre ${result.contre}`, { guild, quiet: true });
@@ -83,7 +83,7 @@ async function voteBan(guild, c, member, reasons, count, sample) {
 async function trapped(message) {
   const { guild, member } = message;
   await message.delete().catch(() => {});
-  await notifySanction(guild, member.id, { sanction: 'Ban', reason: 'message posté dans un salon piège', note: 'Ce salon sert à repérer les comptes piratés et les bots : si ton compte a été piraté, sécurise-le avant de contester.' });
+  await notifySanction(guild, member.id, { sanction: 'Ban', reason: 'message posté dans un salon piège' });
   const banned = await guild.members
     .ban(member, { reason: 'MAGI : message dans le honeypot', deleteMessageSeconds: 86_400 })
     .then(() => true)
@@ -123,7 +123,7 @@ async function sanction(message, finding, observing) {
   const reason = `MAGI, modération automatique (cas #${c.id}) : ${finding.reasons.join(' ; ')}`;
   await message.delete().catch(() => {});
   const sanctionLabel = action.label.replace('suppression + ', '').replace(' + vote de ban', '');
-  notifySanction(guild, member.id, { sanction: sanctionLabel[0].toUpperCase() + sanctionLabel.slice(1), reason: finding.reasons.join(', '), caseId: c.id, until: action.timeout ? Date.now() + action.timeout : null, note: `Ton message a été retiré${action.vote ? ', et les unités de MAGI votent sur un ban' : ''}.` });
+  notifySanction(guild, member.id, { sanction: sanctionLabel[0].toUpperCase() + sanctionLabel.slice(1), reason: finding.reasons.join(', ') });
   if (action.timeout) await member.timeout(action.timeout, reason).catch((err) => updateCase(guild, c.id, { excluded: false, excludedUntil: null }, { event: `exclusion impossible : ${err.message}` }));
   if (action.warn) {
     await speak(message.channel, 'balthasar', `<@${member.id}>, ton message a été retiré : ${finding.reasons[0]}. Premier avertissement, la prochaine fois ce sera une exclusion temporaire.`, { mentions: [member.id] }).catch(() => {});

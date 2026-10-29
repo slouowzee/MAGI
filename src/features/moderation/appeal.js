@@ -28,17 +28,17 @@ function card(guild, { color, title, lines, footer = null, button = null }) {
   return container;
 }
 
-export function sanctionCard(guild, { sanction, reason, caseId = null, until = null, note = null, at = Date.now() }) {
+export function sanctionCard(guild, { sanction, reason, at = Date.now() }) {
   return card(guild, {
     color: COLORS[sanction.split(' ')[0].toLowerCase()] ?? COLORS.ban,
     title: 'Tu as reçu une sanction',
-    lines: [`**Sanction** : ${sanction}`, until && `**Jusqu'à** : ${stamp(until, 'f')} (${stamp(until)})`, `**Motif** : ${reason || 'non précisé'}`, note, `**${caseId ? `Cas #${caseId}` : 'Date'}** · ${stamp(at, 'f')}`],
+    lines: [`**Sanction** : ${sanction}`, `**Motif** : ${reason || 'non précisé'}`, `**Date** : ${stamp(at, 'f')}`],
     footer: `-# Si c'est une erreur, tu peux la contester : les opérateurs de ${guild.name} recevront ta demande.`,
     button: buttonRow(`open:${guild.id}`, 'Contester'),
   });
 }
 
-const decisionCard = (guild, c, state) => card(guild, { color: COLORS[state], title: `Contestation du cas #${c.id}`, lines: [state === 'en attente' ? `En attente, envoyée ${stamp(c.appeal.at)}.` : DECISIONS[state]] });
+const decisionCard = (guild, c, state) => card(guild, { color: COLORS[state], title: 'Ta contestation', lines: [state === 'en attente' ? `En attente, envoyée ${stamp(c.appeal.at)}.` : DECISIONS[state]] });
 
 export function notifySanction(guild, userId, details) {
   return guild.client.users
@@ -70,7 +70,7 @@ async function status(interaction, guild, c) {
 function contestedCard(interaction, guild, c, at) {
   const original = interaction.message?.components?.[0];
   const button = buttonRow(`state:${guild.id}:${c.id}`, 'Voir la réponse');
-  if (original?.type !== ComponentType.Container) return card(guild, { color: COLORS['en attente'], title: `Contestation du cas #${c.id}`, lines: [`**Sanction** : ${c.action}`], footer: sentFooter(at), button });
+  if (original?.type !== ComponentType.Container) return card(guild, { color: COLORS['en attente'], title: 'Ta contestation', lines: [`**Sanction** : ${c.action}`], footer: sentFooter(at), button });
   const json = original.toJSON();
   return { ...json, components: [...json.components.slice(0, -2), text(sentFooter(at)).toJSON(), button.toJSON()] };
 }

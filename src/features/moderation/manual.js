@@ -69,13 +69,13 @@ export async function punish({ guild, moderator, userId, action, reason, duratio
   let c;
   if (action === 'warn') {
     c = await openCase(guild, userId, { ...base, action: 'avertissement', ...infraction(guild, userId, reason) });
-    notifySanction(guild, userId, { sanction: 'Avertissement', reason, caseId: c.id });
+    notifySanction(guild, userId, { sanction: 'Avertissement', reason });
     if (channel && target && channel.permissionsFor?.(target)?.has(P.ViewChannel)) await speak(channel, 'balthasar', `<@${userId}>, avertissement de la modération : ${reason}`, { mentions: [userId] }).catch(() => {});
   } else if (action === 'mute') {
     if (!target.moderatable) throw new Error('MAGI ne peut pas exclure ce membre (rôle trop haut ou permission manquante)');
     await target.timeout(duration[1], audit);
     c = await openCase(guild, userId, { ...base, action: `exclusion ${duration[0]}`, excluded: true, excludedUntil: Date.now() + duration[1], ...infraction(guild, userId, reason) });
-    notifySanction(guild, userId, { sanction: `Exclusion ${duration[0]}`, reason, caseId: c.id, until: c.excludedUntil });
+    notifySanction(guild, userId, { sanction: `Exclusion ${duration[0]}`, reason });
   } else if (action === 'ban') {
     if (target) await notifySanction(guild, userId, { sanction: 'Ban', reason });
     await guild.members.ban(userId, { reason: audit, deleteMessageSeconds: purge });

@@ -134,8 +134,10 @@ test('contestation : DM avec bouton, fenêtre, carte du cas, refus et réponse a
   const shown = JSON.stringify(sent);
   assert.equal(dm.flags, 32768);
   assert.equal(sent.accent_color, 0xef9f27);
-  assert.match(shown, /\*\*Sanction\*\* : Avertissement[^"]*\*\*Motif\*\* : flood[^"]*\*\*Cas #(\d+)\*\*/);
-  const id = Number(shown.match(/Cas #(\d+)/)[1]);
+  assert.match(shown, /\*\*Sanction\*\* : Avertissement\\n\*\*Motif\*\* : flood\\n\*\*Date\*\* : <t:\d+:f>"/);
+  assert.ok(!/cas #/i.test(shown));
+  const { latestCase } = await import('./cases.js');
+  const { id } = latestCase('g-appel', 'yui', () => true);
   const open = sent.components.at(-1).components[0].custom_id;
   const out = [];
   const click = (customId, extra = {}) => handleAppealInteraction({ customId, client: w.guild.client, user: { id: 'yui' }, reply: async (p) => out.push(['reply', p]), update: async (p) => out.push(['update', p]), showModal: async (m) => out.push(['modal', m.toJSON()]), message: { components: dm.components.map((b) => ({ type: b.toJSON().type, toJSON: () => b.toJSON() })) }, ...extra });
