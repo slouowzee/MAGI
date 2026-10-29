@@ -42,7 +42,7 @@ import { SERVER_ACTIONS } from './server-actions.js';
 import { parseEmoji } from '../features/community/hall-of-fame.js';
 import { logsSection } from './pages/logs.js';
 import { permissionsSection } from './pages/permissions.js';
-import { debugActive, debugBlocks, debugLine } from '../features/debug/console.js';
+import { debugActive, debugBlocks } from '../features/debug/console.js';
 
 const COLOR = 0xd65c62;
 const DEBUG_COLOR = 0xef9f27;
@@ -91,8 +91,7 @@ export function panelPage(guild, page = setting(guild.id, 'config_page') ?? 'acc
   const name = names.includes(page) ? page : 'accueil';
   const debug = debugActive(guild.id);
   const title = name === 'accueil' ? 'Configuration de MAGI' : PAGES[name];
-  const banner = debug ? `\n**🐞 Mode débogage actif ${debugLine(guild.id)}**` : '';
-  const header = text(`## ${title}${banner}\n-# Page ${names.indexOf(name) + 1}/${names.length}`);
+  const header = text(`## ${title}\n-# Page ${names.indexOf(name) + 1}/${names.length}`);
   const blocks = [header, separator(), ...BUILDERS[name](guild), separator(), ...navigation(name, names)];
   return { components: [new ContainerBuilder({ accent_color: debug ? DEBUG_COLOR : COLOR, components: blocks.map((b) => b.toJSON()) })], flags: V2 };
 }
