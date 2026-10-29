@@ -9,13 +9,13 @@ test('commandes enregistrées selon le module, /magi, /ecrire et /clear toujours
   let sent = [];
   const guild = { id: 'g-commandes', commands: { set: async (list) => (sent = list) } };
   await syncCommands(guild);
-  assert.deepEqual(sent.map((c) => c.name), ['Vérifier (Melchior)', 'Avis de Casper', 'Soutien de Balthasar', 'Résumer depuis ici', 'chuchoter', 'magi', 'ecrire', 'clear', 'profil', 'lookup', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick']);
+  assert.deepEqual(sent.map((c) => c.name), ['Vérifier (Melchior)', 'Avis de Casper', 'Soutien de Balthasar', 'Résumer depuis ici', 'chuchoter', 'magi', 'ecrire', 'clear', 'profil', 'lookup', 'classement', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick']);
   setModules(guild.id, Object.keys(MODULES).filter((m) => m !== 'commandes'));
   await syncCommands(guild);
-  assert.deepEqual(sent.map((c) => c.name), ['magi', 'ecrire', 'clear', 'profil', 'lookup', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick']);
+  assert.deepEqual(sent.map((c) => c.name), ['magi', 'ecrire', 'clear', 'profil', 'lookup', 'classement', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick']);
   assert.ok(COMMANDS.every((c) => c.data.name.length <= 32));
   const perms = Object.fromEntries(sent.map((c) => [c.name, c.default_member_permissions]));
-  assert.deepEqual(perms, { magi: '32', ecrire: '32', clear: '8192', profil: null, lookup: '8192', warn: '8192', mute: '1099511627776', unmute: '1099511627776', ban: '4', unban: '4', kick: '2' });
+  assert.deepEqual(perms, { magi: '32', ecrire: '32', clear: '8192', profil: null, lookup: '8192', classement: null, warn: '8192', mute: '1099511627776', unmute: '1099511627776', ban: '4', unban: '4', kick: '2' });
   assert.ok(COMMANDS.every((c) => c.perms || c.tier in { membres: 1, moderation: 1, operateurs: 1 }));
 });
 
@@ -59,4 +59,46 @@ test('clear : par paquets de 100, filtre MAGI, s’arrête aux messages de plus 
   removed.length = 0;
   assert.deepEqual(await sweep(channel, 1000, (m) => fromMagi(m, 'magi'), now), { deleted: 115, old: 10 });
   assert.ok(fromMagi({ author: { id: 'webhook' }, applicationId: 'magi' }, 'magi'));
+});
+
+test('date des messages programmés : heure de Paris, lendemain si passée, erreurs claires', async () => {
+  const { parseWhen } = await import('./write.js');
+  const now = Date.parse('2026-10-29T16:00:00Z');
+  const at = (text) => parseWhen(text, now).at;
+  assert.equal(parseWhen('', now).at, null);
+  assert.equal(at('18h30'), Date.parse('2026-10-29T17:30:00Z'));
+  assert.equal(at('9h'), Date.parse('2026-10-30T08:00:00Z'));
+  assert.equal(at('2h'), Date.parse('2026-10-30T01:00:00Z'));
+  assert.equal(at('demain à 9h'), Date.parse('2026-10-30T08:00:00Z'));
+  assert.equal(at('dans 2h'), now + 7_200_000);
+  assert.equal(at('dans 1h30'), now + 5_400_000);
+  assert.equal(at('30min'), now + 1_800_000);
+  assert.equal(at('31/10 20h'), Date.parse('2026-10-31T19:00:00Z'));
+  assert.equal(at('1/7 12:00'), Date.parse('2027-07-01T10:00:00Z'));
+  for (const bad of ['25h', '32/10 10h', 'bientôt', '12h75']) assert.match(parseWhen(bad, now).error, /Date non comprise/);
+  assert.match(parseWhen('dans 400j', now).error, /un an/);
+});
+
+test('/ecrire programmé : enregistré, annulable, publié à l’heure', async () => {
+  const { cancelScheduled, handleWriteModal, scheduledMessages, sendDueMessages } = await import('./write.js');
+  const sent = [];
+  const guild = { id: 'g-prog', ownerId: 'op', channels: { cache: new Map() } };
+  const channel = { id: 'c-prog', guild, toString: () => '<#c-prog>', send: async (p) => (sent.push(p), { url: 'https://discord.com/x' }) };
+  guild.channels.cache.set(channel.id, channel);
+  const replies = [];
+  const submit = (quand) => handleWriteModal({ customId: 'magi-write:message:c-prog:', guild, member: { id: 'op', guild, toString: () => '<@op>' }, user: { id: 'op' }, isModalSubmit: () => true, fields: { getTextInputValue: (k) => ({ texte: 'Soirée jeux ce soir', quand })[k] }, reply: async (p) => replies.push(p) });
+  await submit('demain 32h');
+  assert.match(replies.at(-1).content, /Date non comprise[\s\S]*Soirée jeux ce soir/);
+  await submit('dans 1h');
+  assert.match(replies.at(-1).content, /^Message n°\d+ programmé dans <#c-prog>/);
+  const [first] = scheduledMessages('g-prog');
+  await submit('dans 2h');
+  const cancel = replies.at(-1).components[0].toJSON().components[0].custom_id;
+  const updates = [];
+  await handleWriteModal({ customId: cancel, guild, member: { id: 'op', guild, toString: () => '<@op>' }, update: async (p) => updates.push(p.content) });
+  assert.match(updates[0], /annulé/);
+  await sendDueMessages({ guilds: { cache: new Map([['g-prog', guild]]) } }, Date.now() + 3 * 3_600_000);
+  assert.deepEqual(sent.map((p) => p.content), ['Soirée jeux ce soir']);
+  assert.equal(scheduledMessages('g-prog').length, 0);
+  assert.equal(cancelScheduled(first.id, 'g-prog'), false);
 });

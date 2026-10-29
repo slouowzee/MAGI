@@ -51,6 +51,29 @@ test('palier franchi : réaction et annonce en réponse au message, sans mention
   assert.deepEqual(listSettings(guild.id, 'synchro_notice:'), []);
 });
 
+test('classement : synchro, actifs de la semaine remis à zéro le lundi, Hall of Fame', async () => {
+  const { leaderboard } = await import('./leaderboard.js');
+  const { countActivity } = await import('./store.js');
+  const { weekOf } = await import('./synchro.js');
+  const guild = { id: 'g-classement', name: 'Test' };
+  setModules(guild.id, [...Object.keys(MODULES)]);
+  assert.equal(weekOf(Date.parse('2026-10-29T16:00:00Z')), '2026-10-26');
+  assert.equal(weekOf(Date.parse('2026-11-01T22:30:00Z')), '2026-10-26');
+  assert.equal(weekOf(Date.parse('2026-11-01T23:30:00Z')), '2026-11-02');
+  const lastWeek = Date.parse('2026-10-24T12:00:00Z');
+  const now = Date.parse('2026-10-29T12:00:00Z');
+  for (let i = 1; i <= 90; i++) countActivity(guild.id, 'lea', i, lastWeek, weekOf(lastWeek));
+  for (let i = 91; i <= 95; i++) countActivity(guild.id, 'lea', i, now, weekOf(now));
+  for (let i = 1; i <= 70; i++) countActivity(guild.id, 'tom', i, now, weekOf(now));
+  setSetting(guild.id, 'hof:tom', '3');
+  const card = JSON.stringify(leaderboard(guild, 'zoe', now).toJSON());
+  assert.match(card, /1\. <@lea> · 38 %\\n2\. <@tom> · 33 %/);
+  assert.match(card, /1\. <@tom> · 1 h 10 d’activité\\n2\. <@lea> · 5 min d’activité/);
+  assert.match(card, /1\. <@tom> · 3 messages/);
+  setModules(guild.id, []);
+  assert.match(JSON.stringify(leaderboard(guild, 'zoe', now).toJSON()), /sont coupés/);
+});
+
 test("anniversaires : une fois par jour, à partir de 9 h à Paris", async () => {
   const sent = [];
   const channel = { id: 'c', isThread: () => false, send: async (p) => sent.push(p) };

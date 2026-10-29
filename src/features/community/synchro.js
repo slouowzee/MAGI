@@ -1,5 +1,6 @@
 import { activePersonas, isMuted, moduleEnabled } from '../../core/config.js';
-import { saveSynchro, synchroOf } from './store.js';
+import { countActivity, synchroOf } from './store.js';
+import { parisDay } from '../../core/log/digest.js';
 import { listSettings, setSetting, setting } from '../../core/settings.js';
 import { speak } from '../../core/discord/webhooks.js';
 import { log } from '../../core/log/log.js';
@@ -8,6 +9,11 @@ const COOLDOWN = 60_000;
 const NOTICE_TTL = 30_000;
 const NOTICE = 'synchro_notice:';
 export const MILESTONES = [25, 50, 75, 100, 150, 200, 300, 400];
+
+export function weekOf(now = Date.now()) {
+  const noon = Date.parse(`${parisDay(now).day}T12:00:00Z`);
+  return new Date(noon - ((new Date(noon).getUTCDay() + 6) % 7) * 86_400_000).toISOString().slice(0, 10);
+}
 
 export const rateOf = (points) => Math.min(400, Math.floor(Math.sqrt(points) * 4));
 
@@ -39,7 +45,7 @@ export async function trackActivity(message, now = message.createdTimestamp) {
   if (now - last < COOLDOWN) return null;
   const before = rateOf(points);
   const after = rateOf(points + 1);
-  saveSynchro(guild.id, member.id, points + 1, now);
+  countActivity(guild.id, member.id, points + 1, now, weekOf(now));
   const reached = crossed(before, after);
   if (!reached.length) return null;
   const roles = paliers(guild.id);

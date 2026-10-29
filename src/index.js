@@ -20,7 +20,7 @@ import { watchAuditLog } from './features/security/antinuke.js';
 import { startBackups } from './features/security/backup.js';
 import { catchUp } from './features/conversation/catch-up.js';
 import { handleCommand, isCommand } from './features/commands/commands.js';
-import { handleWriteModal, isWriteModal } from './features/commands/write.js';
+import { handleWriteModal, isWriteModal, startScheduled } from './features/commands/write.js';
 import { handleLookupInteraction, isLookupInteraction } from './features/moderation/lookup.js';
 import { handleDebugInteraction, isDebugInteraction, startDebugTimers } from './features/debug/console.js';
 import { noteMessage, startPresence } from './features/presence/presence.js';
@@ -64,6 +64,7 @@ client.once(Events.ClientReady, async (c) => {
   followHostJournal();
   await catchUp(c).catch((err) => log.err('rattrapage', `échec : ${err.message}`));
   startReminders(c);
+  startScheduled(c);
   startConversationSweeper(c);
   startBackups(c);
   startPresence(c);

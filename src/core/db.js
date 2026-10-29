@@ -108,6 +108,17 @@ db.exec(`CREATE TABLE IF NOT EXISTS birthdays (
   day INTEGER NOT NULL,
   PRIMARY KEY (guild_id, user_id)
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS scheduled (
+  id INTEGER PRIMARY KEY,
+  guild_id TEXT NOT NULL,
+  channel_id TEXT NOT NULL,
+  author_id TEXT NOT NULL,
+  form TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  text TEXT NOT NULL,
+  due_at INTEGER NOT NULL,
+  done INTEGER NOT NULL DEFAULT 0
+)`);
 db.exec(`CREATE TABLE IF NOT EXISTS synchro (
   guild_id TEXT NOT NULL,
   user_id TEXT NOT NULL,
@@ -115,6 +126,9 @@ db.exec(`CREATE TABLE IF NOT EXISTS synchro (
   last_at INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (guild_id, user_id)
 )`);
+const synchroColumns = db.query('PRAGMA table_info(synchro)').all().map((c) => c.name);
+if (!synchroColumns.includes('week')) db.exec("ALTER TABLE synchro ADD COLUMN week TEXT NOT NULL DEFAULT ''");
+if (!synchroColumns.includes('week_points')) db.exec('ALTER TABLE synchro ADD COLUMN week_points INTEGER NOT NULL DEFAULT 0');
 
 export function listBackups() {
   if (!backupDir || !existsSync(backupDir)) return [];

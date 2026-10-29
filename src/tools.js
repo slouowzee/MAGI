@@ -8,6 +8,7 @@ import { CHANNEL_TOOLS } from './features/conversation/channel.js';
 import { REMINDER_TOOLS } from './features/reminders/tools.js';
 import { ADMIN_TOOLS } from './features/admin/index.js';
 import { COMMUNITY_TOOLS } from './features/community/tools.js';
+import { SCHEDULE_TOOLS } from './features/commands/write.js';
 
 const inModule = (module, tools) => tools.map((tool) => ({ ...tool, module }));
 
@@ -18,6 +19,7 @@ export const TOOLS = [
   ...inModule('rappels', REMINDER_TOOLS),
   ...inModule('administration', ADMIN_TOOLS),
   ...COMMUNITY_TOOLS,
+  ...SCHEDULE_TOOLS,
 ];
 
 const WHO = { operator: 'opérateurs MAGI', owner: 'propriétaire du serveur' };

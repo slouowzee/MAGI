@@ -9,6 +9,10 @@ const getSynchro = db.query('SELECT points, last_at FROM synchro WHERE guild_id 
 const putSynchro = db.query(`INSERT INTO synchro (guild_id, user_id, points, last_at) VALUES (?1, ?2, ?3, ?4)
   ON CONFLICT(guild_id, user_id) DO UPDATE SET points = ?3, last_at = ?4`);
 const topSynchro = db.query('SELECT user_id, points FROM synchro WHERE guild_id = ? ORDER BY points DESC LIMIT ?');
+const countSynchro = db.query(`INSERT INTO synchro (guild_id, user_id, points, last_at, week, week_points) VALUES (?1, ?2, ?3, ?4, ?5, 1)
+  ON CONFLICT(guild_id, user_id) DO UPDATE SET points = ?3, last_at = ?4, week_points = CASE WHEN week = ?5 THEN week_points + 1 ELSE 1 END, week = ?5`);
+const rankSynchro = db.query('SELECT count(*) + 1 AS rank FROM synchro WHERE guild_id = ? AND points > ?');
+const topWeek = db.query('SELECT user_id, week_points FROM synchro WHERE guild_id = ? AND week = ? ORDER BY week_points DESC LIMIT ?');
 
 export function setBirthday(guildId, userId, month, day) {
   upsertBirthday.run(guildId, userId, month, day);
@@ -37,3 +41,10 @@ export function saveSynchro(guildId, userId, points, at) {
 export function synchroTop(guildId, limit = 5) {
   return topSynchro.all(guildId, limit);
 }
+
+export function countActivity(guildId, userId, points, at, week) {
+  countSynchro.run(guildId, userId, points, at, week);
+}
+
+export const synchroRank = (guildId, points) => rankSynchro.get(guildId, points).rank;
+export const weekTop = (guildId, week, limit = 5) => topWeek.all(guildId, week, limit);
