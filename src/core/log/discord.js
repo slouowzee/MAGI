@@ -26,6 +26,7 @@ const SOURCES = {
   sudo: 'securite',
   su: 'securite',
   login: 'securite',
+  debug: 'systeme',
   outils: 'logs',
   config: 'logs',
   membres: 'logs',
@@ -36,7 +37,7 @@ const ICONS = {
   moderation: '🛡️', antinuke: '💣', honeypot: '🍯', antiraid: '🚧', automod: '🤖', filtre: '🚪', audit: '🔍', sauvegarde: '💾',
   sshd: '🔑', 'sshd-session': '🔑', ssh: '🔑', sudo: '🔐', su: '🔐', login: '🔑', outils: '🔧', config: '⚙️', installation: '🛠️',
   rappels: '⏰', tickets: '🎫', bot: '🔄', commandes: '⌨️', conversation: '💬', vote: '🗳️', debat: '💭', etoiles: '🔥', synchro: '📈',
-  anniversaires: '🎂', vocal: '🔊', publications: '📰', journal: '📜', interaction: '🖱️', rattrapage: '⏪',
+  anniversaires: '🎂', vocal: '🔊', debug: '🐞', publications: '📰', journal: '📜', interaction: '🖱️', rattrapage: '⏪',
 };
 export const PALETTE = { erreur: 0xe24b4a, alerte: 0xef9f27, securite: 0x7f77dd, moderation: 0xd85a30, config: 0x378add, arrivee: 0x1d9e75, depart: 0x888780, communaute: 0xd4537e, systeme: 0x5f5e5a };
 const GROUPS = {

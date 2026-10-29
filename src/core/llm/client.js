@@ -34,6 +34,28 @@ const PROVIDERS = {
 
 const pausedUntil = new Map();
 const strikes = new Map();
+const debugState = { forced: null, lastCall: null };
+
+export function clearPauses() {
+  pausedUntil.clear();
+  strikes.clear();
+  notify();
+}
+
+export function forceProvider(name) {
+  if (name && !PROVIDERS[name]) throw new Error(`fournisseur inconnu : ${name}`);
+  debugState.forced = name || null;
+  return debugState.forced;
+}
+
+export const forcedProvider = () => debugState.forced;
+
+export function simulateOutage(provider, ms) {
+  for (const model of PROVIDERS[provider].models()) pausedUntil.set(`${provider}/${model}`, Date.now() + ms);
+  notify();
+}
+
+export const lastCall = () => debugState.lastCall;
 
 function pause(id) {
   const count = (strikes.get(id) ?? 0) + 1;
@@ -198,7 +220,7 @@ function result(message, model) {
 
 function candidates(model) {
   const all = [];
-  for (const name of activeProviders()) {
+  for (const name of activeProviders().filter((p) => !debugState.forced || p === debugState.forced)) {
     const models = name === 'gemini' && model ? [model, ...PROVIDERS.gemini.models()] : PROVIDERS[name].models();
     for (const m of new Set(models)) all.push({ provider: name, model: m, id: `${name}/${m}` });
   }
@@ -267,8 +289,15 @@ export async function chat({ messages, format, options, tools, model, reasoning,
   if (!activeProviders().length) throw new LLMUnavailable('aucune clé de LLM configurée');
   busy++;
   notify();
+  const started = Date.now();
+  const call = { at: started, messages, tools: tools?.map((t) => t.function?.name ?? t.name), format: Boolean(format) };
   try {
-    return await attempt({ messages, format, options, tools, model, reasoning, timeoutMs });
+    const answer = await attempt({ messages, format, options, tools, model, reasoning, timeoutMs });
+    debugState.lastCall = { ...call, ms: Date.now() - started, answer };
+    return answer;
+  } catch (err) {
+    debugState.lastCall = { ...call, ms: Date.now() - started, error: err.message };
+    throw err;
   } finally {
     busy--;
     notify();

@@ -37,13 +37,13 @@ function locate(message, persona, now) {
   );
 }
 
-export async function handleMessage(message, { catchUp = false } = {}) {
+export async function handleMessage(message, { catchUp = false, force = false } = {}) {
   if (!message.inGuild() || message.author.bot || message.webhookId || isMuted(message.channel)) return;
   const now = Date.now();
   const channelId = message.channel.id;
   const detected = await detect(message, message.client);
   const following = detected || catchUp || addressesSomeoneElse(message) ? null : followUpConversation(channelId, message.author.id, now);
-  const trigger = detected ?? (following ? { persona: 'auto', vote: false, text: message.content } : null);
+  const trigger = detected ?? (following || force ? { persona: 'auto', vote: false, text: message.content } : null);
   const line = `${message.member?.displayName ?? message.author.username} : ${message.content}`;
   const found = following ? { conversation: following, by: 'suite' } : locate(message, trigger?.persona, now);
   let { conversation } = found;

@@ -22,6 +22,7 @@ import { catchUp } from './features/conversation/catch-up.js';
 import { handleCommand, isCommand } from './features/commands/commands.js';
 import { handleWriteModal, isWriteModal } from './features/commands/write.js';
 import { handleLookupInteraction, isLookupInteraction } from './features/moderation/lookup.js';
+import { handleDebugInteraction, isDebugInteraction, startDebugTimers } from './features/debug/console.js';
 import { noteMessage, startPresence } from './features/presence/presence.js';
 import { log } from './core/log/log.js';
 import { llmChain } from './core/llm/client.js';
@@ -59,6 +60,7 @@ client.once(Events.ClientReady, async (c) => {
   log.notice('bot', offline ? `Redémarré, ${offline} s d'interruption` : 'En ligne');
   if (!llmChain()) log.err('bot', 'aucun modèle de langage configuré, les unités ne peuvent pas répondre');
   startDigest(c, { channelOf: (guild) => logChannels(guild).logs, ownerGuilds });
+  startDebugTimers(c);
   followHostJournal();
   await catchUp(c).catch((err) => log.err('rattrapage', `échec : ${err.message}`));
   startReminders(c);
@@ -90,7 +92,7 @@ client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => watchAuditLog(entry
 client.on(Events.InteractionCreate, (interaction) => {
   if (isCommand(interaction)) return handleCommand(interaction);
   const id = interaction.customId ?? '';
-  const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : isSecurityButton(id) ? handleSecurityButton : isTicketInteraction(id) ? handleTicketInteraction : isWriteModal(id) ? handleWriteModal : isLookupInteraction(id) ? handleLookupInteraction : handleInteraction;
+  const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : isSecurityButton(id) ? handleSecurityButton : isTicketInteraction(id) ? handleTicketInteraction : isWriteModal(id) ? handleWriteModal : isLookupInteraction(id) ? handleLookupInteraction : isDebugInteraction(id) ? handleDebugInteraction : handleInteraction;
   handler(interaction).catch((err) => log.err('interaction', `un bouton ou menu a échoué (${id.split(':').slice(0, 2).join(':')}) : ${err.message}`, { guild: interaction.guild, channel: interaction.channel }));
 });
 client.on(Events.MessageCreate, async (message) => {

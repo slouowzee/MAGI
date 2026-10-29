@@ -20,9 +20,9 @@ export function datesToCelebrate({ year, month, day }) {
   return month === 2 && day === 28 && !leap ? [[2, 28], [2, 29]] : [[month, day]];
 }
 
-export async function celebrate(guild, now = Date.now()) {
+export async function celebrate(guild, now = Date.now(), { force = false } = {}) {
   const today = parisDay(now);
-  if (!moduleEnabled(guild.id, 'anniversaires') || today.hour < HOUR || setting(guild.id, 'birthday_done') === today.key) return 0;
+  if (!force && (!moduleEnabled(guild.id, 'anniversaires') || today.hour < HOUR || setting(guild.id, 'birthday_done') === today.key)) return 0;
   setSetting(guild.id, 'birthday_done', today.key);
   const channel = channelSetting(guild, 'birthday_channel') ?? channelSetting(guild, 'welcome_channel') ?? guild.systemChannel;
   if (!channel) return 0;

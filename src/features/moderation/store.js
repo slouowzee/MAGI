@@ -85,3 +85,21 @@ export function purgeMember(guildId, userId) {
   purgeCases.run(guildId, userId);
   return record;
 }
+
+const deleteCaseQuery = db.query('DELETE FROM cases WHERE id = ?');
+const guildCasesQuery = db.query('SELECT * FROM cases WHERE guild_id = ? ORDER BY id');
+const wipeGuildInfractions = db.query('DELETE FROM infractions WHERE guild_id = ?');
+const wipeUserInfractions = db.query('DELETE FROM infractions WHERE guild_id = ? AND user_id = ?');
+const deleteGuildCases = db.query('DELETE FROM cases WHERE guild_id = ?');
+const usersWithRecords = db.query('SELECT user_id FROM cases WHERE guild_id = ?1 UNION SELECT user_id FROM infractions WHERE guild_id = ?1');
+
+export const deleteCase = (id) => deleteCaseQuery.run(id).changes > 0;
+export const guildCases = (guildId) => guildCasesQuery.all(guildId).map(parse);
+export const wipeInfractions = (guildId, userId = null) => (userId ? wipeUserInfractions.run(guildId, userId) : wipeGuildInfractions.run(guildId)).changes;
+export const usersOnRecord = (guildId) => usersWithRecords.all(guildId).map((row) => row.user_id);
+
+export function resetCases(guildId) {
+  const cases = guildCases(guildId);
+  deleteGuildCases.run(guildId);
+  return cases;
+}

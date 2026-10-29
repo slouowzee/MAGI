@@ -34,3 +34,14 @@ export function pendingReminders(guildId, userId) {
 export function cancelReminder(id, guildId, userId) {
   return cancel.run(id, guildId, userId).changes > 0;
 }
+
+const selectGuild = db.query('SELECT id, user_id, text, due_at FROM reminders WHERE guild_id = ? AND done = 0 ORDER BY due_at');
+const cancelAny = db.query('UPDATE reminders SET done = 1 WHERE id = ? AND guild_id = ? AND done = 0');
+
+export function guildReminders(guildId) {
+  return selectGuild.all(guildId);
+}
+
+export function cancelAnyReminder(id, guildId) {
+  return cancelAny.run(id, guildId).changes > 0;
+}

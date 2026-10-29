@@ -124,11 +124,11 @@ export function history(guildId, userId) {
   return [`**Historique de <@${userId}>** (${list.length} dernier${list.length > 1 ? 's' : ''} cas)`, ...list.map((c) => `- #${c.id} · ${stamp(c.at, 'd')} · ${KINDS[c.kind] ?? c.kind} · ${c.action}${c.status === 'annulee' ? ' · **annulée**' : c.observing ? ' · observation' : ''}`)].join('\n');
 }
 
-export async function markPurged(guild, c, by, now = Date.now()) {
+export async function markPurged(guild, c, by, now = Date.now(), label = 'purgé') {
   const channel = c.channelLog && guild.channels.cache.get(c.channelLog);
   const message = channel && (await channel.messages.fetch(c.messageId).catch(() => null));
   if (!message) return;
-  const card = new ContainerBuilder().setAccentColor(COLORS.observation).addTextDisplayComponents(text(`### Cas #${c.id} · purgé\n-# Effacé du dossier de <@${c.userId}> par ${by} ${stamp(now)}.`));
+  const card = new ContainerBuilder().setAccentColor(COLORS.observation).addTextDisplayComponents(text(`### Cas #${c.id} · ${label}\n-# Effacé du dossier de <@${c.userId}> par ${by} ${stamp(now)}.`));
   await message.edit({ components: [card], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } }).catch(() => {});
 }
 

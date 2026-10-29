@@ -65,6 +65,23 @@ export async function summariesAbout(guildId, userId, limit = SUMMARIES_IN_CONTE
   return (await relevant(query, { scope: conversationScope(guildId, userId), type: 'event' }, limit)).map((m) => m.content);
 }
 
+export async function forgetGuild(guildId) {
+  await ready;
+  const sql = provider.require();
+  const pattern = `discord/${guildId}/%`;
+  const count = sql.prepare('SELECT count(*) AS n FROM fortune_memories WHERE scope LIKE ?').get(pattern).n;
+  sql.prepare('DELETE FROM fortune_memories_fts WHERE id IN (SELECT id FROM fortune_memories WHERE scope LIKE ?)').run(pattern);
+  sql.prepare('DELETE FROM fortune_memories WHERE scope LIKE ?').run(pattern);
+  return count;
+}
+
+export async function backupMemory(path) {
+  await ready;
+  if (dbPath === ':memory:') return null;
+  provider.require().exec(`VACUUM INTO '${path.replaceAll("'", "''")}'`);
+  return path;
+}
+
 export async function forgetUser(guildId, userId) {
   await ready;
   const all = [];

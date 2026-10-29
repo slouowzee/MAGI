@@ -9,13 +9,13 @@ test('commandes enregistrées selon le module, /magi, /ecrire et /clear toujours
   let sent = [];
   const guild = { id: 'g-commandes', commands: { set: async (list) => (sent = list) } };
   await syncCommands(guild);
-  assert.deepEqual(sent.map((c) => c.name), ['Vérifier (Melchior)', 'Avis de Casper', 'Soutien de Balthasar', 'Résumer depuis ici', 'chuchoter', 'magi', 'ecrire', 'clear', 'profil', 'lookup', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick']);
+  assert.deepEqual(sent.map((c) => c.name), ['Vérifier (Melchior)', 'Avis de Casper', 'Soutien de Balthasar', 'Résumer depuis ici', 'chuchoter', 'magi', 'ecrire', 'clear', 'profil', 'lookup', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick', 'debug']);
   setModules(guild.id, Object.keys(MODULES).filter((m) => m !== 'commandes'));
   await syncCommands(guild);
-  assert.deepEqual(sent.map((c) => c.name), ['magi', 'ecrire', 'clear', 'profil', 'lookup', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick']);
+  assert.deepEqual(sent.map((c) => c.name), ['magi', 'ecrire', 'clear', 'profil', 'lookup', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick', 'debug']);
   assert.ok(COMMANDS.every((c) => c.data.name.length <= 32));
   const perms = Object.fromEntries(sent.map((c) => [c.name, c.default_member_permissions]));
-  assert.deepEqual(perms, { magi: '32', ecrire: '32', clear: '8192', profil: null, lookup: '8192', warn: '8192', mute: '1099511627776', unmute: '1099511627776', ban: '4', unban: '4', kick: '2' });
+  assert.deepEqual(perms, { magi: '32', ecrire: '32', clear: '8192', profil: null, lookup: '8192', warn: '8192', mute: '1099511627776', unmute: '1099511627776', ban: '4', unban: '4', kick: '2', debug: '8' });
   assert.ok(COMMANDS.every((c) => c.perms || c.tier in { membres: 1, moderation: 1, operateurs: 1 }));
 });
 

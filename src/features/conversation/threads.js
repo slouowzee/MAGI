@@ -74,6 +74,12 @@ export function closeConversation(conversation) {
   return conversation;
 }
 
+export function closeAllConversations(guildId) {
+  let closed = 0;
+  for (const list of channels.values()) for (const c of [...list]) if (c.guildId === guildId && closeConversation(c)) closed++;
+  return closed;
+}
+
 export function expiredConversations(now = Date.now()) {
   const ended = [];
   for (const [channelId, list] of channels) {
