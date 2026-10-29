@@ -1,11 +1,12 @@
 import { activePersonas, isMuted, moduleEnabled } from '../../core/config.js';
 import { saveSynchro, synchroOf } from './store.js';
-import { setting } from '../../core/settings.js';
+import { listSettings, setSetting, setting } from '../../core/settings.js';
 import { speak } from '../../core/discord/webhooks.js';
 import { log } from '../../core/log/log.js';
 
 const COOLDOWN = 60_000;
 const NOTICE_TTL = 30_000;
+const NOTICE = 'synchro_notice:';
 export const MILESTONES = [25, 50, 75, 100, 150, 200, 300, 400];
 
 export const rateOf = (points) => Math.min(400, Math.floor(Math.sqrt(points) * 4));
@@ -16,6 +17,19 @@ export function paliers(guildId) {
 
 export function crossed(before, after) {
   return MILESTONES.filter((m) => before < m && after >= m);
+}
+
+async function dropNotice(guild, channelId, messageId) {
+  await guild.channels.cache.get(channelId)?.messages.delete(messageId).catch(() => {});
+  setSetting(guild.id, `${NOTICE}${channelId}:${messageId}`, null);
+}
+
+export function sweepNotices(client, now = Date.now()) {
+  for (const guild of client.guilds.cache.values())
+    for (const { key, value } of listSettings(guild.id, NOTICE)) {
+      const [channelId, messageId] = key.slice(NOTICE.length).split(':');
+      setTimeout(() => dropNotice(guild, channelId, messageId), Math.max(0, Number(value) - now));
+    }
 }
 
 export async function trackActivity(message, now = message.createdTimestamp) {
@@ -39,7 +53,10 @@ export async function trackActivity(message, now = message.createdTimestamp) {
   message.react('📈').catch(() => {});
   if (!isMuted(message.channel)) {
     const notice = await speak(message.channel, persona, `Taux de synchronisation : ${reached.at(-1)} %${role}.`, { replyTo: message }).catch(() => null);
-    if (notice) setTimeout(() => notice.delete().catch(() => {}), NOTICE_TTL);
+    if (notice) {
+      setSetting(guild.id, `${NOTICE}${notice.channelId}:${notice.id}`, String(now + NOTICE_TTL));
+      setTimeout(() => dropNotice(guild, notice.channelId, notice.id), NOTICE_TTL);
+    }
   }
   log.info('synchro', `${member.user.tag} atteint ${reached.at(-1)} %${role}`, { guild });
   return reached.at(-1);

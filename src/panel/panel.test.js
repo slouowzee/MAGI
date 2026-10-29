@@ -44,7 +44,7 @@ test('alertes : module actif sans salon ou sans permission', () => {
   assert.match(found.sondages, /permissions/);
   const home = walk(panelPage(guild).components[0].toJSON()).map((c) => c.content ?? '').join('\n');
   assert.match(home, /Hall of Fame\*\* \(Communauté\)/);
-  assert.ok(home.includes('Modèles de langage'));
+  assert.ok(!home.includes('Modèles de langage'));
 });
 
 test('/magi config : seulement dans le salon du panneau, republie sans laisser de message', async () => {

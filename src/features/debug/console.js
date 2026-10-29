@@ -113,6 +113,7 @@ async function execute(interaction, { action: key, params = {} }, { confirmed = 
   const payload = typeof output === 'string' ? { content: output.slice(0, 2000) } : { content: output.content.slice(0, 2000), files: output.files };
   await interaction.editReply({ ...payload, components: [] });
   if (ctx.restart) {
+    setSetting('global', 'last_stop', Date.now());
     await flushAll();
     setTimeout(() => process.exit(0), 1_500);
   }

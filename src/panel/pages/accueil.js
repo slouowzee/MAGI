@@ -1,7 +1,6 @@
 import { moderationMode } from '../../features/moderation/store.js';
 import { enabledModules, MODULES } from '../../core/config.js';
 import { logChannels } from '../../core/installation.js';
-import { statusReport } from '../../features/commands/commands.js';
 import { currentLevel, LEVELS } from '../../core/permissions.js';
 import { PAGES, MODE_LABELS, text, separator, pageOf, alerts } from '../ui.js';
 import { activationBlocks } from '../../features/debug/console.js';
@@ -24,8 +23,6 @@ export function homeSection(guild) {
     ),
     separator(),
     text(todo.length ? ['**À régler**', ...todo].join('\n') : 'Rien à régler.'),
-    separator(),
-    text(statusReport()),
     separator(),
     ...activationBlocks(guild),
   ];

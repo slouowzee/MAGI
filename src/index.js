@@ -9,7 +9,7 @@ import { gateMember, hideNewChannel } from './features/security/gate.js';
 import { resumeLockdowns, trackJoin } from './features/security/raid.js';
 import { handleSecurityButton, isSecurityButton } from './features/security/actions.js';
 import { handleStar } from './features/community/hall-of-fame.js';
-import { trackActivity } from './features/community/synchro.js';
+import { sweepNotices, trackActivity } from './features/community/synchro.js';
 import { cleanTemporary, handleVoiceState } from './features/community/voice.js';
 import { startBirthdays } from './features/community/birthdays.js';
 import { handleTicketInteraction, isTicketInteraction } from './features/community/tickets.js';
@@ -70,6 +70,7 @@ client.once(Events.ClientReady, async (c) => {
   resumeLockdowns(c);
   startBirthdays(c);
   cleanTemporary(c).catch(() => {});
+  sweepNotices(c);
 });
 
 client.on(Events.GuildCreate, setupGuild);

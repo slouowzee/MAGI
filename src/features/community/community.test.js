@@ -2,13 +2,13 @@ import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { ChannelType, Collection } from 'discord.js';
 
-const { crossed, rateOf, trackActivity } = await import('./synchro.js');
+const { crossed, rateOf, sweepNotices, trackActivity } = await import('./synchro.js');
 const { celebrate, datesToCelebrate, parisDay } = await import('./birthdays.js');
 const { handleVoiceState, isTemporary } = await import('./voice.js');
 const { COMMUNITY_TOOLS } = await import('./tools.js');
 const { saveSynchro, setBirthday, synchroOf } = await import('./store.js');
 const { setModules, MODULES } = await import('../../core/config.js');
-const { setSetting } = await import('../../core/settings.js');
+const { listSettings, setSetting } = await import('../../core/settings.js');
 
 const tool = (name) => COMMUNITY_TOOLS.find((t) => t.name === name);
 
@@ -22,6 +22,7 @@ test('taux de synchronisation : progression et paliers franchis', () => {
 test('palier franchi : réaction et annonce en réponse au message, sans mention', async () => {
   const sent = [];
   const reactions = [];
+  const deleted = [];
   const guild = { id: 'g-synchro', channels: { cache: new Collection() }, roles: { cache: new Collection() } };
   const channel = {
     id: 'salon',
@@ -29,8 +30,10 @@ test('palier franchi : réaction et annonce en réponse au message, sans mention
     isThread: () => false,
     client: { user: { id: 'magi' } },
     fetchWebhooks: async () => new Collection(),
-    createWebhook: async ({ name }) => ({ name, owner: { id: 'magi' }, send: async (p) => (sent.push(p), { delete: async () => {} }) }),
+    createWebhook: async ({ name }) => ({ name, owner: { id: 'magi' }, send: async (p) => (sent.push(p), { id: 'n1', channelId: 'salon' }) }),
+    messages: { delete: async (id) => deleted.push(id) },
   };
+  guild.channels.cache.set('salon', channel);
   setModules(guild.id, [...Object.keys(MODULES)]);
   saveSynchro(guild.id, 'u1', 39, 0);
   const message = { guild, channel, id: 'm1', url: 'https://discord.com/channels/g/salon/m1', content: 'salut', createdTimestamp: 120_000, author: { id: 'u1', bot: false }, member: { id: 'u1', user: { tag: 'u1' }, roles: { cache: new Collection() } }, react: async (e) => reactions.push(e) };
@@ -41,6 +44,11 @@ test('palier franchi : réaction et annonce en réponse au message, sans mention
   assert.match(sent[0].content, /^-# ↪ <@u1> \[salut\]\(.+\)\nTaux de synchronisation : 25 %\.$/);
   assert.deepEqual(sent[0].allowedMentions.users, []);
   assert.equal(await trackActivity({ ...message, createdTimestamp: 130_000 }), null);
+  assert.deepEqual(listSettings(guild.id, 'synchro_notice:').map((r) => [r.key, r.value]), [['synchro_notice:salon:n1', '150000']]);
+  sweepNotices({ guilds: { cache: new Collection([[guild.id, guild]]) } });
+  await Bun.sleep(5);
+  assert.deepEqual(deleted, ['n1']);
+  assert.deepEqual(listSettings(guild.id, 'synchro_notice:'), []);
 });
 
 test("anniversaires : une fois par jour, à partir de 9 h à Paris", async () => {
