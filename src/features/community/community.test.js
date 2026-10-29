@@ -51,27 +51,27 @@ test('palier franchi : réaction et annonce en réponse au message, sans mention
   assert.deepEqual(listSettings(guild.id, 'synchro_notice:'), []);
 });
 
-test('classement : synchro, actifs de la semaine remis à zéro le lundi, Hall of Fame', async () => {
-  const { leaderboard } = await import('./leaderboard.js');
-  const { countActivity } = await import('./store.js');
-  const { weekOf } = await import('./synchro.js');
+test('classement : synchro par pages de 10, boutons aux bords désactivés', async () => {
+  const { handleLeaderboardInteraction, leaderboard } = await import('./leaderboard.js');
   const guild = { id: 'g-classement', name: 'Test' };
   setModules(guild.id, [...Object.keys(MODULES)]);
-  assert.equal(weekOf(Date.parse('2026-10-29T16:00:00Z')), '2026-10-26');
-  assert.equal(weekOf(Date.parse('2026-11-01T22:30:00Z')), '2026-10-26');
-  assert.equal(weekOf(Date.parse('2026-11-01T23:30:00Z')), '2026-11-02');
-  const lastWeek = Date.parse('2026-10-24T12:00:00Z');
-  const now = Date.parse('2026-10-29T12:00:00Z');
-  for (let i = 1; i <= 90; i++) countActivity(guild.id, 'lea', i, lastWeek, weekOf(lastWeek));
-  for (let i = 91; i <= 95; i++) countActivity(guild.id, 'lea', i, now, weekOf(now));
-  for (let i = 1; i <= 70; i++) countActivity(guild.id, 'tom', i, now, weekOf(now));
-  setSetting(guild.id, 'hof:tom', '3');
-  const card = JSON.stringify(leaderboard(guild, 'zoe', now).toJSON());
-  assert.match(card, /1\. <@lea> · 38 %\\n2\. <@tom> · 33 %/);
-  assert.match(card, /1\. <@tom> · 1 h 10 d’activité\\n2\. <@lea> · 5 min d’activité/);
-  assert.match(card, /1\. <@tom> · 3 messages/);
+  for (let i = 1; i <= 23; i++) saveSynchro(guild.id, `u${i}`, i * 10, 0);
+  saveSynchro(guild.id, 'zero', 0, 0);
+  const first = leaderboard(guild).toJSON();
+  const shown = JSON.stringify(first);
+  assert.match(shown, /1\. <@u23> · 60 %[^"]*10\. <@u14> · 47 %"/);
+  assert.match(shown, /Page 1\/3/);
+  assert.ok(!/Hall of Fame|semaine|zero/.test(shown));
+  const buttons = first.components.at(-1).components;
+  assert.deepEqual(buttons.map((b) => [b.custom_id, Boolean(b.disabled)]), [['magi-rank:page:-1', true], ['magi-rank:page:1', false]]);
+  const updates = [];
+  await handleLeaderboardInteraction({ customId: 'magi-rank:page:2', guild, update: async (p) => updates.push(p) });
+  const last = JSON.stringify(updates[0].components[0].toJSON());
+  assert.match(last, /21\. <@u3> · 21 %[^"]*23\. <@u1> · 12 %"/);
+  assert.match(last, /Page 3\/3/);
+  assert.match(JSON.stringify(leaderboard(guild, 99).toJSON()), /Page 3\/3/);
   setModules(guild.id, []);
-  assert.match(JSON.stringify(leaderboard(guild, 'zoe', now).toJSON()), /sont coupés/);
+  assert.match(JSON.stringify(leaderboard(guild).toJSON()), /coupée/);
 });
 
 test("anniversaires : une fois par jour, à partir de 9 h à Paris", async () => {

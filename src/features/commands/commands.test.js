@@ -9,7 +9,7 @@ test('commandes enregistrées selon le module, /magi, /ecrire et /clear toujours
   let sent = [];
   const guild = { id: 'g-commandes', commands: { set: async (list) => (sent = list) } };
   await syncCommands(guild);
-  assert.deepEqual(sent.map((c) => c.name), ['Vérifier (Melchior)', 'Avis de Casper', 'Soutien de Balthasar', 'Résumer depuis ici', 'chuchoter', 'magi', 'ecrire', 'clear', 'profil', 'lookup', 'classement', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick']);
+  assert.deepEqual(sent.map((c) => c.name), ['Vérifier (Melchior)', 'Avis de Casper', 'Soutien de Balthasar', 'Résumer depuis ici', 'chuchoter', 'magi', 'ecrire', 'clear', 'profil', 'lookup', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick']);
   setModules(guild.id, Object.keys(MODULES).filter((m) => m !== 'commandes'));
   await syncCommands(guild);
   assert.deepEqual(sent.map((c) => c.name), ['magi', 'ecrire', 'clear', 'profil', 'lookup', 'classement', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick']);

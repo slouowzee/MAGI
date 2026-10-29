@@ -60,6 +60,5 @@ export async function handleStar(reaction) {
     throw err;
   });
   setSetting(guild.id, `star:${message.id}`, posted.id);
-  setSetting(guild.id, `hof:${message.author.id}`, Number(setting(guild.id, `hof:${message.author.id}`) ?? 0) + 1);
   log.info('etoiles', `message de ${message.author.tag} sur le mur (${reaction.count} ${STAR})`, { channel: message.channel });
 }

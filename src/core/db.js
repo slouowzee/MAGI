@@ -126,9 +126,6 @@ db.exec(`CREATE TABLE IF NOT EXISTS synchro (
   last_at INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (guild_id, user_id)
 )`);
-const synchroColumns = db.query('PRAGMA table_info(synchro)').all().map((c) => c.name);
-if (!synchroColumns.includes('week')) db.exec("ALTER TABLE synchro ADD COLUMN week TEXT NOT NULL DEFAULT ''");
-if (!synchroColumns.includes('week_points')) db.exec('ALTER TABLE synchro ADD COLUMN week_points INTEGER NOT NULL DEFAULT 0');
 
 export function listBackups() {
   if (!backupDir || !existsSync(backupDir)) return [];

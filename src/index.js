@@ -23,6 +23,7 @@ import { handleCommand, isCommand } from './features/commands/commands.js';
 import { handleWriteModal, isWriteModal, startScheduled } from './features/commands/write.js';
 import { handleLookupInteraction, isLookupInteraction } from './features/moderation/lookup.js';
 import { handleAppealInteraction, isAppealInteraction } from './features/moderation/appeal.js';
+import { handleLeaderboardInteraction, isLeaderboardInteraction } from './features/community/leaderboard.js';
 import { handleDebugInteraction, isDebugInteraction, startDebugTimers } from './features/debug/console.js';
 import { noteMessage, startPresence } from './features/presence/presence.js';
 import { log } from './core/log/log.js';
@@ -95,7 +96,7 @@ client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => watchAuditLog(entry
 client.on(Events.InteractionCreate, (interaction) => {
   if (isCommand(interaction)) return handleCommand(interaction);
   const id = interaction.customId ?? '';
-  const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : isSecurityButton(id) ? handleSecurityButton : isTicketInteraction(id) ? handleTicketInteraction : isWriteModal(id) ? handleWriteModal : isLookupInteraction(id) ? handleLookupInteraction : isDebugInteraction(id) ? handleDebugInteraction : isAppealInteraction(id) ? handleAppealInteraction : handleInteraction;
+  const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : isSecurityButton(id) ? handleSecurityButton : isTicketInteraction(id) ? handleTicketInteraction : isWriteModal(id) ? handleWriteModal : isLookupInteraction(id) ? handleLookupInteraction : isDebugInteraction(id) ? handleDebugInteraction : isAppealInteraction(id) ? handleAppealInteraction : isLeaderboardInteraction(id) ? handleLeaderboardInteraction : handleInteraction;
   handler(interaction).catch((err) => log.err('interaction', `un bouton ou menu a échoué (${id.split(':').slice(0, 2).join(':')}) : ${err.message}`, { guild: interaction.guild, channel: interaction.channel }));
 });
 client.on(Events.MessageCreate, async (message) => {
