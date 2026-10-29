@@ -15,19 +15,17 @@ export const FUNCTIONS = {
   hall_of_fame: 'Hall of Fame',
   tickets: 'tickets',
   anniversaires: 'anniversaires',
-  synchro: 'annonces de synchronisation',
   generateur_vocal: 'salon vocal générateur',
   roles: 'panneaux de rôles',
   afk: 'salon vocal AFK',
 };
-const PUBLIC_FUNCTIONS = new Set(['regles', 'annonces', 'accueil', 'hall_of_fame', 'tickets', 'anniversaires', 'synchro', 'generateur_vocal', 'roles']);
+const PUBLIC_FUNCTIONS = new Set(['regles', 'annonces', 'accueil', 'hall_of_fame', 'tickets', 'anniversaires', 'generateur_vocal', 'roles']);
 
 export const FEATURES = {
   hall_of_fame: 'Hall of Fame',
   tickets: 'Tickets',
   accueil: 'Bienvenue',
   anniversaires: 'Anniversaires',
-  synchro: 'Synchronisation',
   generateur_vocal: 'Vocaux temporaires',
   contenu: 'Règlement, accueil, FAQ',
   roles: 'Panneaux de rôles',

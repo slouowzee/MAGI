@@ -26,7 +26,7 @@ import { exportConfig, importConfig, readConfig } from './config.js';
 
 const DEBUG_LEVEL_FOR = 15 * 60_000;
 const SOURCES = ['logs', 'moderation', 'securite', 'systeme'];
-const RESET_PREFIXES = ['module:', 'stars_', 'gate_rules', 'gate_min_age', 'raid_threshold', 'welcome_channel', 'birthday_channel', 'synchro_channel', 'tickets_channel', 'voice_hub', 'roles_channel', 'personas', 'persona_channels:', 'muted_channels', 'log_level', 'presence_', 'automod_', 'server_', 'digest'];
+const RESET_PREFIXES = ['module:', 'stars_', 'gate_rules', 'gate_min_age', 'raid_threshold', 'welcome_channel', 'birthday_channel', 'tickets_channel', 'voice_hub', 'roles_channel', 'personas', 'persona_channels:', 'muted_channels', 'log_level', 'presence_', 'automod_', 'server_', 'digest'];
 const idOf = (text) => String(text ?? '').match(/\d{17,20}/)?.[0] ?? null;
 const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
 const field = (id, label, { placeholder = '', required = true, long = false, choices = null, file = false } = {}) => ({ id, label, placeholder, required, long, choices, file });

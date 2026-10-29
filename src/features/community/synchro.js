@@ -1,4 +1,4 @@
-import { activePersonas, channelSetting, isMuted, moduleEnabled } from '../../core/config.js';
+import { activePersonas, isMuted, moduleEnabled } from '../../core/config.js';
 import { saveSynchro, synchroOf } from './store.js';
 import { setting } from '../../core/settings.js';
 import { speak } from '../../core/discord/webhooks.js';
@@ -37,9 +37,7 @@ export async function trackActivity(message, now = message.createdTimestamp) {
   const persona = activePersonas(guild.id).includes('melchior') ? 'melchior' : activePersonas(guild.id)[0];
   const role = earned.length ? `, accès ${earned.map((r) => r.name).join(', ')} accordé` : '';
   message.react('📈').catch(() => {});
-  const board = channelSetting(guild, 'synchro_channel');
-  if (board) await speak(board, persona, `Taux de synchronisation de <@${member.id}> : ${reached.at(-1)} %${role}.`, { mentions: [member.id] }).catch(() => {});
-  if (board?.id !== message.channel.id && !isMuted(message.channel)) {
+  if (!isMuted(message.channel)) {
     const notice = await speak(message.channel, persona, `Taux de synchronisation : ${reached.at(-1)} %${role}.`, { replyTo: message }).catch(() => null);
     if (notice) setTimeout(() => notice.delete().catch(() => {}), NOTICE_TTL);
   }

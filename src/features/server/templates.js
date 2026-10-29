@@ -6,7 +6,7 @@ import { norm, structure, TYPES } from './plan.js';
 
 const SCOPE = 'modeles';
 const TYPE_NAMES = Object.fromEntries(Object.entries(TYPES).map(([k, v]) => [v, k]));
-const HOOKED = { welcome_channel: 'accueil', stars_channel: 'hall_of_fame', tickets_channel: 'tickets', birthday_channel: 'anniversaires', synchro_channel: 'synchro', voice_hub: 'generateur_vocal', roles_channel: 'roles' };
+const HOOKED = { welcome_channel: 'accueil', stars_channel: 'hall_of_fame', tickets_channel: 'tickets', birthday_channel: 'anniversaires', voice_hub: 'generateur_vocal', roles_channel: 'roles' };
 
 function accessOf(channel, everyone) {
   if (channel.nsfw) return 'nsfw';

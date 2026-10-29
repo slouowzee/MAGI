@@ -23,7 +23,6 @@ const HOOKS = {
   hall_of_fame: { key: 'stars_channel', module: 'etoiles' },
   tickets: { key: 'tickets_channel', module: 'tickets', after: postTicketPanel },
   anniversaires: { key: 'birthday_channel', module: 'anniversaires' },
-  synchro: { key: 'synchro_channel', module: 'synchro' },
   generateur_vocal: { key: 'voice_hub', module: 'vocal_temporaire' },
   roles: { key: 'roles_channel' },
 };
