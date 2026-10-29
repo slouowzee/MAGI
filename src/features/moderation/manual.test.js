@@ -100,6 +100,26 @@ test('purge : le bouton « Tout effacer » répond et vide le casier', async () 
   assert.deepEqual([recordOf('g-bouton', 'yui').cases.length, recordOf('g-bouton', 'yui').infractions], [0, 0]);
 });
 
+test('profil : la mémoire est visible et le membre peut tout oublier, lui seulement', async () => {
+  const { handleLookupInteraction, showProfile } = await import('./lookup.js');
+  const { factsAbout, rememberFact } = await import('../memory/store.js');
+  const w = world('g-oubli');
+  await rememberFact('g-oubli', 'yui', 'joue du piano');
+  const replies = [];
+  const base = { guild: w.guild, guildId: 'g-oubli', member: w.yui, user: { ...w.yui.user, displayAvatarURL: () => 'https://x/a.png' }, reply: async (p) => replies.push(p), update: async (p) => replies.push(p) };
+  await showProfile(base);
+  const card = JSON.stringify(replies[0].components[0].toJSON());
+  assert.match(card, /joue du piano/);
+  assert.match(card, /magi-look:oublier:yui/);
+  await handleLookupInteraction({ ...base, customId: 'magi-look:oublier-ok:yui', user: { id: 'mod' } });
+  assert.match(replies.at(-1).content, /Seule la personne concernée/);
+  await handleLookupInteraction({ ...base, customId: 'magi-look:oublier:yui' });
+  assert.match(replies.at(-1).content, /définitif/);
+  await handleLookupInteraction({ ...base, customId: 'magi-look:oublier-ok:yui' });
+  assert.match(replies.at(-1).content, /^C’est oublié : 1 souvenir/);
+  assert.deepEqual(await factsAbout('g-oubli', 'yui'), []);
+});
+
 test('lookup : la fenêtre Mute applique la sanction', async () => {
   const { handleLookupInteraction } = await import('./lookup.js');
   const w = world('g-fenetre');

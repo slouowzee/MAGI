@@ -22,7 +22,8 @@ import { listSettings, setSetting, setting } from '../../core/settings.js';
 import { birthdayOfUser, synchroOf } from '../community/store.js';
 import { paliers, rateOf } from '../community/synchro.js';
 import { pendingReminders } from '../reminders/store.js';
-import { factsAbout } from '../memory/store.js';
+import { factsAbout, forgetUser } from '../memory/store.js';
+import { moduleEnabled } from '../../core/config.js';
 import { gateRole } from '../security/gate.js';
 import { activeInfractions, casesOf, purgeMember, recordOf } from './store.js';
 import { excludedOf, KINDS, markPurged, sanctionOf } from './cases.js';
@@ -41,7 +42,7 @@ const day = (ms) => stamp(ms, 'd');
 const clipList = (lines, max) => (lines.length > max ? [...lines.slice(0, max), `-# et ${lines.length - max} autre(s)`] : lines);
 
 export const LOOKUP_COMMANDS = [
-  { tier: 'membres', data: { name: 'profil', type: ApplicationCommandType.ChatInput, description: 'Ton dossier sur le serveur : sanctions, infractions, synchro, rappels (visible par toi seul)' } },
+  { tier: 'membres', data: { name: 'profil', type: ApplicationCommandType.ChatInput, description: 'Ton dossier : sanctions, infractions, synchro, rappels, ce que MAGI retient (visible par toi seul)' } },
   { tier: 'moderation', data: { name: 'lookup', type: ApplicationCommandType.ChatInput, description: "Dossier complet d'un membre (modération)", options: [{ type: O.User, name: 'membre', description: 'Le membre ou l’utilisateur', required: true }] } },
 ];
 
@@ -75,6 +76,7 @@ export async function showProfile(interaction) {
   const birthday = birthdayOfUser(guild.id, user.id);
   const reminders = pendingReminders(guild.id, user.id);
   const sanctions = sanctionLines(guild.id, user.id);
+  const facts = await factsAbout(guild.id, user.id, 10).catch(() => []);
   const container = new ContainerBuilder()
     .setAccentColor(COLOR)
     .addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(`### Ton dossier\n<@${user.id}> · arrivé ${stamp(member.joinedTimestamp)} (${day(member.joinedTimestamp)})`)).setThumbnailAccessory(new ThumbnailBuilder().setURL(user.displayAvatarURL({ size: 128 }))))
@@ -84,6 +86,12 @@ export async function showProfile(interaction) {
     .addSeparatorComponents(new SeparatorBuilder())
     .addTextDisplayComponents(text(`**Synchronisation** : ${synchroLine(guild, user.id)}\n**Anniversaire** : ${birthday ? `${String(birthday.day).padStart(2, '0')}/${String(birthday.month).padStart(2, '0')}` : 'non enregistré'}`))
     .addTextDisplayComponents(text(`**Rappels en attente**\n${reminders.length ? clipList(reminders.map((r) => `- n°${r.id} · ${r.text} · ${stamp(r.due_at)}`), 6).join('\n') : 'Aucun.'}`));
+  if (facts.length || moduleEnabled(guild.id, 'memoire')) {
+    container
+      .addSeparatorComponents(new SeparatorBuilder())
+      .addTextDisplayComponents(text(`**Ce que MAGI retient de toi**\n${facts.length ? facts.map((f) => `- ${f}`).join('\n') : 'Rien pour l’instant.'}\n-# MAGI garde aussi un résumé des conversations auxquelles tu as participé.`))
+      .addActionRowComponents(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}oublier:${user.id}`).setLabel('Tout oublier').setStyle(ButtonStyle.Danger)));
+  }
   return interaction.reply({ components: [container], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
 }
 
@@ -206,8 +214,26 @@ async function purgeRecord(interaction, userId) {
   return interaction.editReply({ content: `Casier de <@${userId}> effacé : ${record.cases.length} cas, ${record.infractions} infraction${record.infractions > 1 ? 's' : ''}${lifted.length ? `, ${lifted.join(', ')}` : ''}.` });
 }
 
+async function forgetMe(interaction, confirmed) {
+  const { guild, user } = interaction;
+  if (!confirmed) {
+    return interaction.reply({
+      content: 'Effacer tout ce que MAGI retient de toi, souvenirs et résumés de conversations ? C’est définitif.',
+      components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}oublier-ok:${user.id}`).setLabel('Tout oublier').setStyle(ButtonStyle.Danger))],
+      ...ephemeral,
+    });
+  }
+  const { facts, summaries } = await forgetUser(guild.id, user.id);
+  log.notice('memoire', `<@${user.id}> a fait effacer ce que MAGI retenait : ${facts} souvenir${facts > 1 ? 's' : ''}, ${summaries} résumé${summaries > 1 ? 's' : ''}`, { guild });
+  return interaction.update({ content: `C’est oublié : ${facts} souvenir${facts > 1 ? 's' : ''} et ${summaries} résumé${summaries > 1 ? 's' : ''} de conversation effacés.`, components: [] });
+}
+
 export async function handleLookupInteraction(interaction) {
   const [action, userId] = interaction.customId.slice(PREFIX.length).split(':');
+  if (action === 'oublier' || action === 'oublier-ok') {
+    if (interaction.user.id !== userId) return interaction.reply({ content: 'Seule la personne concernée peut effacer sa mémoire.', ...ephemeral });
+    return forgetMe(interaction, action === 'oublier-ok');
+  }
   if (!allowedToLook(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits.", ...ephemeral });
   if (action === 'purge' || action === 'purge-ok') {
     if (!isOperator(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits : purger un casier est réservé aux opérateurs MAGI.", ...ephemeral });
