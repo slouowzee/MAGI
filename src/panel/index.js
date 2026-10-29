@@ -98,9 +98,15 @@ export function panelPage(guild, page = 'accueil', { live = false, viewer = null
   return { components: [new ContainerBuilder({ accent_color: debug ? DEBUG_COLOR : COLOR, components: blocks.map((b) => b.toJSON()) })], flags: V2 };
 }
 
-export function openPanel(interaction, page = 'accueil') {
+export async function openPanel(interaction, page = 'accueil') {
   if (!isOperator(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits : le panneau de configuration est réservé aux opérateurs MAGI.", flags: MessageFlags.Ephemeral, ...silent });
-  if (interaction.isChatInputCommand?.()) refreshPanel(interaction.guild, { repost: true }).catch((err) => log.err('config', `échec panneau : ${err.message}`, { guild: interaction.guild }));
+  const { guild } = interaction;
+  if (interaction.isChatInputCommand?.() && interaction.channelId === setting(guild.id, 'config_channel')) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await refreshPanel(guild, { repost: true });
+    return interaction.deleteReply();
+  }
+  if (interaction.isChatInputCommand?.()) refreshPanel(guild, { repost: true }).catch((err) => log.err('config', `échec panneau : ${err.message}`, { guild }));
   return interaction.reply({ ...panelPage(interaction.guild, page, { live: true, viewer: interaction.user.id }), flags: PRIVATE, ...silent });
 }
 
