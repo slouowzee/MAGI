@@ -61,7 +61,8 @@ test('classement : synchro par pages de 10, boutons aux bords désactivés', asy
   const shown = JSON.stringify(first);
   assert.match(shown, /1\. <@u23> · 60 %[^"]*10\. <@u14> · 47 %"/);
   assert.match(shown, /Page 1\/3/);
-  assert.ok(!/Hall of Fame|semaine|zero/.test(shown));
+  assert.match(shown, /### Taux de synchronisation/);
+  assert.ok(!/Hall of Fame|semaine|zero|Test/.test(shown));
   const buttons = first.components.at(-1).components;
   assert.deepEqual(buttons.map((b) => [b.custom_id, Boolean(b.disabled)]), [['magi-rank:page:-1', true], ['magi-rank:page:1', false]]);
   const updates = [];

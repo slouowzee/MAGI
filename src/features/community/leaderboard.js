@@ -15,12 +15,12 @@ export const LEADERBOARD_COMMANDS = [{ module: 'synchro', tier: 'membres', data:
 export const isLeaderboardInteraction = (id) => id.startsWith(PREFIX);
 
 export function leaderboard(guild, page = 0) {
-  const container = new ContainerBuilder().setAccentColor(COLOR).addTextDisplayComponents(text(`### Classement de ${guild.name}`)).addSeparatorComponents(new SeparatorBuilder());
+  const container = new ContainerBuilder().setAccentColor(COLOR).addTextDisplayComponents(text('### Taux de synchronisation')).addSeparatorComponents(new SeparatorBuilder());
   if (!moduleEnabled(guild.id, 'synchro')) return container.addTextDisplayComponents(text('La synchronisation est coupée sur ce serveur.'));
   const pages = Math.max(1, Math.ceil(synchroCount(guild.id) / PER_PAGE));
   const at = Math.min(Math.max(0, page), pages - 1);
   const rows = synchroTop(guild.id, PER_PAGE, at * PER_PAGE);
-  container.addTextDisplayComponents(text(`**Synchronisation**\n${rows.length ? rows.map((r, i) => `${at * PER_PAGE + i + 1}. <@${r.user_id}> · ${rateOf(r.points)} %`).join('\n') : 'Personne pour l’instant.'}`));
+  container.addTextDisplayComponents(text(`${rows.length ? rows.map((r, i) => `${at * PER_PAGE + i + 1}. <@${r.user_id}> · ${rateOf(r.points)} %`).join('\n') : 'Personne pour l’instant.'}`));
   if (pages > 1) container.addTextDisplayComponents(text(`-# Page ${at + 1}/${pages}`)).addActionRowComponents(new ActionRowBuilder().addComponents(pageButton(at - 1, '‹ Précédent', at === 0), pageButton(at + 1, 'Suivant ›', at === pages - 1)));
   return container;
 }
