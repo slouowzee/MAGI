@@ -47,7 +47,6 @@ import { debugActive, debugBlocks, debugLine } from '../features/debug/console.j
 const COLOR = 0xd65c62;
 const DEBUG_COLOR = 0xef9f27;
 const V2 = MessageFlags.IsComponentsV2;
-const PRIVATE = V2 | MessageFlags.Ephemeral;
 
 const silent = { allowedMentions: { parse: [] } };
 
@@ -67,7 +66,7 @@ const BUILDERS = {
   debug: debugBlocks,
 };
 
-const pagesFor = (guild, viewer) => Object.keys(PAGES).filter((page) => page !== 'debug' || (viewer === guild.ownerId && debugActive(guild.id)));
+const pagesFor = (guild) => Object.keys(PAGES).filter((page) => page !== 'debug' || debugActive(guild.id));
 
 function navigation(name, names) {
   const at = names.indexOf(name);
@@ -87,22 +86,32 @@ function navigation(name, names) {
   ];
 }
 
-export function panelPage(guild, page = 'accueil', { live = false, viewer = null } = {}) {
-  const names = pagesFor(guild, viewer);
+export function panelPage(guild, page = setting(guild.id, 'config_page') ?? 'accueil') {
+  const names = pagesFor(guild);
   const name = names.includes(page) ? page : 'accueil';
   const debug = debugActive(guild.id);
   const title = name === 'accueil' ? 'Configuration de MAGI' : PAGES[name];
   const banner = debug ? `\n**🐞 Mode débogage actif ${debugLine(guild.id)}**` : '';
-  const header = text(`## ${title}${banner}\n-# Page ${names.indexOf(name) + 1}/${names.length}${live ? ' · visible par toi seul' : ''}`);
-  const blocks = [header, separator(), ...BUILDERS[name](guild, { live, viewer }), separator(), ...navigation(name, names)];
+  const header = text(`## ${title}${banner}\n-# Page ${names.indexOf(name) + 1}/${names.length}`);
+  const blocks = [header, separator(), ...BUILDERS[name](guild), separator(), ...navigation(name, names)];
   return { components: [new ContainerBuilder({ accent_color: debug ? DEBUG_COLOR : COLOR, components: blocks.map((b) => b.toJSON()) })], flags: V2 };
 }
 
-export async function openPanel(interaction, page = 'accueil') {
-  if (!isOperator(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits : le panneau de configuration est réservé aux opérateurs MAGI.", flags: MessageFlags.Ephemeral, ...silent });
+export function showPage(interaction, page) {
+  setSetting(interaction.guild.id, 'config_page', page === 'accueil' ? null : page);
+  return interaction.update(panelPage(interaction.guild, page));
+}
+
+export async function openPanel(interaction) {
   const { guild } = interaction;
-  if (interaction.isChatInputCommand?.()) await Promise.race([refreshPanel(guild, { repost: true }).catch((err) => log.err('config', `échec panneau : ${err.message}`, { guild })), Bun.sleep(2_000)]);
-  return interaction.reply({ ...panelPage(guild, page, { live: true, viewer: interaction.user.id }), flags: PRIVATE, ...silent });
+  const refuse = (content) => interaction.reply({ content, flags: MessageFlags.Ephemeral, ...silent });
+  if (!isOperator(interaction.member)) return refuse("Tu n'as pas les droits : le panneau de configuration est réservé aux opérateurs MAGI.");
+  const channel = setting(guild.id, 'config_channel');
+  if (channel && interaction.channelId !== channel) return refuse(`Le panneau se trouve dans <#${channel}> : lance \`/magi config\` là-bas pour le republier.`);
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  setSetting(guild.id, 'config_page', null);
+  await refreshPanel(guild, { repost: true });
+  return interaction.deleteReply();
 }
 
 function configChannel(guild) {
@@ -244,16 +253,12 @@ export async function handlePanelInteraction(interaction) {
   const field = interaction.customId.slice(PREFIX.length);
   const ephemeral = (content) => interaction.reply({ content: content.slice(0, 2000), flags: MessageFlags.Ephemeral, ...silent });
   if (!isOperator(member)) return ephemeral('Ce panneau est réservé aux opérateurs MAGI.');
-  const show = (page) =>
-    interaction.message?.flags.has(MessageFlags.Ephemeral) ? interaction.update(panelPage(guild, page, { live: true, viewer: interaction.user.id })) : openPanel(interaction, page);
-  const changed = (summary) => {
-    log.notice('config', `${summary} par ${member.displayName}`, { guild });
-    refreshPanel(guild).catch(() => {});
-  };
+  const show = (page) => showPage(interaction, page);
+  const changed = (summary) => log.notice('config', `${summary} par ${member.displayName}`, { guild });
 
   if (field === 'page' || field.startsWith('page:') || field.startsWith('goto:')) {
     const page = field === 'page' ? interaction.values?.[0] : field.split(':')[1];
-    return pagesFor(guild, interaction.user.id).includes(page) ? show(page) : ephemeral(PAGES[page] ? 'Cette page n’est pas disponible.' : 'Page inconnue.');
+    return pagesFor(guild).includes(page) ? show(page) : ephemeral(PAGES[page] ? 'Cette page n’est pas disponible.' : 'Page inconnue.');
   }
   if (SERVER_ACTIONS[field]) return SERVER_ACTIONS[field](interaction);
   if (field === 'stars_emoji') {

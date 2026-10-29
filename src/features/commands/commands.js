@@ -48,7 +48,7 @@ export const COMMANDS = [
       description: 'MAGI',
       options: [
         { type: ApplicationCommandOptionType.Subcommand, name: 'statut', description: 'État des modèles de langage, latences et pauses (opérateurs)' },
-        { type: ApplicationCommandOptionType.Subcommand, name: 'config', description: 'Ouvrir le panneau de configuration, visible par toi seul (opérateurs)' },
+        { type: ApplicationCommandOptionType.Subcommand, name: 'config', description: 'Republier le panneau de configuration dans son salon (opérateurs)' },
       ],
     },
   },

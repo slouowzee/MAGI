@@ -5,7 +5,7 @@ import { setSetting, setting } from '../../core/settings.js';
 import { log } from '../../core/log/log.js';
 import { flushAll } from '../../core/log/discord.js';
 import { forcedProvider } from '../../core/llm/client.js';
-import { panelPage, refreshPanel } from '../../panel/index.js';
+import { refreshPanel, showPage } from '../../panel/index.js';
 import { ACTIONS } from './actions.js';
 
 const PREFIX = 'magi-debug:';
@@ -66,7 +66,7 @@ export function debugBlocks(guild) {
 
 export function activationBlocks(guild) {
   if (debugActive(guild.id)) return [text(`**Mode débogage** : actif ${debugLine(guild.id)}`), new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('magi-config:goto:debug').setLabel('Ouvrir le débogage').setStyle(ButtonStyle.Primary), button('off', 'Désactiver', ButtonStyle.Danger))];
-  return [text('**Mode débogage**\n-# Outils du propriétaire pour tout corriger ou réinitialiser. Le panneau passe en mode débogage tant qu’il est actif.'), new ActionRowBuilder().addComponents(button('on:15', 'Débogage 15 min'), button(`on:${FOREVER}`, "Jusqu'à désactivation"))];
+  return [text('**Mode débogage**\n-# Réservé au propriétaire : outils pour tout corriger ou réinitialiser. Le panneau passe en mode débogage tant qu’il est actif.'), new ActionRowBuilder().addComponents(button('on:15', 'Débogage 15 min'), button(`on:${FOREVER}`, "Jusqu'à désactivation"))];
 }
 
 function form(key, action) {
@@ -132,8 +132,6 @@ async function prepare(interaction, key, params) {
   return interaction.editReply({ content: `${summary}\n-# Une copie de la base est faite avant.`, components: [new ActionRowBuilder().addComponents(button(`ok:${token}`, 'Confirmer', ButtonStyle.Danger))] });
 }
 
-const view = (interaction, page) => interaction.update(panelPage(interaction.guild, page, { live: true, viewer: interaction.user.id }));
-
 export async function handleDebugInteraction(interaction) {
   if (!isOwner(interaction)) return interaction.reply({ content: "Tu n'as pas les droits : le mode débogage est réservé au propriétaire du serveur.", ...ephemeral });
   const { guild, member } = interaction;
@@ -142,14 +140,12 @@ export async function handleDebugInteraction(interaction) {
     const forever = arg === FOREVER;
     setSetting(guild.id, 'debug_until', forever ? FOREVER : Date.now() + SESSION);
     log.notice('debug', `${member} a ${kind === 'extend' ? 'prolongé' : 'activé'} le mode débogage ${forever ? "jusqu'à désactivation" : 'pour 15 min'}`, { guild });
-    refreshPanel(guild).catch(() => {});
-    return view(interaction, 'debug');
+    return showPage(interaction, 'debug');
   }
   if (kind === 'off') {
     setSetting(guild.id, 'debug_until', null);
     log.notice('debug', `${member} a désactivé le mode débogage`, { guild });
-    refreshPanel(guild).catch(() => {});
-    return view(interaction, 'accueil');
+    return showPage(interaction, 'accueil');
   }
   if (!debugActive(guild.id)) return interaction.reply({ content: 'Le mode débogage est désactivé : réactive-le depuis l’accueil du panneau.', ...ephemeral });
   if (kind === 'action') {

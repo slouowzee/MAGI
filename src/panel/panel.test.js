@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { Collection, MessageFlags, PermissionsBitField } from 'discord.js';
 
 process.env.DB_PATH = ':memory:';
-const { panelPage } = await import('./index.js');
+const { openPanel, panelPage } = await import('./index.js');
+const { setSetting, setting } = await import('../core/settings.js');
 const { alerts, PAGE_MODULES } = await import('./ui.js');
 const { MODULES, setModules, setMutedChannels } = await import('../core/config.js');
 
@@ -43,5 +44,17 @@ test('alertes : module actif sans salon ou sans permission', () => {
   assert.match(found.sondages, /permissions/);
   const home = walk(panelPage(guild).components[0].toJSON()).map((c) => c.content ?? '').join('\n');
   assert.match(home, /Hall of Fame\*\* \(Communauté\)/);
-  assert.ok(!home.includes('Modèles de langage'));
+  assert.ok(home.includes('Modèles de langage'));
+});
+
+test('/magi config : seulement dans le salon du panneau, republie sans laisser de message', async () => {
+  setSetting('panel-test', 'config_channel', 'c-config');
+  setSetting('panel-test', 'config_page', 'logs');
+  const out = [];
+  const run = (channelId) => openPanel({ guild: { ...guild, ownerId: 'owner' }, channelId, member: { id: 'owner', guild: { ...guild, ownerId: 'owner' } }, reply: async (p) => out.push(['reply', p.content]), deferReply: async () => out.push(['defer']), deleteReply: async () => out.push(['delete']) });
+  await run('ailleurs');
+  assert.deepEqual(out.pop(), ['reply', "Le panneau se trouve dans <#c-config> : lance `/magi config` là-bas pour le republier."]);
+  await run('c-config');
+  assert.deepEqual(out, [['defer'], ['delete']]);
+  assert.equal(setting('panel-test', 'config_page'), null);
 });

@@ -41,7 +41,7 @@ export const INSTALLATION_TOOLS = [
   {
     name: 'panneau_config',
     description:
-      "Donne le lien du panneau de configuration de #magi-config, ou le republie s'il a été supprimé. Seulement quand on demande où est le panneau ou de le réafficher : il ne modifie rien et ne crée aucun salon (pour ça, preparer_salons). Les opérateurs règlent tout eux-mêmes dans ce panneau, ou avec /magi config.",
+      "Donne le lien du panneau de configuration de #magi-config, ou le republie s'il a été supprimé. Seulement quand on demande où est le panneau ou de le réafficher : il ne modifie rien et ne crée aucun salon (pour ça, preparer_salons). Les opérateurs règlent tout eux-mêmes dans ce panneau (/magi config dans #magi-config le republie).",
     parameters: { type: 'object', properties: {} },
     access: 'owner',
     async run({ guild }) {

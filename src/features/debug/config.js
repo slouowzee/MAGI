@@ -2,7 +2,7 @@ import { listSettings, setSetting } from '../../core/settings.js';
 import { MODES, moderationMode, setModerationMode } from '../moderation/store.js';
 import { interventionChannels, replaceInterventions } from '../conversation/interventions.js';
 
-const RUNTIME = ['star:', 'ticket:', 'tempvoice:', 'quarantine:', 'stats:', 'notes:', 'config_message', 'config_panel', 'honeypot_message', 'birthday_done', 'digest_done', 'raid_', 'debug_', 'server_journal', 'season_journal', 'log_level_'];
+const RUNTIME = ['star:', 'ticket:', 'tempvoice:', 'quarantine:', 'stats:', 'notes:', 'config_message', 'config_panel', 'config_page', 'honeypot_message', 'birthday_done', 'digest_done', 'raid_', 'debug_', 'server_journal', 'season_journal', 'log_level_'];
 const runtime = (key) => RUNTIME.some((prefix) => key.startsWith(prefix));
 
 export function exportConfig(guild, now = Date.now()) {
