@@ -24,7 +24,7 @@ export function communitySection(guild) {
     feature(guild, 'anniversaires', one('birthday_channel', guild)),
     channelSelect('birthday_channel', 'Salon des anniversaires (bienvenue sinon)', [setting(guild.id, 'birthday_channel')], 1),
     separator(),
-    feature(guild, 'synchro', setting(guild.id, 'synchro_channel') ? `annonces dans ${one('synchro_channel', guild)}` : 'annonces dans le salon du message'),
+    feature(guild, 'synchro', setting(guild.id, 'synchro_channel') ? `annonce sous le message et dans ${one('synchro_channel', guild)}` : 'annonce temporaire sous le message'),
     channelSelect('synchro_channel', 'Salon des annonces de synchronisation', [setting(guild.id, 'synchro_channel')], 1),
     separator(),
     feature(guild, 'sondages'),

@@ -5,6 +5,7 @@ import { speak } from '../../core/discord/webhooks.js';
 import { log } from '../../core/log/log.js';
 
 const COOLDOWN = 60_000;
+const NOTICE_TTL = 30_000;
 export const MILESTONES = [25, 50, 75, 100, 150, 200, 300, 400];
 
 export const rateOf = (points) => Math.min(400, Math.floor(Math.sqrt(points) * 4));
@@ -34,9 +35,14 @@ export async function trackActivity(message, now = message.createdTimestamp) {
     .filter((role) => role?.editable && !member.roles.cache.has(role.id));
   if (earned.length) await member.roles.add(earned, `MAGI : taux de synchronisation ${after} %`).catch(() => {});
   const persona = activePersonas(guild.id).includes('melchior') ? 'melchior' : activePersonas(guild.id)[0];
-  const channel = channelSetting(guild, 'synchro_channel') ?? (isMuted(message.channel) ? null : message.channel);
   const role = earned.length ? `, accès ${earned.map((r) => r.name).join(', ')} accordé` : '';
-  if (channel) await speak(channel, persona, `Taux de synchronisation de <@${member.id}> : ${reached.at(-1)} %${role}.`, { mentions: [member.id] }).catch(() => {});
+  message.react('📈').catch(() => {});
+  const board = channelSetting(guild, 'synchro_channel');
+  if (board) await speak(board, persona, `Taux de synchronisation de <@${member.id}> : ${reached.at(-1)} %${role}.`, { mentions: [member.id] }).catch(() => {});
+  if (board?.id !== message.channel.id && !isMuted(message.channel)) {
+    const notice = await speak(message.channel, persona, `Taux de synchronisation : ${reached.at(-1)} %${role}.`, { replyTo: message }).catch(() => null);
+    if (notice) setTimeout(() => notice.delete().catch(() => {}), NOTICE_TTL);
+  }
   log.info('synchro', `${member.user.tag} atteint ${reached.at(-1)} %${role}`, { guild });
   return reached.at(-1);
 }
