@@ -29,6 +29,7 @@ function world(id) {
       deferReply: async () => out.push(['defer']),
       editReply: async (p) => out.push(['edit', p]),
       showModal: async (m) => out.push(['modal', m.toJSON()]),
+      message: { edit: async () => out.push(['panel']) },
     };
     return handleDebugInteraction(interaction);
   };
@@ -80,7 +81,7 @@ test('action avec fenêtre et confirmation : effacer les infractions d’un memb
   recordInfraction('g-debug2', 'yui', 'spam');
   recordInfraction('g-debug2', 'lea', 'spam');
   await w.click('magi-debug:action', { values: ['infractions'] });
-  assert.equal(w.out.at(-1)[0], 'modal');
+  assert.deepEqual(w.out.slice(-2).map(([kind]) => kind), ['panel', 'modal']);
   await w.click('magi-debug:form:infractions', { fields: { membre: '<@123456789012345678>' } });
   assert.equal(w.out.at(-1)[0], 'edit');
   assert.match(w.out.at(-1)[1].content, /Effacer toutes les infractions de <@123456789012345678>/);

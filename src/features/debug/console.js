@@ -5,7 +5,7 @@ import { setSetting, setting } from '../../core/settings.js';
 import { log } from '../../core/log/log.js';
 import { flushAll } from '../../core/log/discord.js';
 import { forcedProvider } from '../../core/llm/client.js';
-import { refreshPanel, showPage } from '../../panel/index.js';
+import { panelPage, refreshPanel, showPage } from '../../panel/index.js';
 import { ACTIONS } from './actions.js';
 
 const PREFIX = 'magi-debug:';
@@ -150,6 +150,7 @@ export async function handleDebugInteraction(interaction) {
   if (!debugActive(guild.id)) return interaction.reply({ content: 'Le mode débogage est désactivé : réactive-le depuis l’accueil du panneau.', ...ephemeral });
   if (kind === 'action') {
     const key = interaction.values[0];
+    interaction.message?.edit(panelPage(guild)).catch(() => {});
     return ACTIONS[key].fields ? interaction.showModal(form(key, ACTIONS[key])) : prepare(interaction, key, {});
   }
   if (kind === 'form' && ACTIONS[arg]) return prepare(interaction, arg, readForm(interaction, ACTIONS[arg]));
