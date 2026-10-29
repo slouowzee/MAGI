@@ -13,8 +13,6 @@ import { openPanel } from '../../panel/index.js';
 import { clear, openWrite, WRITE_COMMANDS } from './write.js';
 import { MANUAL_COMMANDS, MANUAL_NAMES, runManual } from '../moderation/manual.js';
 import { LOOKUP_COMMANDS, showLookup, showProfile } from '../moderation/lookup.js';
-import { DEBUG_COMMANDS } from '../debug/command.js';
-import { openConsole } from '../debug/console.js';
 
 const ASK = {
   'Vérifier (Melchior)': { persona: 'melchior', instruction: "Vérifie les affirmations factuelles de ce message : dis ce qui est vrai, faux ou invérifiable, sans rien inventer. S'il n'y a rien de factuel à vérifier, dis-le." },
@@ -57,7 +55,6 @@ export const COMMANDS = [
   ...WRITE_COMMANDS,
   ...LOOKUP_COMMANDS,
   ...MANUAL_COMMANDS,
-  ...DEBUG_COMMANDS,
 ];
 
 export async function syncCommands(guild) {
@@ -152,9 +149,7 @@ export async function handleCommand(interaction) {
                     ? () => showLookup(interaction)
                     : MANUAL_NAMES.has(interaction.commandName)
                       ? () => runManual(interaction)
-                      : interaction.commandName === 'debug'
-                        ? () => openConsole(interaction)
-                        : null;
+                      : null;
   if (!run) return;
   try {
     await run();

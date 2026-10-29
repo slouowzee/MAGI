@@ -42,8 +42,10 @@ import { SERVER_ACTIONS } from './server-actions.js';
 import { parseEmoji } from '../features/community/hall-of-fame.js';
 import { logsSection } from './pages/logs.js';
 import { permissionsSection } from './pages/permissions.js';
+import { debugActive, debugBlocks, debugLine } from '../features/debug/console.js';
 
 const COLOR = 0xd65c62;
+const DEBUG_COLOR = 0xef9f27;
 const V2 = MessageFlags.IsComponentsV2;
 const PRIVATE = V2 | MessageFlags.Ephemeral;
 
@@ -62,10 +64,12 @@ const BUILDERS = {
   serveur: serverSection,
   logs: logsSection,
   permissions: permissionsSection,
+  debug: debugBlocks,
 };
 
-function navigation(name) {
-  const names = Object.keys(PAGES);
+const pagesFor = (guild, viewer) => Object.keys(PAGES).filter((page) => page !== 'debug' || (viewer === guild.ownerId && debugActive(guild.id)));
+
+function navigation(name, names) {
   const at = names.indexOf(name);
   const prev = names[(at - 1 + names.length) % names.length];
   const next = names[(at + 1) % names.length];
@@ -83,17 +87,20 @@ function navigation(name) {
   ];
 }
 
-export function panelPage(guild, name = 'accueil', { live = false } = {}) {
-  const names = Object.keys(PAGES);
+export function panelPage(guild, page = 'accueil', { live = false, viewer = null } = {}) {
+  const names = pagesFor(guild, viewer);
+  const name = names.includes(page) ? page : 'accueil';
+  const debug = debugActive(guild.id);
   const title = name === 'accueil' ? 'Configuration de MAGI' : PAGES[name];
-  const header = text(`## ${title}\n-# Page ${names.indexOf(name) + 1}/${names.length}${live ? ' · visible par toi seul' : ''}`);
-  const blocks = [header, separator(), ...BUILDERS[name](guild, { live }), separator(), ...navigation(name)];
-  return { components: [new ContainerBuilder({ accent_color: COLOR, components: blocks.map((b) => b.toJSON()) })], flags: V2 };
+  const banner = debug ? `\n**🐞 Mode débogage actif ${debugLine(guild.id)}**` : '';
+  const header = text(`## ${title}${banner}\n-# Page ${names.indexOf(name) + 1}/${names.length}${live ? ' · visible par toi seul' : ''}`);
+  const blocks = [header, separator(), ...BUILDERS[name](guild, { live, viewer }), separator(), ...navigation(name, names)];
+  return { components: [new ContainerBuilder({ accent_color: debug ? DEBUG_COLOR : COLOR, components: blocks.map((b) => b.toJSON()) })], flags: V2 };
 }
 
 export function openPanel(interaction, page = 'accueil') {
   if (!isOperator(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits : le panneau de configuration est réservé aux opérateurs MAGI.", flags: MessageFlags.Ephemeral, ...silent });
-  return interaction.reply({ ...panelPage(interaction.guild, page, { live: true }), flags: PRIVATE, ...silent });
+  return interaction.reply({ ...panelPage(interaction.guild, page, { live: true, viewer: interaction.user.id }), flags: PRIVATE, ...silent });
 }
 
 function configChannel(guild) {
@@ -236,15 +243,15 @@ export async function handlePanelInteraction(interaction) {
   const ephemeral = (content) => interaction.reply({ content: content.slice(0, 2000), flags: MessageFlags.Ephemeral, ...silent });
   if (!isOperator(member)) return ephemeral('Ce panneau est réservé aux opérateurs MAGI.');
   const show = (page) =>
-    interaction.message?.flags.has(MessageFlags.Ephemeral) ? interaction.update(panelPage(guild, page, { live: true })) : openPanel(interaction, page);
+    interaction.message?.flags.has(MessageFlags.Ephemeral) ? interaction.update(panelPage(guild, page, { live: true, viewer: interaction.user.id })) : openPanel(interaction, page);
   const changed = (summary) => {
     log.notice('config', `${summary} par ${member.displayName}`, { guild });
     refreshPanel(guild).catch(() => {});
   };
 
-  if (field === 'page' || field.startsWith('page:')) {
-    const page = field === 'page' ? interaction.values?.[0] : field.slice('page:'.length);
-    return PAGES[page] ? show(page) : ephemeral('Page inconnue.');
+  if (field === 'page' || field.startsWith('page:') || field.startsWith('goto:')) {
+    const page = field === 'page' ? interaction.values?.[0] : field.split(':')[1];
+    return pagesFor(guild, interaction.user.id).includes(page) ? show(page) : ephemeral(PAGES[page] ? 'Cette page n’est pas disponible.' : 'Page inconnue.');
   }
   if (SERVER_ACTIONS[field]) return SERVER_ACTIONS[field](interaction);
   if (field === 'stars_emoji') {

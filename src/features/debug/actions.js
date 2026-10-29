@@ -22,14 +22,14 @@ import { syncAutomod } from '../security/automod.js';
 import { gateChannel, gateRole } from '../security/gate.js';
 import { refreshPanel } from '../../panel/index.js';
 import { syncCommands } from '../commands/commands.js';
-import { exportConfig } from './config.js';
+import { exportConfig, importConfig, readConfig } from './config.js';
 
 const DEBUG_LEVEL_FOR = 15 * 60_000;
 const SOURCES = ['logs', 'moderation', 'securite', 'systeme'];
 const RESET_PREFIXES = ['module:', 'stars_', 'gate_rules', 'gate_min_age', 'raid_threshold', 'welcome_channel', 'birthday_channel', 'synchro_channel', 'tickets_channel', 'voice_hub', 'roles_channel', 'personas', 'persona_channels:', 'muted_channels', 'log_level', 'presence_', 'automod_', 'server_', 'digest'];
 const idOf = (text) => String(text ?? '').match(/\d{17,20}/)?.[0] ?? null;
 const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
-const field = (id, label, { placeholder = '', required = true, long = false } = {}) => ({ id, label, placeholder, required, long });
+const field = (id, label, { placeholder = '', required = true, long = false, choices = null, file = false } = {}) => ({ id, label, placeholder, required, long, choices, file });
 
 async function emptyChannel(channel, botId) {
   const { deleted } = await sweep(channel, 1000, (m) => fromMagi(m, botId));
@@ -101,10 +101,10 @@ export const ACTIONS = {
   },
   logs_vider: {
     label: 'Vider un salon de logs',
-    fields: [field('salon', 'logs, moderation, securite, systeme ou tous', { placeholder: 'logs' })],
-    confirm: ({ params }) => `Supprimer les messages de MAGI dans ${params.salon.trim() === 'tous' ? 'tous les salons de logs' : `#magi-${params.salon.trim()}`} ?`,
+    fields: [field('salon', 'Salon à vider', { choices: { logs: '#magi-logs', moderation: '#magi-moderation', securite: '#magi-securite', systeme: '#magi-systeme', tous: 'Tous les salons de logs' } })],
+    confirm: ({ params }) => `Supprimer les messages de MAGI dans ${params.salon === 'tous' ? 'tous les salons de logs' : `#magi-${params.salon}`} ?`,
     async run({ guild, params }) {
-      const wanted = params.salon.trim().toLowerCase();
+      const wanted = params.salon.toLowerCase();
       if (wanted !== 'tous' && !SOURCES.includes(wanted)) throw new Error(`salon inconnu : ${wanted}`);
       const channels = logChannels(guild);
       const done = [];
@@ -114,10 +114,10 @@ export const ACTIONS = {
   },
   resume: {
     label: 'Résumé quotidien : envoyer ou remettre à zéro',
-    fields: [field('choix', 'envoyer ou reset', { placeholder: 'envoyer' })],
-    confirm: ({ params }) => (params.choix.trim() === 'reset' ? 'Remettre à zéro tous les compteurs du résumé quotidien ?' : null),
+    fields: [field('choix', 'Que faire ?', { choices: { envoyer: 'Envoyer le résumé du jour maintenant', reset: 'Remettre les compteurs à zéro' } })],
+    confirm: ({ params }) => (params.choix === 'reset' ? 'Remettre à zéro tous les compteurs du résumé quotidien ?' : null),
     async run({ guild, client, params }) {
-      const choice = params.choix.trim().toLowerCase();
+      const choice = params.choix.toLowerCase();
       if (choice === 'reset') {
         let n = 0;
         for (const scope of [guild.id, 'global']) {
@@ -177,9 +177,9 @@ export const ACTIONS = {
   },
   modeles: {
     label: 'Modèles : lever les pauses ou en forcer un',
-    fields: [field('choix', 'lever, gemini, groq ou auto', { placeholder: 'lever' })],
+    fields: [field('choix', 'Que faire ?', { choices: { lever: 'Lever toutes les pauses', gemini: 'Ne faire répondre que Gemini', groq: 'Ne faire répondre que Groq', auto: "Revenir à l'ordre normal" } })],
     async run({ params }) {
-      const choice = params.choix.trim().toLowerCase();
+      const choice = params.choix.toLowerCase();
       if (choice === 'lever') {
         clearPauses();
         return 'Pauses levées : tous les modèles sont de nouveau disponibles.';
@@ -242,9 +242,9 @@ export const ACTIONS = {
   },
   simulation: {
     label: 'Simuler un raid ou un nuke',
-    fields: [field('type', 'raid ou nuke', { placeholder: 'raid' })],
+    fields: [field('type', 'Que simuler ?', { choices: { raid: 'Un raid (arrivées en masse)', nuke: 'Un nuke (destruction en masse)' } })],
     async run({ guild, member, params }) {
-      const type = params.type.trim().toLowerCase();
+      const type = params.type.toLowerCase();
       const operators = operatorRole(guild);
       const mention = { users: [guild.ownerId], roles: operators ? [operators.id] : [] };
       if (type === 'raid') log.alert('antiraid', '[Test] Raid probable : 12 arrivées en moins d’une minute. Simulation, aucun salon verrouillé.', { guild, mention });
@@ -255,10 +255,10 @@ export const ACTIONS = {
   },
   securite: {
     label: 'Anti-raid et AutoMod : lever, resynchroniser, supprimer',
-    fields: [field('choix', 'lever, resync ou supprimer', { placeholder: 'lever' })],
-    confirm: ({ params }) => (params.choix.trim() === 'supprimer' ? 'Supprimer toutes les règles AutoMod « MAGI · … » et couper le module AutoMod ?' : null),
+    fields: [field('choix', 'Que faire ?', { choices: { lever: 'Lever le verrouillage anti-raid', resync: 'Resynchroniser les règles AutoMod', supprimer: 'Supprimer les règles AutoMod de MAGI' } })],
+    confirm: ({ params }) => (params.choix === 'supprimer' ? 'Supprimer toutes les règles AutoMod « MAGI · … » et couper le module AutoMod ?' : null),
     async run({ guild, member, params }) {
-      const choice = params.choix.trim().toLowerCase();
+      const choice = params.choix.toLowerCase();
       if (choice === 'lever') return `Verrouillage levé : ${plural(await unlock(guild, `débogage, ${member.displayName}`), 'salon')} rouvert(s).`;
       if (choice === 'resync') {
         await syncAutomod(guild);
@@ -299,10 +299,27 @@ export const ACTIONS = {
       return value === 'null' ? `\`${key}\` supprimé.` : `\`${key}\` = \`${value}\`.`;
     },
   },
-  exporter: {
-    label: 'Exporter la configuration',
-    async run({ guild }) {
-      return { content: 'Configuration exportée. Pour la réimporter : `/debug importer` avec ce fichier.', files: [{ attachment: Buffer.from(JSON.stringify(exportConfig(guild), null, 2)), name: `magi-config-${guild.id}.json` }] };
+  configuration: {
+    label: 'Exporter ou importer la configuration',
+    fields: [
+      field('mode', 'Que faire ?', { choices: { exporter: 'Exporter en fichier', importer: 'Importer le fichier joint' } }),
+      field('fichier', 'Fichier à importer (.json exporté)', { file: true, required: false }),
+    ],
+    async confirm({ params }) {
+      if (params.mode !== 'importer') return null;
+      if (!params.fichier) throw new Error('joins le fichier .json exporté pour importer');
+      params.data = readConfig(await (await fetch(params.fichier)).text());
+      const { data } = params;
+      return `Importer la configuration de « ${data.guild?.name ?? '?'} » exportée <t:${Math.floor((Date.parse(data.at) || Date.now()) / 1000)}:R> : ${Object.keys(data.settings).length} réglages, modération ${data.moderation} ? Les réglages du même nom sont remplacés.`;
+    },
+    async run({ guild, params }) {
+      if (params.mode === 'importer') {
+        const n = importConfig(guild, params.data);
+        await syncCommands(guild).catch(() => {});
+        await refreshPanel(guild).catch(() => {});
+        return `Configuration importée : ${plural(n, 'réglage')}.`;
+      }
+      return { content: 'Configuration exportée. Pour la réimporter : même action, « Importer le fichier joint ».', files: [{ attachment: Buffer.from(JSON.stringify(exportConfig(guild), null, 2)), name: `magi-config-${guild.id}.json` }] };
     },
   },
   config_reset: {

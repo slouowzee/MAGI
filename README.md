@@ -35,7 +35,7 @@ src/
     security/             anti-nuke, AutoMod, audit, sauvegardes, filtre, anti-raid, honeypot
     admin/                outils d'administration (salons, membres, rôles, publications)
     server/               mise en place du serveur : styles, plan, application, annulation, modèles, audit
-    debug/                mode débogage du propriétaire : console, actions, export et import de la configuration
+    debug/                mode débogage du propriétaire (page du panneau) : actions, export et import de la configuration
     presence/             statut du bot
     welcome/              arrivées et départs
 ```

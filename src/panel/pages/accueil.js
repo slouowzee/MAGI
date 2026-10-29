@@ -4,8 +4,9 @@ import { logChannels } from '../../core/installation.js';
 import { statusReport } from '../../features/commands/commands.js';
 import { currentLevel, LEVELS } from '../../core/permissions.js';
 import { PAGES, MODE_LABELS, text, separator, pageOf, alerts } from '../ui.js';
+import { activationBlocks } from '../../features/debug/console.js';
 
-export function homeSection(guild, { live }) {
+export function homeSection(guild, { live, viewer }) {
   const found = Object.entries(alerts(guild));
   const level = currentLevel(guild.members.me.permissions);
   const missingLogs = Object.entries(logChannels(guild)).filter(([, c]) => !c).map(([source]) => source);
@@ -24,5 +25,6 @@ export function homeSection(guild, { live }) {
     separator(),
     text(todo.length ? ['**À régler**', ...todo].join('\n') : 'Rien à régler.'),
     ...(live ? [separator(), text(statusReport())] : [text('-# Choisis une page : elle s’ouvre en privé, visible par toi seul.')]),
+    ...(live && viewer === guild.ownerId ? [separator(), ...activationBlocks(guild)] : []),
   ];
 }

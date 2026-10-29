@@ -29,6 +29,7 @@ export const PAGES = {
   serveur: 'Serveur',
   logs: 'Logs',
   permissions: 'Permissions',
+  debug: 'Débogage',
 };
 
 export const PAGE_MODULES = {
