@@ -23,7 +23,7 @@ function world(id) {
       member: { id: 'owner', displayName: 'Slou', toString: () => '<@owner>' },
       client: guild.client,
       values: extra.values,
-      fields: { getTextInputValue: (k) => extra.fields?.[k] ?? '', getStringSelectValues: (k) => [extra.fields?.[k] ?? ''] },
+      fields: { getTextInputValue: (k) => extra.fields?.[k] ?? '', getStringSelectValues: (k) => [extra.fields?.[k] ?? ''], getSelectedUsers: (k) => (extra.fields?.[k] ? new Collection([[extra.fields[k], { id: extra.fields[k] }]]) : null) },
       reply: async (p) => out.push(['reply', p]),
       update: async (p) => out.push(['update', p]),
       deferReply: async () => out.push(['defer']),
@@ -82,7 +82,8 @@ test('action avec fenêtre et confirmation : effacer les infractions d’un memb
   recordInfraction('g-debug2', 'lea', 'spam');
   await w.click('magi-debug:action', { values: ['infractions'] });
   assert.deepEqual(w.out.slice(-2).map(([kind]) => kind), ['panel', 'modal']);
-  await w.click('magi-debug:form:infractions', { fields: { membre: '<@123456789012345678>' } });
+  assert.equal(w.out.at(-1)[1].components[0].component.type, 5);
+  await w.click('magi-debug:form:infractions', { fields: { membre: '123456789012345678' } });
   assert.equal(w.out.at(-1)[0], 'edit');
   assert.match(w.out.at(-1)[1].content, /Effacer toutes les infractions de <@123456789012345678>/);
   await w.click('magi-debug:form:infractions', { fields: { membre: '' } });

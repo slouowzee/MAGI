@@ -76,6 +76,7 @@ function form(key, action) {
       label.setLabel(f.label.slice(0, 45));
       if (f.choices) return label.setStringSelectMenuComponent((s) => s.setCustomId(f.id).setRequired(f.required).addOptions(Object.entries(f.choices).map(([value, name]) => ({ label: name.slice(0, 100), value }))));
       if (f.file) return label.setFileUploadComponent((u) => u.setCustomId(f.id).setRequired(f.required).setMaxValues(1));
+      if (f.user) return label.setUserSelectMenuComponent((u) => u.setCustomId(f.id).setRequired(f.required).setMaxValues(1).setPlaceholder('Chercher un membre'));
       return label.setTextInputComponent((t) => {
         t.setCustomId(f.id).setStyle(f.long ? TextInputStyle.Paragraph : TextInputStyle.Short).setRequired(f.required).setMaxLength(f.long ? 4000 : 200);
         if (f.placeholder) t.setPlaceholder(f.placeholder);
@@ -91,6 +92,7 @@ function readForm(interaction, action) {
     action.fields.map((f) => {
       if (f.choices) return [f.id, interaction.fields.getStringSelectValues(f.id)?.[0] ?? ''];
       if (f.file) return [f.id, interaction.fields.getUploadedFiles(f.id, false)?.first()?.url ?? ''];
+      if (f.user) return [f.id, interaction.fields.getSelectedUsers(f.id, false)?.first()?.id ?? ''];
       return [f.id, interaction.fields.getTextInputValue(f.id) ?? ''];
     }),
   );

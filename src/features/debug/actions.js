@@ -29,7 +29,7 @@ const SOURCES = ['logs', 'moderation', 'securite', 'systeme'];
 const RESET_PREFIXES = ['module:', 'stars_', 'gate_rules', 'gate_min_age', 'raid_threshold', 'welcome_channel', 'birthday_channel', 'tickets_channel', 'voice_hub', 'roles_channel', 'personas', 'persona_channels:', 'muted_channels', 'log_level', 'presence_', 'automod_', 'server_', 'digest'];
 const idOf = (text) => String(text ?? '').match(/\d{17,20}/)?.[0] ?? null;
 const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
-const field = (id, label, { placeholder = '', required = true, long = false, choices = null, file = false } = {}) => ({ id, label, placeholder, required, long, choices, file });
+const field = (id, label, { placeholder = '', required = true, long = false, choices = null, file = false, user = false } = {}) => ({ id, label, placeholder, required, long, choices, file, user });
 
 async function emptyChannel(channel, botId) {
   const { deleted } = await sweep(channel, 1000, (m) => fromMagi(m, botId));
@@ -77,7 +77,7 @@ export const ACTIONS = {
   },
   infractions: {
     label: 'Effacer des infractions',
-    fields: [field('membre', 'Membre (vide = tout le serveur)', { placeholder: 'identifiant ou mention', required: false })],
+    fields: [field('membre', 'Membre (vide = tout le serveur)', { user: true, required: false })],
     confirm: ({ params }) => (idOf(params.membre) ? `Effacer toutes les infractions de <@${idOf(params.membre)}> ?` : 'Effacer toutes les infractions du serveur ? Tous les compteurs repartent à zéro.'),
     async run({ guild, params }) {
       const n = wipeInfractions(guild.id, idOf(params.membre));
@@ -146,7 +146,7 @@ export const ACTIONS = {
   },
   memoire: {
     label: 'Effacer la mémoire de MAGI',
-    fields: [field('membre', 'Membre (vide = tout le serveur)', { placeholder: 'identifiant ou mention', required: false })],
+    fields: [field('membre', 'Membre (vide = tout le serveur)', { user: true, required: false })],
     confirm: ({ params }) => (idOf(params.membre) ? `Effacer tout ce que MAGI retient de <@${idOf(params.membre)}> ?` : 'Effacer toute la mémoire de MAGI sur ce serveur ? Faits et résumés de conversation de tout le monde.'),
     async run({ guild, params }) {
       if (backupDir) await backupMemory(join(backupDir, `memoire-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.db`));
@@ -235,7 +235,7 @@ export const ACTIONS = {
   },
   synchro: {
     label: "Modifier la synchro d'un membre",
-    fields: [field('membre', 'Membre', { placeholder: 'identifiant ou mention' }), field('valeur', 'Points, ou taux en %', { placeholder: '50 %' })],
+    fields: [field('membre', 'Membre', { user: true }), field('valeur', 'Points, ou taux en %', { placeholder: '50 %' })],
     confirm: ({ params }) => `Mettre la synchro de <@${idOf(params.membre)}> à ${params.valeur.trim()} ?`,
     async run({ guild, params }) {
       const userId = idOf(params.membre);
