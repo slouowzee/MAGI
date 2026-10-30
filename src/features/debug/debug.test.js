@@ -110,7 +110,11 @@ test('actions directes : modèles, réglage brut, logs en débogage puis retour'
   setSetting('g-debug3', 'log_level_until', Date.now() - 1);
   tickDebug(w.guild.client);
   assert.equal(setting('g-debug3', 'log_level'), null);
+  await w.click('magi-debug:action', { values: ['hall'] });
+  assert.equal(setting('g-debug3', 'stars_test'), '1');
+  assert.match(w.out.at(-1)[1].content, /dès 1 réaction/);
   await w.click('magi-debug:off');
+  assert.equal(setting('g-debug3', 'stars_test'), null);
   await w.click('magi-debug:action', { values: ['conversations'] });
   assert.match(w.out.at(-1)[1].content, /désactivé/);
 });

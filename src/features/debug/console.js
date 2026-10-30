@@ -144,7 +144,7 @@ export async function handleDebugInteraction(interaction) {
     return showPage(interaction, 'debug');
   }
   if (kind === 'off') {
-    setSetting(guild.id, 'debug_until', null);
+    endDebug(guild);
     log.notice('debug', `${member} a désactivé le mode débogage`, { guild });
     return showPage(interaction, 'accueil');
   }
@@ -165,11 +165,16 @@ export async function handleDebugInteraction(interaction) {
   return interaction.reply({ content: 'Action inconnue.', ...ephemeral });
 }
 
+function endDebug(guild) {
+  setSetting(guild.id, 'debug_until', null);
+  setSetting(guild.id, 'stars_test', null);
+}
+
 export function tickDebug(client, now = Date.now()) {
   for (const guild of client.guilds.cache.values()) {
     const until = debugUntil(guild.id);
     if (until && until !== FOREVER && Number(until) <= now) {
-      setSetting(guild.id, 'debug_until', null);
+      endDebug(guild);
       log.notice('debug', 'Mode débogage terminé : les 15 min sont écoulées', { guild });
       refreshPanel(guild).catch(() => {});
     }

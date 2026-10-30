@@ -176,10 +176,18 @@ export const ACTIONS = {
     },
   },
   modeles: {
-    label: 'Modèles : lever les pauses ou en forcer un',
-    fields: [field('choix', 'Que faire ?', { choices: { lever: 'Lever toutes les pauses', gemini: 'Ne faire répondre que Gemini', groq: 'Ne faire répondre que Groq', auto: "Revenir à l'ordre normal" } })],
+    label: 'Modèles : pauses, forcer un modèle, simuler une panne',
+    fields: [
+      field('choix', 'Que faire ?', { choices: { lever: 'Lever toutes les pauses', gemini: 'Ne faire répondre que Gemini', groq: 'Ne faire répondre que Groq', auto: "Revenir à l'ordre normal", panne: 'Simuler une panne de Gemini' } }),
+      field('minutes', 'Durée de la panne en minutes', { placeholder: '5', required: false }),
+    ],
     async run({ params }) {
       const choice = params.choix.toLowerCase();
+      if (choice === 'panne') {
+        const minutes = Math.min(Math.max(Number(params.minutes) || 5, 1), 60);
+        simulateOutage('gemini', minutes * 60_000);
+        return `Gemini en pause simulée pendant ${minutes} min : les réponses passent par le relais.`;
+      }
       if (choice === 'lever') {
         clearPauses();
         return 'Pauses levées : tous les modèles sont de nouveau disponibles.';
@@ -190,15 +198,6 @@ export const ACTIONS = {
       }
       forceProvider(choice);
       return `Seul ${choice} répond désormais, jusqu'à « auto » ou au prochain redémarrage.`;
-    },
-  },
-  panne: {
-    label: 'Simuler une panne de Gemini',
-    fields: [field('minutes', 'Durée en minutes', { placeholder: '5' })],
-    async run({ params }) {
-      const minutes = Math.min(Math.max(Number(params.minutes) || 5, 1), 60);
-      simulateOutage('gemini', minutes * 60_000);
-      return `Gemini en pause simulée pendant ${minutes} min : les réponses passent par le relais.`;
     },
   },
   requete: {
@@ -224,6 +223,14 @@ export const ACTIONS = {
     async run({ guild }) {
       const sent = await celebrate(guild, Date.now(), { force: true });
       return sent ? `${plural(sent, 'anniversaire')} souhaité${sent > 1 ? 's' : ''}.` : "Aucun anniversaire aujourd'hui, ou aucun salon où l'annoncer.";
+    },
+  },
+  hall: {
+    label: 'Hall of Fame dès 1 réaction (ou seuil normal)',
+    async run({ guild }) {
+      const on = !setting(guild.id, 'stars_test');
+      setSetting(guild.id, 'stars_test', on ? '1' : null);
+      return on ? 'Hall of Fame en test : un message y entre dès 1 réaction, jusqu’à la fin du mode débogage ou un nouveau choix de cette action.' : 'Hall of Fame revenu au seuil normal.';
     },
   },
   synchro: {

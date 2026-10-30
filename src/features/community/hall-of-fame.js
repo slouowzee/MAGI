@@ -56,7 +56,7 @@ export async function handleStar(reaction) {
   if (!guild || !moduleEnabled(guild.id, 'etoiles') || message.author?.id === guild.client.user.id) return;
   const wall = channelSetting(guild, 'stars_channel');
   if (!wall || message.channel.id === wall.id || setting(guild.id, `star:${message.id}`)) return;
-  if (reaction.count < Number(option(guild.id, 'stars_threshold'))) return;
+  if (reaction.count < (setting(guild.id, 'stars_test') ? 1 : Number(option(guild.id, 'stars_threshold')))) return;
   setSetting(guild.id, `star:${message.id}`, 'en cours');
   const persona = activePersonas(guild.id).includes('casper') ? 'casper' : activePersonas(guild.id)[0];
   const STAR = wallEmoji(guild.id);

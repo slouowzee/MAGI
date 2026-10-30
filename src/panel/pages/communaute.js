@@ -7,7 +7,7 @@ import { one, separator, feature, channelSelect, choice, id, row } from '../ui.j
 export function communitySection(guild) {
   const emoji = wallEmoji(guild.id);
   return [
-    feature(guild, 'etoiles', `${option(guild.id, 'stars_threshold')} ${emoji} · ${one('stars_channel', guild)}`),
+    feature(guild, 'etoiles', `${setting(guild.id, 'stars_test') ? '1 (test de débogage)' : option(guild.id, 'stars_threshold')} ${emoji} · ${one('stars_channel', guild)}`),
     choice(guild, 'stars_threshold', 'Réactions nécessaires', (v) => `${v} réactions pour entrer`),
     row(
       new StringSelectMenuBuilder()
