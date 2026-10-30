@@ -10,7 +10,8 @@ import { log } from '../../core/log/log.js';
 export const EMOJI_CHOICES = { '🔥': 'Flamme', '⭐': 'Étoile', '🏆': 'Trophée', '💯': 'Cent', '❤️': 'Cœur', '👑': 'Couronne', '✨': 'Étincelles', '😂': 'Rire' };
 const DEFAULT = '🔥';
 const bare = (text) => String(text ?? '').replace(/\uFE0F/g, '');
-const COLORS = Object.fromEntries(Object.entries({ '🔥': 0xd85a30, '💯': 0xe24b4a, '❤️': 0xe24b4a, '🏆': 0xba7517, '⭐': 0xef9f27, '👑': 0xef9f27, '✨': 0xef9f27, '😂': 0xef9f27 }).map(([emoji, color]) => [bare(emoji), color]));
+const HEAT = [[25, 0xa32d2d], [15, 0xe24b4a], [10, 0xd85a30], [5, 0xef9f27], [0, 0xfac775]];
+export const heat = (count) => HEAT.find(([min]) => count >= min)[1];
 const MAX_MEDIA = 4;
 const text = (content) => new TextDisplayBuilder().setContent(content);
 const clip = (value, max) => (value.length > max ? `${value.slice(0, max - 1)}…` : value);
@@ -38,11 +39,10 @@ export function starCard(message, { count, emoji, parent = null }) {
   const body = content || (media.length ? '' : describe(message));
   const header = `### ${emoji} ${count} · ${displayName(message)}\n-# <#${message.channel.id}> · <t:${Math.floor(message.createdTimestamp / 1000)}:f>`;
   const avatar = message.member?.displayAvatarURL?.({ size: 128 }) ?? message.author.displayAvatarURL?.({ size: 128 });
-  const card = new ContainerBuilder().setAccentColor(COLORS[bare(emoji)] ?? 0xf5c542);
-  if (avatar) card.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(avatar)));
-  else card.addTextDisplayComponents(text(header));
-  const lines = [parent && `-# ↪ ${displayName(parent)} : ${clip(describe(parent).replace(/\s+/g, ' '), 120)}`, body && clip(body, 3000)].filter(Boolean);
-  if (lines.length) card.addTextDisplayComponents(text(lines.join('\n')));
+  const lines = text([header, parent && `-# ↪ ${displayName(parent)} : ${clip(describe(parent).replace(/\s+/g, ' '), 120)}`, body && clip(body, 3000)].filter(Boolean).join('\n'));
+  const card = new ContainerBuilder().setAccentColor(heat(count));
+  if (avatar) card.addSectionComponents(new SectionBuilder().addTextDisplayComponents(lines).setThumbnailAccessory(new ThumbnailBuilder().setURL(avatar)));
+  else card.addTextDisplayComponents(lines);
   if (media.length) card.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(media.map((url) => (item) => item.setURL(url))));
   return card.addActionRowComponents(new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(message.url).setLabel('Aller au message')));
 }

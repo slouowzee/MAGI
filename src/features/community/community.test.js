@@ -92,12 +92,13 @@ test('Hall of Fame : carte enrichie avec auteur, contexte, galerie de 4 médias 
   const card = starCard(message, { count: 12, emoji: '🔥', parent }).toJSON();
   const shown = JSON.stringify(card);
   assert.equal(card.accent_color, 0xd85a30);
-  assert.match(shown, /### 🔥 12 · Miss Fortune\\n-# <#c> · <t:1793000000:f>/);
-  assert.match(shown, /-# ↪ Yui : t’as vu sa tête quand il a perdu \?\\nLa réaction \?/);
+  assert.equal(card.components[0].components.length, 1);
+  assert.match(card.components[0].components[0].content, /^### 🔥 12 · Miss Fortune\n-# <#c> · <t:1793000000:f>\n-# ↪ Yui : t’as vu sa tête quand il a perdu \?\nLa réaction \?$/);
   assert.equal(card.components.find((c) => c.type === 12).items.length, 4);
   const link = card.components.at(-1).components[0];
   assert.deepEqual([link.style, link.url, link.label], [5, message.url, 'Aller au message']);
-  assert.equal(starCard({ ...message, attachments: new Collection() }, { count: 3, emoji: '❤', parent: null }).toJSON().accent_color, 0xe24b4a);
+  const { heat } = await import('./hall-of-fame.js');
+  assert.deepEqual([1, 5, 10, 15, 30].map(heat), [0xfac775, 0xef9f27, 0xd85a30, 0xe24b4a, 0xa32d2d]);
 });
 
 test("anniversaires : une fois par jour, à partir de 9 h à Paris", async () => {
