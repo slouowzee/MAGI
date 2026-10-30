@@ -225,9 +225,17 @@ test('clic droit « Publier avec MAGI » : brouillon repris du message, original
   assert.match(JSON.stringify(preview.components[0].toJSON()), /message d’origine sera supprimé/);
   assert.match(preview.components[1].toJSON().components[0].content, /^Tournoi samedi <@1>$/);
   assert.equal(preview.files.length, 1);
-  const publish = preview.components[2].toJSON().components.find((b) => b.label === 'Publier').custom_id;
+  const where = preview.components.at(-1).toJSON().components[0];
+  assert.equal(where.type, 8);
+  assert.deepEqual(where.default_values, [{ id: channel.id, type: 'channel' }]);
+  const annonces = { id: 'annonces', guild: channel.guild, toString: () => '<#annonces>', send: async (p) => (sent.push(['annonces', p]), { id: '423456789012345678', url: 'https://discord.com/annonces' }) };
+  channel.guild.channels.cache.set('annonces', annonces);
+  await handleWriteModal({ ...base, customId: where.custom_id, values: ['annonces'] });
+  assert.match(out.at(-1)[1].components[0].toJSON().content, /dans <#annonces>/);
+  const publish = out.at(-1)[1].components[2].toJSON().components.find((b) => b.label === 'Publier').custom_id;
   await handleWriteModal({ ...base, customId: publish });
   assert.equal(sent.length, 1);
+  assert.equal(sent[0][0], 'annonces');
   assert.deepEqual(deleted, ['src']);
   await draftFromMessage({ ...base, targetMessage: { ...source, author: { id: 'autre' } } });
   assert.ok(!JSON.stringify(out.at(-1)[1].components[0].toJSON()).includes('supprimé'));

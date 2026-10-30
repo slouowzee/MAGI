@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, extname, join } from 'node:path';
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ContainerBuilder, MediaGalleryBuilder, MessageFlags, ModalBuilder, SectionBuilder, SeparatorBuilder, StringSelectMenuBuilder, TextDisplayBuilder, TextInputStyle, ThumbnailBuilder } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelSelectMenuBuilder, ChannelType, ContainerBuilder, MediaGalleryBuilder, MessageFlags, ModalBuilder, SectionBuilder, SeparatorBuilder, StringSelectMenuBuilder, TextDisplayBuilder, TextInputStyle, ThumbnailBuilder } from 'discord.js';
 import { SIGNATURE } from '../../core/discord/embeds.js';
 import { setSetting, setting } from '../../core/settings.js';
 import { savePublication } from '../admin/publications-store.js';
@@ -83,7 +83,8 @@ export function previewPayload(draft) {
     ...(draft.images.length ? [{ label: `Les images (${draft.images.length})`, value: 'images' }] : []),
   ];
   const remove = removable.length ? [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`magi-write:draft:retirer:${draft.token}`).setPlaceholder('Retirer…').addOptions(removable))] : [];
-  return { components: [text(`-# Aperçu${when}, visible par toi seul${draft.sourceId ? '\n-# Ton message d’origine sera supprimé à la publication.' : ''}`), publicationCard(draft), new ActionRowBuilder().addComponents(controls), ...remove], files: newFiles(draft), attachments: [], allowedMentions: { parse: [] } };
+  const where = draft.editId ? [] : [new ActionRowBuilder().addComponents(new ChannelSelectMenuBuilder().setCustomId(`magi-write:draft:salon:${draft.token}`).setPlaceholder('Salon de publication').setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setDefaultChannels(draft.channelId))];
+  return { components: [text(`-# Aperçu · dans <#${draft.channelId}>${when}, visible par toi seul${draft.sourceId ? '\n-# Ton message d’origine sera supprimé à la publication.' : ''}`), publicationCard(draft), new ActionRowBuilder().addComponents(controls), ...remove, ...where], files: newFiles(draft), attachments: [], allowedMentions: { parse: [] } };
 }
 
 export function removeFromDraft(draft, choice) {

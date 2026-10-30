@@ -224,8 +224,9 @@ async function draftAction(interaction, action, token) {
     return interaction.update(notice('Publication abandonnée.'));
   }
   await interaction.deferUpdate();
-  if (action === 'retirer') {
-    removeFromDraft(draft, interaction.values[0]);
+  if (action === 'retirer' || action === 'salon') {
+    if (action === 'salon') draft.channelId = interaction.values[0];
+    else removeFromDraft(draft, interaction.values[0]);
     return interaction.editReply(previewPayload(draft));
   }
   if (action === 'modifier-set') {
@@ -258,13 +259,19 @@ async function draftAction(interaction, action, token) {
     log.notice('commandes', `${interaction.member} a modifié une publication : ${target.url}`, { channel });
     return interaction.editReply(notice(`Publication modifiée : ${target.url}`));
   }
-  if (draft.sourceId) await channel.messages.delete(draft.sourceId).catch(() => {});
+  const dropSource = () => draft.sourceId && guild.channels.cache.get(draft.sourceChannelId)?.messages.delete(draft.sourceId).catch(() => {});
   if (draft.when) {
+    await dropSource();
     const id = scheduleMessage({ guildId: guild.id, channelId: channel.id, authorId: interaction.user.id, form: 'publication', title: draft.title, text: draft.text, at: draft.when, draft });
     log.notice('commandes', `${interaction.member} a programmé une publication dans ${channel} pour <t:${Math.floor(draft.when / 1000)}:f>`, { channel });
     return interaction.editReply(notice(`Publication n°${id} programmée dans ${channel} pour <t:${Math.floor(draft.when / 1000)}:F> (<t:${Math.floor(draft.when / 1000)}:R>).`, [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}annuler:${id}`).setLabel('Annuler').setStyle(ButtonStyle.Danger))]));
   }
-  const sent = await publishDraft(guild, channel, draft);
+  const sent = await publishDraft(guild, channel, draft).catch((err) => err);
+  if (sent instanceof Error) {
+    log.warning('commandes', `échec de la publication dans ${channel} : ${sent.message}`, { guild });
+    return interaction.editReply(notice(`Impossible de publier dans ${channel} : ${sent.message}. Vérifie que MAGI peut y écrire, puis relance /ecrire.`));
+  }
+  await dropSource();
   log.notice('commandes', `${interaction.member} a publié une publication encadrée : ${sent.url}`, { channel });
   return interaction.editReply(notice(`Publié : ${sent.url}`));
 }
@@ -281,7 +288,7 @@ export async function draftFromMessage(interaction) {
   if (!source.content.trim() && !source.attachments.size) return interaction.reply({ content: 'Ce message est vide : rien à publier.', ...ephemeral });
   await interaction.deferReply(ephemeral);
   const images = await download(source.attachments.values(), 'image');
-  const draft = createDraft({ guildId: interaction.guild.id, channelId: source.channel.id, authorId: interaction.user.id, title: '', text: source.content.trim(), color: 'magi', images, sourceId: source.author.id === interaction.user.id ? source.id : null });
+  const draft = createDraft({ guildId: interaction.guild.id, channelId: source.channel.id, authorId: interaction.user.id, title: '', text: source.content.trim(), color: 'magi', images, sourceId: source.author.id === interaction.user.id ? source.id : null, sourceChannelId: source.channel.id });
   if (textLength(draft) > MAX_TEXT) return interaction.editReply({ content: `Trop de texte : une publication est limitée à ${MAX_TEXT} caractères en tout.` });
   return interaction.editReply({ ...previewPayload(draft), flags: MessageFlags.IsComponentsV2 });
 }
