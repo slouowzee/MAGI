@@ -33,6 +33,21 @@ test('une rafale du même membre donne un seul cas, une seule infraction, une se
   assert.equal(c.infraction, 1);
 });
 
+test('rattrapage au redémarrage : des messages espacés relus d’un coup ne font pas une rafale', async () => {
+  const { addSink } = await import('../../core/log/log.js');
+  const seen = [];
+  const stop = addSink((entry) => seen.push(entry.message));
+  const calm = world('g-rattrapage');
+  const start = Date.now() - 120_000;
+  for (let i = 0; i < 6; i++) assert.equal(await moderate({ ...calm.message(`message normal ${i}`), createdTimestamp: start + i * 20_000 }), false);
+  assert.ok(!seen.some((m) => /messages en quelques secondes/.test(m)));
+  const flood = world('g-vraie-rafale');
+  const burst = { ...flood.message('spam'), author: { id: 'lea', bot: false, createdTimestamp: Date.now() - 3_600_000 } };
+  for (let i = 0; i < 6; i++) await moderate({ ...burst, content: `spam ${i}`, createdTimestamp: start + i * 300 });
+  stop();
+  assert.ok(seen.some((m) => /\d+ messages en quelques secondes/.test(m)), seen.join(" / "));
+});
+
 test('carte de cas : couleur et boutons selon l’état, identifiants uniques', () => {
   const base = { id: 7, userId: 'yui', kind: 'spam', reasons: ['10 messages en 3 s'], verdict: 'spam', action: 'suppression + exclusion 1 h', deleted: 10, sample: 'youre such a tryhard', infraction: 2, infractionId: 5, excluded: false, status: 'active', events: [{ at: 1_793_021_041_000, text: 'exclu 1 h' }] };
   const json = (c) => caseCard(c).toJSON();

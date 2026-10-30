@@ -45,10 +45,10 @@ const normalize = (text) => text.toLowerCase().replace(/\s+/g, ' ').trim();
 export function createTracker() {
   const recent = new Map();
   return function track(userId, channelId, content, now) {
-    const list = (recent.get(userId) ?? []).filter((m) => now - m.at <= DUPLICATE.window);
+    const list = (recent.get(userId) ?? []).filter((m) => Math.abs(now - m.at) <= DUPLICATE.window);
     list.push({ at: now, channelId, text: normalize(content) });
     recent.set(userId, list);
-    const burst = list.filter((m) => now - m.at <= BURST.window).length;
+    const burst = list.filter((m) => Math.abs(now - m.at) <= BURST.window).length;
     const text = normalize(content);
     const duplicateChannels = text.length >= 10 ? new Set(list.filter((m) => m.text === text).map((m) => m.channelId)).size : 0;
     return { burst, duplicateChannels };

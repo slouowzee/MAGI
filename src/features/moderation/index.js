@@ -152,7 +152,7 @@ export async function moderate(message) {
   const { mode } = moderationMode(guild.id);
   if (mode === 'desactivee') return false;
 
-  const now = Date.now();
+  const now = message.createdTimestamp ?? Date.now();
   const finding = detect({
     content: message.content,
     mentionCount: message.mentions.users.size + message.mentions.roles.size,
