@@ -43,6 +43,8 @@ import { parseEmoji } from '../features/community/hall-of-fame.js';
 import { milestoneMessages, orderMilestoneRoles, paliers, setMilestone } from '../features/community/synchro.js';
 import { logsSection } from './pages/logs.js';
 import { permissionsSection } from './pages/permissions.js';
+import { repliesSection } from './pages/reponses.js';
+import { forgetExample } from '../features/conversation/examples.js';
 import { debugActive, debugBlocks } from '../features/debug/console.js';
 
 const COLOR = 0xd65c62;
@@ -56,6 +58,7 @@ const BUILDERS = {
   conversation: conversationSection,
   statut: statusSection,
   personas: personasSection,
+  reponses: repliesSection,
   communaute: communitySection,
   services: servicesSection,
   arrivees: arrivalsSection,
@@ -285,6 +288,29 @@ export async function handlePanelInteraction(interaction) {
     return pagesFor(guild).includes(page) ? show(page) : ephemeral(PAGES[page] ? 'Cette page n’est pas disponible.' : 'Page inconnue.');
   }
   if (SERVER_ACTIONS[field]) return SERVER_ACTIONS[field](interaction);
+  if (field === 'examples_good' || field === 'examples_bad') {
+    const value = interaction.values?.[0];
+    if (value === 'autre') {
+      const input = new TextInputBuilder().setCustomId('emoji').setLabel('Emoji, ou emoji du serveur <:nom:id>').setStyle(TextInputStyle.Short).setMaxLength(60).setRequired(true);
+      return interaction.showModal(new ModalBuilder().setCustomId(id(`${field}_set`)).setTitle(field === 'examples_good' ? 'Emoji pour ajouter une réponse' : 'Emoji pour retirer une réponse').addComponents(row(input)));
+    }
+    if (value !== 'actuel') setSetting(guild.id, field, value);
+    await show('reponses');
+    return value === 'actuel' ? null : changed(`emoji de la banque d'exemples (${field === 'examples_good' ? 'ajout' : 'retrait'}) = ${value}`);
+  }
+  if ((field === 'examples_good_set' || field === 'examples_bad_set') && interaction.isModalSubmit()) {
+    const emoji = parseEmoji(interaction.fields.getTextInputValue('emoji'));
+    if (!emoji) return ephemeral('Ce n’est pas un emoji : colle un emoji, ou un emoji du serveur sous la forme <:nom:id> (tape \\:nom: dans Discord pour l’obtenir).');
+    const key = field.slice(0, -'_set'.length);
+    setSetting(guild.id, key, emoji);
+    await show('reponses');
+    return changed(`emoji de la banque d'exemples (${key === 'examples_good' ? 'ajout' : 'retrait'}) = ${emoji}`);
+  }
+  if (field === 'examples_forget') {
+    const removed = forgetExample(guild.id, Number(interaction.values?.[0]));
+    await show('reponses');
+    return removed ? changed('réponse retirée de la banque d’exemples') : null;
+  }
   if (field === 'stars_emoji') {
     const value = interaction.values?.[0];
     if (value === 'autre') {

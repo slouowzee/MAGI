@@ -9,6 +9,7 @@ import { gateMember, hideNewChannel } from './features/security/gate.js';
 import { resumeLockdowns, trackJoin } from './features/security/raid.js';
 import { handleSecurityButton, isSecurityButton } from './features/security/actions.js';
 import { handleStar } from './features/community/hall-of-fame.js';
+import { handleExampleReaction } from './features/conversation/feedback.js';
 import { sweepNotices, trackActivity } from './features/community/synchro.js';
 import { cleanTemporary, handleVoiceState } from './features/community/voice.js';
 import { startBirthdays } from './features/community/birthdays.js';
@@ -105,7 +106,10 @@ client.on(Events.MessageCreate, async (message) => {
   trackActivity(message).catch((err) => log.err('synchro', err.message, { guild: message.guild }));
   await handleMessage(message);
 });
-client.on(Events.MessageReactionAdd, (reaction) => handleStar(reaction).catch((err) => log.err('etoiles', err.message, { guild: reaction.message.guild })));
+client.on(Events.MessageReactionAdd, (reaction, user) => {
+  handleStar(reaction).catch((err) => log.err('etoiles', err.message, { guild: reaction.message.guild }));
+  handleExampleReaction(reaction, user).catch((err) => log.err('exemples', err.message, { guild: reaction.message.guild }));
+});
 client.on(Events.MessageReactionRemove, (reaction) => handleStar(reaction, { added: false }).catch((err) => log.err('etoiles', err.message, { guild: reaction.message.guild })));
 client.on(Events.VoiceStateUpdate, (before, after) => handleVoiceState(before, after).catch((err) => log.err('vocal', err.message, { guild: after.guild })));
 

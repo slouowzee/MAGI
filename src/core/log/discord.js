@@ -32,16 +32,18 @@ const SOURCES = {
   membres: 'logs',
   installation: 'logs',
   rappels: 'logs',
+  exemples: 'logs',
+  memoire: 'logs',
 };
 const ICONS = {
   moderation: '🛡️', antinuke: '💣', honeypot: '🍯', antiraid: '🚧', automod: '🤖', filtre: '🚪', audit: '🔍', sauvegarde: '💾',
   sshd: '🔑', 'sshd-session': '🔑', ssh: '🔑', sudo: '🔐', su: '🔐', login: '🔑', outils: '🔧', config: '⚙️', installation: '🛠️',
   rappels: '⏰', tickets: '🎫', bot: '🔄', commandes: '⌨️', conversation: '💬', vote: '🗳️', debat: '💭', etoiles: '🔥', synchro: '📈',
-  anniversaires: '🎂', vocal: '🔊', debug: '🐞', publications: '📰', journal: '📜', interaction: '🖱️', rattrapage: '⏪',
+  anniversaires: '🎂', vocal: '🔊', debug: '🐞', exemples: '📚', memoire: '🧠', publications: '📰', journal: '📜', interaction: '🖱️', rattrapage: '⏪',
 };
 export const PALETTE = { erreur: 0xe24b4a, alerte: 0xef9f27, securite: 0x7f77dd, moderation: 0xd85a30, config: 0x378add, arrivee: 0x1d9e75, depart: 0x888780, communaute: 0xd4537e, systeme: 0x5f5e5a };
 const GROUPS = {
-  config: 'config', outils: 'config', installation: 'config', commandes: 'config', publications: 'config',
+  config: 'config', outils: 'config', installation: 'config', commandes: 'config', publications: 'config', exemples: 'config',
   automod: 'securite', antinuke: 'securite', antiraid: 'securite', filtre: 'securite', honeypot: 'securite', audit: 'securite', sauvegarde: 'securite',
   sshd: 'securite', 'sshd-session': 'securite', ssh: 'securite', sudo: 'securite', su: 'securite', login: 'securite',
   moderation: 'moderation',

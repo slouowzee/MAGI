@@ -9,7 +9,7 @@ const { alerts, PAGE_MODULES } = await import('./ui.js');
 const { MODULES, setModules, setMutedChannels } = await import('../core/config.js');
 
 const guild = { id: 'panel-test', client: { user: { id: '1' } }, members: { me: { permissions: new PermissionsBitField() } }, channels: { cache: new Collection() } };
-const pages = ['accueil', 'conversation', 'statut', 'personas', 'communaute', 'services', 'arrivees', 'securite', 'automod', 'serveur', 'logs', 'permissions'];
+const pages = ['accueil', 'conversation', 'statut', 'personas', 'reponses', 'communaute', 'services', 'arrivees', 'securite', 'automod', 'serveur', 'logs', 'permissions'];
 
 const walk = (node) => [node, ...(node.components ?? []).flatMap(walk), ...(node.accessory ? [node.accessory] : [])];
 
@@ -76,4 +76,25 @@ test('palier de synchro réglé depuis le panneau : fenêtre préremplie, messag
   assert.equal(milestoneMessages('panel-palier')[100], 'GG {membre}, {taux} !');
   const select = walk(out.at(-1)[1].components[0].toJSON()).find((c) => c.custom_id === 'magi-config:synchro_palier');
   assert.equal(select.options.find((o) => o.value === '100').description, '@Pilote · message perso');
+});
+
+test('page Réponses : emojis de la banque réglables, emoji du serveur accepté, réponse apprise retirée', async () => {
+  const { handlePanelInteraction } = await import('./index.js');
+  const { learn, learnedExamples } = await import('../features/conversation/examples.js');
+  const { goodEmoji } = await import('../features/conversation/feedback.js');
+  const g = { ...guild, id: 'panel-reponses', ownerId: 'owner', roles: { cache: new Collection() } };
+  const out = [];
+  const base = { guild: g, member: { id: 'owner', guild: g, displayName: 'Slou' }, user: { id: 'owner' }, update: async (p) => out.push(['update', p]), reply: async (p) => out.push(['reply', p]), showModal: async (m) => out.push(['modal', m.toJSON()]) };
+  await handlePanelInteraction({ ...base, customId: 'magi-config:examples_good', values: ['⭐'] });
+  assert.equal(goodEmoji('panel-reponses'), '⭐');
+  await handlePanelInteraction({ ...base, customId: 'magi-config:examples_good', values: ['autre'] });
+  assert.equal(out.at(-1)[1].custom_id, 'magi-config:examples_good_set');
+  await handlePanelInteraction({ ...base, customId: 'magi-config:examples_good_set', isModalSubmit: () => true, fields: { getTextInputValue: () => '<:magi_ok:123456789012345678>' } });
+  assert.equal(goodEmoji('panel-reponses'), '<:magi_ok:123456789012345678>');
+  learn('panel-reponses', { persona: 'melchior', input: 'Slou : pâtes ou riz ?', output: 'Pâtes, évidemment.', by: 'owner' });
+  await handlePanelInteraction({ ...base, customId: 'magi-config:page:reponses' });
+  const select = walk(out.at(-1)[1].components[0].toJSON()).find((c) => c.custom_id === 'magi-config:examples_forget');
+  assert.match(select.options[0].label, /^Melchior · Pâtes, évidemment\.$/);
+  await handlePanelInteraction({ ...base, customId: 'magi-config:examples_forget', values: [select.options[0].value] });
+  assert.equal(learnedExamples('panel-reponses').length, 0);
 });

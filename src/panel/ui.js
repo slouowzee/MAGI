@@ -21,6 +21,7 @@ export const PAGES = {
   conversation: 'Conversation',
   statut: 'Statut du bot',
   personas: 'Personas et salons',
+  reponses: 'Réponses des unités',
   communaute: 'Communauté',
   services: 'Services',
   arrivees: 'Arrivées',

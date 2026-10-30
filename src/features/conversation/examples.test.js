@@ -38,3 +38,23 @@ test('réponse usée : formule toute faite ou même début qu’une réponse ré
   assert.equal(staleness('g-use', 'casper', 'Bravo, trois semaines bien investies.'), null);
   assert.equal(staleness('g-use', 'melchior', 'Franchement ton bot a intérêt à faire le café.'), null);
 });
+
+test('réaction d’un opérateur : ajoute la réponse et son message d’origine, retire avec l’autre emoji, ignore les autres', async () => {
+  const { handleExampleReaction } = await import('./feedback.js');
+  const { learnedExamples } = await import('./examples.js');
+  const { PERSONAS } = await import('../../core/personas.js');
+  const source = { content: 'tu préfères la plage ou la montagne ?', member: { displayName: 'Slou' }, author: { username: 'slou' } };
+  const channel = { id: '111111111111111111', messages: { fetch: async () => source } };
+  const members = { owner: { id: 'owner', guild: null }, lea: { id: 'lea', guild: null, roles: { cache: new Map() } } };
+  const guild = { id: 'g-retour', ownerId: 'owner', channels: { cache: new Map([[channel.id, channel]]) }, members: { fetch: async (id) => members[id] } };
+  for (const m of Object.values(members)) m.guild = guild;
+  const reply = { guild, guildId: guild.id, webhookId: 'w', applicationId: 'app', client: { application: { id: 'app' } }, author: { username: PERSONAS.casper.name }, content: `-# ↪ <@1> [tu préfères la plage…](https://discord.com/channels/333333333333333333/${channel.id}/222222222222222222)\nMontagne, et sans hésiter.` };
+  const react = (name, userId) => handleExampleReaction({ emoji: { name, id: null }, message: reply }, { id: userId, bot: false });
+  assert.equal(await react('👍', 'lea'), null);
+  assert.equal(await react('🔥', 'owner'), null);
+  assert.equal(await react('👍', 'owner'), 'ajoutee');
+  const [saved] = learnedExamples('g-retour');
+  assert.deepEqual([saved.persona, saved.register, saved.input, saved.output], ['casper', 'debat', 'Slou : tu préfères la plage ou la montagne ?', 'Montagne, et sans hésiter.']);
+  assert.equal(await react('👎', 'owner'), 'retiree');
+  assert.equal(learnedExamples('g-retour').length, 0);
+});
