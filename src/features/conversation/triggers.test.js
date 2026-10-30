@@ -1,6 +1,6 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { addressedPersonas, notForMagi, VOTE_INTENT, parseName, wantsDetail } from './triggers.js';
+import { addressedPersonas, detect, notForMagi, VOTE_INTENT, parseName, wantsDetail } from './triggers.js';
 
 test('déclenche sur un nom en ouverture', () => {
   assert.deepEqual(parseName('magi, salut'), { persona: 'auto', vote: false, text: 'salut' });
@@ -66,8 +66,26 @@ test('période du résumé : hier et aujourd’hui en heure de Paris', async () 
 });
 
 test('« pas à toi » : reconnu, sans confondre avec une vraie demande', () => {
-  for (const text of ["c'est pas à toi que je parlais", 'C’était pas pour toi', "ce n'est pas à toi", 'je parlais à Fortune', 'je parle avec @Yui', 'je te parlais pas', 'on te parle pas', "personne te parle", "on t'a rien demandé", 'je ne parlais pas à toi'])
+  for (const text of ["c'est pas à toi que je parlais", 'C’était pas pour toi', "ce n'est pas à toi", 'je parlais à Fortune', 'je parle avec @Yui', 'je te parlais pas', 'on te parle pas', 'on te parlais pas bgl', "personne te parle", "on t'a rien demandé", 'je ne parlais pas à toi'])
     assert.ok(notForMagi(text), text);
   for (const text of ['je parlais à toi justement', 'je parle à Melchior', "c'est pour toi ce message", 'tu peux me parler de ça ?', 'y’avait un blem avec ?'])
     assert.ok(!notForMagi(text), text);
+});
+
+test('nom au milieu d’une phrase : ambigu, tranché par le modèle ; en appel direct, réponse sans demander', async () => {
+  for (const text of ['balthasar, tu peux ?', 'Balthasar tu en penses quoi', 'tu en penses quoi balthasar ?', 'merci balthasar', 'hey balthasar, ça va', 'et toi balthasar ?', 'ok, balthasar : une idée ?'])
+    assert.ok(!parseName(text).ambiguous, text);
+  for (const text of ["pourtant balthasar c'est la personnas la plus sympathique", "Pourquoi Balthasar tu l'as écrit avec un S ? 👀", 'je trouve que casper exagère'])
+    assert.ok(parseName(text).ambiguous, text);
+  const message = (content) => ({ inGuild: () => true, author: { bot: false, username: 'slou' }, webhookId: null, content, mentions: { users: new Map() }, reference: null, channel: { messages: { cache: new Map() } } });
+  const asked = [];
+  const judge = (verdict) => async (m, persona) => (asked.push([m.content, persona]), verdict);
+  assert.equal(await detect(message("pourtant balthasar c'est la personnas la plus sympathique"), { user: { id: 'bot' } }, { judge: judge(false) }), null);
+  assert.deepEqual(asked.at(-1), ["pourtant balthasar c'est la personnas la plus sympathique", 'balthasar']);
+  const yes = await detect(message('je trouve que casper exagère, non ?'), { user: { id: 'bot' } }, { judge: judge(true) });
+  assert.equal(yes.persona, 'casper');
+  assert.ok(!('ambiguous' in yes));
+  asked.length = 0;
+  assert.equal((await detect(message('casper, ton avis ?'), { user: { id: 'bot' } }, { judge: judge(false) })).persona, 'casper');
+  assert.equal(asked.length, 0);
 });
