@@ -31,3 +31,8 @@ test('fin de conversation : réaction et fin, même après une question de l’u
   for (const t of ['ça ira.', 'repos, soldat.']) assert.ok(quickReaction(t).ends && quickReaction(t).always, t);
   assert.equal(quickReaction("c'est sûr que tu peux m'aider ?"), null);
 });
+
+test('merci écrit à la va-vite : reconnu', () => {
+  for (const t of ['oki, merki', 'mercii', 'ok merci bcp', 'thx balthasar', 'super merci beaucoup']) assert.equal(quickReaction(t)?.emoji, '❤️', t);
+  assert.equal(quickReaction('merci de me dire comment faire'), null);
+});

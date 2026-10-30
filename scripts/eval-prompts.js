@@ -43,6 +43,7 @@ const CONVERSATIONS = [
   ['casper ?', "c'est déjà bien mieux niveau réponse", 'ça ira.', 'repos, soldat.'],
   ['melchior ?', 'tu me fais une petite config pour un nas ?', 'bof, un truc basique, un raid 1 et des disques de 8to', 'et tu me recommandes quoi ?'],
   ['melchior, tu fais quoi ce soir ?', 'cool, et tu me conseilles quoi comme film ?', "c'est sûr", 'merci'],
+  ['balthasar ?', "j'ai le nez qui coule", "peut être bien oui, d'autres idées ?", 'oki, merki'],
   ["balthasar, j'ai eu une journée pourrie", "mon chef m'a engueulé devant tout le monde", 'ouais', 'merci, ça fait du bien'],
   ['casper, pizza ou burger ce soir ?', 'nan mais sérieux', 't’es bête mdr', 'bon je vais manger'],
 ];

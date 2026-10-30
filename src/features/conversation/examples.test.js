@@ -11,6 +11,11 @@ test('type de message reconnu, bavardage par défaut', () => {
     'pizza ananas, oui ou non ?': 'debat',
     'pourquoi le ciel est bleu ?': 'question',
     'je fais des crêpes ce soir': 'bavardage',
+    'balthasar ?': 'appel',
+    '?': 'appel',
+    't’es là ?': 'appel',
+    "j'ai le nez qui coule": 'souci',
+    "j'ai oublié mes clés": 'souci',
   };
   for (const [text, register] of Object.entries(cases)) assert.equal(registerOf(text), register, text);
 });

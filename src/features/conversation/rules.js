@@ -19,10 +19,17 @@ function normalize(text) {
     .trim();
 }
 
+const THANKS = /^(?:merci+|merki+|mrc|thx|thanks?|ty|tmtc)$/;
+const FILLER = new Set(['ok', 'oki', 'okk', 'okay', 'top', 'super', 'bien', 'beaucoup', 'bcp', 'encore', 'grave', 'vraiment', 'trop', 'et', 'ah', 'parfait', 'nickel', 'cool', 'à', 'toi', 'pour', 'tout', 'ça']);
+
 export function quickReaction(text) {
   const words = normalize(text);
   if (!words) return null;
-  return QUICK.find((group) => group.words.includes(words)) ?? null;
+  const found = QUICK.find((group) => group.words.includes(words));
+  if (found) return found;
+  const tokens = words.split(' ');
+  if (tokens.length <= 4 && tokens.some((t) => THANKS.test(t)) && tokens.every((t) => THANKS.test(t) || FILLER.has(t))) return QUICK.find((group) => group.emoji === '❤️');
+  return null;
 }
 
 const COOLDOWN = 5_000;
