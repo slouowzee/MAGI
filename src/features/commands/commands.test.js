@@ -232,3 +232,11 @@ test('clic droit « Publier avec MAGI » : brouillon repris du message, original
   await draftFromMessage({ ...base, targetMessage: { ...source, author: { id: 'autre' } } });
   assert.ok(!JSON.stringify(out.at(-1)[1].components[0].toJSON()).includes('supprimé'));
 });
+
+test('publication : une ligne --- devient un séparateur, y compris dans une section avec vignette', async () => {
+  const { publicationCard } = await import('./publication.js');
+  const card = publicationCard({ title: 'Règles', text: 'Un\n---\nDeux\n  -----  \nTrois', color: 'magi', images: [], buttons: [], sections: [{ text: 'A\n---\nB', thumb: { name: 'vignette-1.png', url: 'https://cdn/v.png' } }] }).toJSON();
+  assert.deepEqual(card.components.map((c) => c.type), [10, 14, 10, 14, 10, 14, 9, 14, 10, 10]);
+  assert.deepEqual(card.components.filter((c) => c.type === 10).map((c) => c.content), ['### Règles\nUn', 'Deux', 'Trois', 'B', '-# Publié par MAGI']);
+  assert.equal(card.components[6].components[0].content, 'A');
+});

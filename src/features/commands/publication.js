@@ -18,6 +18,14 @@ const FILES = join(process.env.DB_PATH === ':memory:' ? tmpdir() : dirname(proce
 const drafts = new Map();
 const text = (content) => new TextDisplayBuilder().setContent(content);
 const metaKey = (messageId) => `publication:${messageId}`;
+const RULE = /^[ \t]*-{3,}[ \t]*$/m;
+
+function addText(card, value, first = (part) => card.addTextDisplayComponents(text(part))) {
+  value.split(RULE).map((part) => part.trim()).filter(Boolean).forEach((part, i) => {
+    if (i) card.addSeparatorComponents(new SeparatorBuilder()).addTextDisplayComponents(text(part));
+    else first(part);
+  });
+}
 
 export const publicationMeta = (guildId, messageId) => JSON.parse(setting(guildId, metaKey(messageId)) ?? 'null');
 export const getDraft = (token) => drafts.get(token) ?? null;
@@ -44,13 +52,11 @@ export async function download(attachments, prefix) {
 export function publicationCard(draft, { final = false } = {}) {
   const ref = (file) => (file.data || final ? `attachment://${file.name}` : file.url);
   const card = new ContainerBuilder().setAccentColor(COLORS[draft.color]?.[1] ?? COLORS.magi[1]);
-  const head = [draft.title && `### ${draft.title}`, draft.text].filter(Boolean).join('\n');
-  if (head) card.addTextDisplayComponents(text(head));
+  addText(card, [draft.title && `### ${draft.title}`, draft.text].filter(Boolean).join('\n'));
   if (draft.images.length) card.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(draft.images.map((file) => (item) => item.setURL(ref(file)))));
   for (const section of draft.sections) {
     card.addSeparatorComponents(new SeparatorBuilder());
-    if (section.thumb) card.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(section.text)).setThumbnailAccessory(new ThumbnailBuilder().setURL(ref(section.thumb))));
-    else card.addTextDisplayComponents(text(section.text));
+    addText(card, section.text, section.thumb ? (part) => card.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(part)).setThumbnailAccessory(new ThumbnailBuilder().setURL(ref(section.thumb)))) : undefined);
   }
   card.addTextDisplayComponents(text(`-# ${SIGNATURE}`));
   if (draft.buttons.length) card.addActionRowComponents(new ActionRowBuilder().addComponents(draft.buttons.map((b) => new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(b.label).setURL(b.url))));
@@ -94,7 +100,7 @@ export function draftModal(action, draft) {
     input('texte', 'Texte du bouton', TextInputStyle.Short, 80, 'Rejoindre le vocal');
     input('url', 'Lien', TextInputStyle.Short, 512, 'https://');
   } else {
-    input('texte', 'Texte de la section (Markdown Discord)', TextInputStyle.Paragraph, 1500);
+    input('texte', 'Texte de la section (Markdown Discord)', TextInputStyle.Paragraph, 1500, 'Une ligne --- seule ajoute un séparateur.');
     modal.addLabelComponents((l) => l.setLabel('Petite image à droite (facultatif)').setFileUploadComponent((u) => u.setCustomId('vignette').setRequired(false).setMaxValues(1)));
   }
   return modal;

@@ -182,7 +182,7 @@ function writeModal({ form, channelId, editId, title = '', text = '', color = 'm
       }),
     );
   if (publication) input('titre', 'Titre (facultatif)', TextInputStyle.Short, { length: 256, value: title });
-  input('texte', 'Texte, publié tel quel (Markdown Discord)', TextInputStyle.Paragraph, { length: max, required: true, value: text });
+  input('texte', 'Texte, publié tel quel (Markdown Discord)', TextInputStyle.Paragraph, { length: max, required: true, value: text, placeholder: publication ? 'Une ligne --- seule ajoute un séparateur.' : '' });
   if (publication) {
     modal.addLabelComponents((l) => l.setLabel('Couleur de la barre').setStringSelectMenuComponent((m) => m.setCustomId('couleur').setRequired(false).addOptions(Object.entries(COLORS).map(([value, [name]]) => ({ label: name, value, default: value === color })))));
     modal.addLabelComponents((l) => l.setLabel(keepImages ? 'Nouvelles images (vide = garder)' : `Images, jusqu’à ${MAX_IMAGES} (facultatif)`).setFileUploadComponent((u) => u.setCustomId('images').setRequired(false).setMaxValues(MAX_IMAGES)));
