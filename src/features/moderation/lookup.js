@@ -22,7 +22,7 @@ import { listSettings, setSetting, setting } from '../../core/settings.js';
 import { birthdayOfUser, synchroOf } from '../community/store.js';
 import { paliers, rateOf } from '../community/synchro.js';
 import { pendingReminders } from '../reminders/store.js';
-import { factsAbout, forgetUser } from '../memory/store.js';
+import { factsAbout, forgetUser, summariesAbout } from '../memory/store.js';
 import { moduleEnabled } from '../../core/config.js';
 import { gateRole } from '../security/gate.js';
 import { activeInfractions, casesOf, purgeMember, recordOf } from './store.js';
@@ -43,6 +43,7 @@ const clipList = (lines, max) => (lines.length > max ? [...lines.slice(0, max), 
 
 export const LOOKUP_COMMANDS = [
   { tier: 'membres', data: { name: 'profil', type: ApplicationCommandType.ChatInput, description: 'Ton dossier : sanctions, infractions, synchro, rappels, ce que MAGI retient (visible par toi seul)' } },
+  { tier: 'membres', data: { name: 'oublier', type: ApplicationCommandType.ChatInput, description: 'Voir ce que MAGI retient de toi et lui faire tout oublier (visible par toi seul)' } },
   { tier: 'moderation', data: { name: 'lookup', type: ApplicationCommandType.ChatInput, description: "Dossier complet d'un membre (modération)", options: [{ type: O.User, name: 'membre', description: 'Le membre ou l’utilisateur', required: true }] } },
 ];
 
@@ -212,6 +213,18 @@ async function purgeRecord(interaction, userId) {
   for (const c of record.cases) await markPurged(guild, c, operator.displayName);
   log.notice('moderation', `${operator} a purgé le casier de <@${userId}> : ${record.cases.length} cas, ${record.infractions} infraction${record.infractions > 1 ? 's' : ''}${lifted.length ? `, ${lifted.join(', ')}` : ''}`, { guild });
   return interaction.editReply({ content: `Casier de <@${userId}> effacé : ${record.cases.length} cas, ${record.infractions} infraction${record.infractions > 1 ? 's' : ''}${lifted.length ? `, ${lifted.join(', ')}` : ''}.` });
+}
+
+export async function showMemory(interaction) {
+  const { guild, user } = interaction;
+  const facts = await factsAbout(guild.id, user.id, 50).catch(() => []);
+  const summaries = (await summariesAbout(guild.id, user.id, 100).catch(() => [])).length;
+  const container = new ContainerBuilder().setAccentColor(COLOR).addTextDisplayComponents(text(`### Ce que MAGI retient de toi\n${facts.length ? clipList(facts.map((f) => `- ${f}`), 25).join('\n') : 'Aucun souvenir.'}`));
+  container.addTextDisplayComponents(text(`-# ${summaries ? `Et ${summaries} résumé${summaries > 1 ? 's' : ''} de conversations auxquelles tu as participé.` : 'Aucun résumé de conversation.'} MAGI s’en sert pour te répondre avec le contexte, rien d’autre.`));
+  if (facts.length || summaries) {
+    container.addTextDisplayComponents(text('Tout oublier efface tes souvenirs et ces résumés, définitivement.')).addActionRowComponents(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}oublier-ok:${user.id}`).setLabel('Tout oublier').setStyle(ButtonStyle.Danger)));
+  }
+  return interaction.reply({ components: [container], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
 }
 
 async function forgetMe(interaction, confirmed) {

@@ -111,6 +111,11 @@ test('profil : la mémoire est visible et le membre peut tout oublier, lui seule
   const card = JSON.stringify(replies[0].components[0].toJSON());
   assert.match(card, /joue du piano/);
   assert.match(card, /magi-look:oublier:yui/);
+  const { showMemory } = await import('./lookup.js');
+  await showMemory(base);
+  const memory = JSON.stringify(replies.at(-1).components[0].toJSON());
+  assert.match(memory, /Ce que MAGI retient de toi[^"]*joue du piano/);
+  assert.match(memory, /magi-look:oublier-ok:yui/);
   await handleLookupInteraction({ ...base, customId: 'magi-look:oublier-ok:yui', user: { id: 'mod' } });
   assert.match(replies.at(-1).content, /Seule la personne concernée/);
   await handleLookupInteraction({ ...base, customId: 'magi-look:oublier:yui' });

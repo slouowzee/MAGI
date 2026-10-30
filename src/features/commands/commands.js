@@ -12,7 +12,7 @@ import { log } from '../../core/log/log.js';
 import { openPanel } from '../../panel/index.js';
 import { clear, draftFromMessage, openWrite, PUBLISH_FROM_MESSAGE, WRITE_COMMANDS } from './write.js';
 import { MANUAL_COMMANDS, MANUAL_NAMES, runManual } from '../moderation/manual.js';
-import { LOOKUP_COMMANDS, showLookup, showProfile } from '../moderation/lookup.js';
+import { LOOKUP_COMMANDS, showLookup, showMemory, showProfile } from '../moderation/lookup.js';
 import { LEADERBOARD_COMMANDS, showLeaderboard } from '../community/leaderboard.js';
 
 const ASK = {
@@ -133,6 +133,7 @@ const HANDLERS = {
   [PUBLISH_FROM_MESSAGE]: draftFromMessage,
   clear,
   profil: showProfile,
+  oublier: showMemory,
   lookup: showLookup,
   classement: showLeaderboard,
 };
