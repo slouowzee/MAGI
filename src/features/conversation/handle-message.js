@@ -65,7 +65,7 @@ export async function handleMessage(message, { catchUp = false, force = false } 
   const where = { channel: message.channel };
   log.debug('conversation', `${message.author.tag} → ${trigger.persona}${trigger.vote ? ' (vote)' : ''}${catchUp ? ' (rattrapage)' : ''} : ${message.content.slice(0, 120)}`, where);
   const quick = quickReaction(message.content);
-  if (quick && !awaitingAnswer(conversation, message.author.id, now)) {
+  if (quick && (quick.always || !awaitingAnswer(conversation, message.author.id, now))) {
     if (conversation) addMessage(conversation, message.id, message.author.id, now, line);
     await message.react(quick.emoji).catch(() => {});
     if (quick.ends) summarizeConversation(message.client, closeConversation(conversation));

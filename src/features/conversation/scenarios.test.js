@@ -213,6 +213,18 @@ test('« c’est pas à toi que je parlais » : pas de réponse, un 👌, et la 
   expect(rappel.answers.map((x) => x.persona)).toEqual(['melchior']);
 });
 
+test('« ça ira » ou « repos » après une réponse : une réaction, pas de relance', async () => {
+  const w = world('fin');
+  await w.say('slou', 'casper ?');
+  const fin = await w.say('slou', 'ça ira.');
+  expect(fin.answers).toHaveLength(0);
+  expect(fin.reactions).toEqual(['👌']);
+  await w.say('slou', 'casper, ça va ?');
+  const conge = await w.say('slou', 'repos, soldat.');
+  expect(conge.answers).toHaveLength(0);
+  expect(conge.reactions).toEqual(['🫡']);
+});
+
 test('chacun garde sa suite sans le nom dans le même salon', async () => {
   const w = world('suites');
   await w.say('slou', 'melchior, explique les vecteurs');

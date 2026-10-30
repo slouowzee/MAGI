@@ -25,3 +25,9 @@ test('anti-flood : un avertissement, puis silence, puis de nouveau autorisé', (
   assert.equal(floodCheck('u', 7_000), 'warn');
   assert.equal(floodCheck('autre', 7_000), 'ok');
 });
+
+test('fin de conversation : réaction et fin, même après une question de l’unité', () => {
+  assert.deepEqual(['ça ira.', "c'est sûr", 'Pas de souci', 'repos, soldat.', 'bien vu casper'].map((t) => quickReaction(t)?.emoji), ['👌', '👌', '👌', '🫡', '👌']);
+  for (const t of ['ça ira.', 'repos, soldat.']) assert.ok(quickReaction(t).ends && quickReaction(t).always, t);
+  assert.equal(quickReaction("c'est sûr que tu peux m'aider ?"), null);
+});

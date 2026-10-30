@@ -123,7 +123,7 @@ export function examplesNote(guildId, persona, register, random = Math.random) {
 
 const RECENT = 20;
 const recent = new Map();
-const CLICHES = [/\bje (?:range|pose) les vannes\b/i, /^c'est une (?:excellente|super|tr[èe]s bonne) nouvelle/i, /\bje prends note\b/i, /\bmes (?:capteurs|circuits)\b/i, /hypoth[èe]se not[ée]e/i, /\bje vois [çc]a\b/i, /garde un peu de s[ée]rieux/i, /\baucune donn[ée]e\b/i, /\bfascinant\b/i, /\bint[ée]ressant,? (?:tr[èe]s )?int[ée]ressant\b/i, /\bsignal stable\b/i, /\bnot[ée]\.\s*$/i, /\bje (?:range|note) [çc]a\b/i, /\bquelle surprise\b/i, /\btest r[ée]ussi\b/i];
+const CLICHES = [/\bj'ai (?:pas|autre chose) (?:que [çc]a|[àa] faire)\b/i, /\bne m'appelle pas pour rien\b/i, /\bje (?:retourne|repars) [àa] mes (?:affaires|occupations)\b/i, /\bcertificat de bonne conduite\b/i, /\bop[ée]rationnel(?:le)?s?\b/i, /\btest (?:r[ée]ussi|rat[ée])\b/i, /\bprotocole\b/i, /\bje (?:range|pose) les vannes\b/i, /^c'est une (?:excellente|super|tr[èe]s bonne) nouvelle/i, /\bje prends note\b/i, /\bmes (?:capteurs|circuits)\b/i, /hypoth[èe]se not[ée]e/i, /\bje vois [çc]a\b/i, /garde un peu de s[ée]rieux/i, /\baucune donn[ée]e\b/i, /\bfascinant\b/i, /\bint[ée]ressant,? (?:tr[èe]s )?int[ée]ressant\b/i, /\bsignal stable\b/i, /\bnot[ée]\.\s*$/i, /\bje (?:range|note) [çc]a\b/i, /\bquelle surprise\b/i, /\btest r[ée]ussi\b/i];
 const opening = (text) => text.toLowerCase().replace(/^-#[^\n]*\n/, '').replace(/[^\p{L}\p{N}\s']/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 3).join(' ');
 
 export function recentReplies(guildId, persona) {

@@ -1,6 +1,8 @@
 const NAMES = /(?<![\p{L}\p{N}])(?:magi|melchior|balthasar|casper)(?![\p{L}\p{N}])/giu;
 
 const QUICK = [
+  { emoji: '🫡', ends: true, always: true, words: ['repos', 'repos soldat', 'rompez', 'à vos ordres', 'a vos ordres', 'garde à vous', 'au rapport', 'dispose', 'disposez'] },
+  { emoji: '👌', ends: true, always: true, words: ['ça ira', 'ca ira', "c'est sûr", "c'est sur", 'pas de souci', 'pas de soucis', 'pas de problème', 'pas de probleme', "t'inquiète", "t'inquiete", 'tkt', 'ça roule', 'ca roule', 'bien vu', "c'est clair", 'carrément', 'carrement', 'grave', 'laisse tomber', "c'est bon", 'on verra', 'si tu le dis', 'bref', 'exactement', 'exact', 'effectivement', 'clairement', 'trop vrai', 'en effet', 'je sais', 'je vois', "j'avoue", 'ah ok', "ah d'accord", 'oki', 'okk', 'ok ok', 'ok cool'] },
   { emoji: '❤️', ends: true, words: ['merci', 'merci beaucoup', 'merci bien', 'thx', 'thanks', 'ok merci', 'super merci', 'top merci', 'nickel merci', 'parfait merci', 'merci pour tout', 'c gentil', "c'est gentil", 'trop gentil'] },
   { emoji: '👋', ends: true, words: ['bonne nuit', 'bonne soirée', 'bonne journée', 'à plus', 'a plus', 'a+', '++', 'bye', 'ciao', 'tchao', 'à demain', 'a demain', 'au revoir', 'salut et merci', 'je file', 'je te laisse'] },
   { emoji: '😄', ends: false, words: ['mdr', 'ptdr', 'lol', 'xd', 'haha', 'hahaha', 'ahah', 'ahahah', 'jpp', 'excellent', 'énorme', 'enorme', 'pas mal'] },
