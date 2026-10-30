@@ -40,6 +40,24 @@ export function wantsSummary(text) {
   return MISSED.test(clean) || (SUMMARY.test(clean) && ABOUT_CHAT.test(clean));
 }
 
+const NOT_FOR_ME = new RegExp(
+  [
+    "\\b(?:c'?est|c'?[ée]tait|ce n'est|ce n'[ée]tait)\\s+pas\\s+(?:à|a|pour)\\s+toi\\b",
+    "\\bpas\\s+(?:à|a)\\s+toi\\s+que\\b",
+    "\\bje\\s+(?:ne\\s+)?(?:te\\s+)?parl(?:e|ais)\\s+pas\\s+(?:à|a)\\s+toi\\b",
+    "\\bje\\s+(?:ne\\s+)?te\\s+parl(?:e|ais)\\s+pas\\b",
+    "\\bje\\s+parl(?:e|ais)\\s+(?:à|a|avec)\\s+(?!toi\\b|magi\\b|melchior\\b|balthasar\\b|casper\\b)[\\p{L}@<]",
+    "\\bon\\s+(?:ne\\s+)?te\\s+parl(?:e|ait)\\s+pas\\b",
+    "\\bpersonne\\s+(?:ne\\s+)?te\\s+parl(?:e|ait)\\b",
+    "\\bon\\s+t'?a\\s+rien\\s+demand[ée](?![\\p{L}])",
+  ].join('|'),
+  'iu',
+);
+
+export function notForMagi(text) {
+  return NOT_FOR_ME.test((text ?? '').replace(/[’‘]/g, "'"));
+}
+
 export function wantsDetail(text) {
   return DETAIL.test(text);
 }

@@ -62,6 +62,11 @@ export function answered(conversation, { persona, messageIds, userId, asked = fa
   saveConversation(conversation);
 }
 
+export function endFollowUp(conversation) {
+  conversation.follow = null;
+  saveConversation(conversation);
+}
+
 export function awaitingAnswer(conversation, userId, now = Date.now()) {
   const follow = conversation?.follow;
   return Boolean(follow?.asked && follow.userId === userId && now <= follow.until);

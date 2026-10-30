@@ -1,5 +1,5 @@
 import { pickPersona, randomPersona, startsNewTopic } from './router.js';
-import { addMessage, answered, awaitingAnswer, closeConversation, followUpConversation, isClaimed, locateConversation, openConversation } from './threads.js';
+import { addMessage, answered, awaitingAnswer, closeConversation, endFollowUp, followUpConversation, isClaimed, locateConversation, openConversation } from './threads.js';
 import { activePersonas, isMuted, moduleEnabled, personaForChannel } from '../../core/config.js';
 import { memoryContext, summarizeConversation } from '../memory/context.js';
 import { floodCheck, quickReaction } from './rules.js';
@@ -8,7 +8,7 @@ import { runVote } from '../vote/vote.js';
 import { announce } from '../presence/presence.js';
 import { runDebate, wantsDebate } from '../vote/debate.js';
 import { maybeIntervene } from './spontaneous.js';
-import { addressedPersonas, detect, VOTE_INTENT, wantsDetail, wantsSummary } from './triggers.js';
+import { addressedPersonas, detect, notForMagi, VOTE_INTENT, wantsDetail, wantsSummary } from './triggers.js';
 import { buttonsFor, previewsFor } from '../../core/discord/buttons.js';
 import { conversationFor, conversationPrompt, rememberAnswer } from '../../core/discord/history.js';
 import { splitMessage } from '../../core/discord/split.js';
@@ -43,6 +43,13 @@ export async function handleMessage(message, { catchUp = false, force = false } 
   const channelId = message.channel.id;
   const detected = await detect(message, message.client);
   const following = detected || catchUp || addressesSomeoneElse(message) ? null : followUpConversation(channelId, message.author.id, now);
+  if (following && notForMagi(message.content)) {
+    endFollowUp(following);
+    addMessage(following, message.id, message.author.id, now, `${message.member?.displayName ?? message.author.username} : ${message.content}`);
+    await message.react('👌').catch(() => {});
+    log.debug('conversation', `${message.author.tag} : pas pour MAGI, suite arrêtée`, { channel: message.channel });
+    return;
+  }
   const trigger = detected ?? (following || force ? { persona: 'auto', vote: false, text: message.content } : null);
   const line = `${message.member?.displayName ?? message.author.username} : ${message.content}`;
   const found = following ? { conversation: following, by: 'suite' } : locate(message, trigger?.persona, now);

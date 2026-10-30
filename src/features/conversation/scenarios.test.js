@@ -201,6 +201,18 @@ test('suite sans le nom : seulement pour la personne à qui la persona vient de 
   expect(intrus.answers).toHaveLength(0);
 });
 
+test('« c’est pas à toi que je parlais » : pas de réponse, un 👌, et la suite s’arrête', async () => {
+  const w = world('pas-a-toi');
+  await w.say('slou', 'melchior, combien font 2 + 2 ?');
+  const erreur = await w.say('slou', "c'est pas à toi que je parlais");
+  expect(erreur.answers).toHaveLength(0);
+  expect(erreur.reactions).toEqual(['👌']);
+  const apres = await w.say('slou', 'et 3 + 3 ?');
+  expect(apres.answers).toHaveLength(0);
+  const rappel = await w.say('slou', 'melchior, et 3 + 3 ?');
+  expect(rappel.answers.map((x) => x.persona)).toEqual(['melchior']);
+});
+
 test('chacun garde sa suite sans le nom dans le même salon', async () => {
   const w = world('suites');
   await w.say('slou', 'melchior, explique les vecteurs');

@@ -1,6 +1,6 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { addressedPersonas, VOTE_INTENT, parseName, wantsDetail } from './triggers.js';
+import { addressedPersonas, notForMagi, VOTE_INTENT, parseName, wantsDetail } from './triggers.js';
 
 test('déclenche sur un nom en ouverture', () => {
   assert.deepEqual(parseName('magi, salut'), { persona: 'auto', vote: false, text: 'salut' });
@@ -63,4 +63,11 @@ test('période du résumé : hier et aujourd’hui en heure de Paris', async () 
   assert.deepEqual(periodOf('résume ce qui s’est dit hier', now), { day: '2026-10-26', label: 'hier' });
   assert.deepEqual(periodOf("récap d'aujourd’hui", now), { day: '2026-10-27', label: "aujourd'hui" });
   assert.equal(periodOf('résume la discussion', now), undefined);
+});
+
+test('« pas à toi » : reconnu, sans confondre avec une vraie demande', () => {
+  for (const text of ["c'est pas à toi que je parlais", 'C’était pas pour toi', "ce n'est pas à toi", 'je parlais à Fortune', 'je parle avec @Yui', 'je te parlais pas', 'on te parle pas', "personne te parle", "on t'a rien demandé", 'je ne parlais pas à toi'])
+    assert.ok(notForMagi(text), text);
+  for (const text of ['je parlais à toi justement', 'je parle à Melchior', "c'est pour toi ce message", 'tu peux me parler de ça ?', 'y’avait un blem avec ?'])
+    assert.ok(!notForMagi(text), text);
 });
