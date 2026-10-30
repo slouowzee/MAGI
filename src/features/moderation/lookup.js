@@ -69,7 +69,7 @@ function synchroLine(guild, userId) {
     .filter(([threshold]) => Number(threshold) <= rate)
     .sort((a, b) => Number(b[0]) - Number(a[0]))[0];
   const role = tier && guild.roles.cache.get(tier[1]);
-  return `${rate} %${role ? ` · palier ${role}` : ''}`;
+  return `${rate} % · ${points} point${points > 1 ? 's' : ''}${role ? ` · palier ${role}` : ''}`;
 }
 
 export async function showProfile(interaction) {
