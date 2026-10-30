@@ -139,6 +139,24 @@ test('Hall of Fame : la carte suit les réactions, le commentaire de Casper ne b
   assert.equal(await refreshCard(guild, message, 'inconnu'), false);
 });
 
+test('paliers : points restants, message perso avec {membre} et {taux}, rôle vérifié', async () => {
+  const { milestoneLine, nextMilestone, pointsFor, setMilestone, paliers } = await import('./synchro.js');
+  assert.deepEqual([25, 50, 100, 400].map(pointsFor), [40, 157, 625, 10000]);
+  assert.deepEqual([0, 25, 399, 400].map(nextMilestone), [25, 50, 400, null]);
+  const ok = { id: 'r-ok', name: 'Pilote', editable: true, permissions: { has: () => false } };
+  const admin = { id: 'r-admin', name: 'Admin', editable: true, permissions: { has: () => true } };
+  const guild = { id: 'g-palier', roles: { cache: new Collection([['r-ok', ok], ['r-admin', admin]]) } };
+  assert.equal(milestoneLine(guild.id, 50, 'u1'), 'Taux de synchronisation : 50 %.');
+  setMilestone(guild, 50, { message: 'Bienvenue chez les pilotes, {membre} : {taux} atteint.', roleId: 'r-ok' });
+  assert.equal(paliers(guild.id)[50], 'r-ok');
+  assert.equal(milestoneLine(guild.id, 50, 'u1', [ok]), 'Bienvenue chez les pilotes, <@u1> : 50 % atteint.\n-# Rôle Pilote accordé.');
+  assert.throws(() => setMilestone(guild, 50, { roleId: 'r-admin' }), /permissions de gestion/);
+  assert.throws(() => setMilestone(guild, 60, {}), /palier inconnu/);
+  setMilestone(guild, 50, {});
+  assert.equal(paliers(guild.id)[50], undefined);
+  assert.equal(milestoneLine(guild.id, 50, 'u1'), 'Taux de synchronisation : 50 %.');
+});
+
 test("anniversaires : une fois par jour, à partir de 9 h à Paris", async () => {
   const sent = [];
   const channel = { id: 'c', isThread: () => false, send: async (p) => sent.push(p) };

@@ -111,6 +111,7 @@ test('profil : la mémoire est visible et le membre peut tout oublier, lui seule
   const card = JSON.stringify(replies[0].components[0].toJSON());
   assert.match(card, /joue du piano/);
   assert.match(card, /\*\*Synchronisation\*\* : 0 % · 0 point/);
+  assert.match(card, /Prochain palier 25 % dans 40 points, soit 40 minutes actives au moins/);
   assert.match(card, /magi-look:oublier:yui/);
   const { showMemory } = await import('./lookup.js');
   await showMemory(base);

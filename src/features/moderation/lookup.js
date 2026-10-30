@@ -20,7 +20,7 @@ import {
 import { isOperator } from '../../core/installation.js';
 import { listSettings, setSetting, setting } from '../../core/settings.js';
 import { birthdayOfUser, synchroOf } from '../community/store.js';
-import { paliers, rateOf } from '../community/synchro.js';
+import { nextMilestone, paliers, pointsFor, rateOf } from '../community/synchro.js';
 import { pendingReminders } from '../reminders/store.js';
 import { factsAbout, forgetUser, summariesAbout } from '../memory/store.js';
 import { moduleEnabled } from '../../core/config.js';
@@ -69,7 +69,9 @@ function synchroLine(guild, userId) {
     .filter(([threshold]) => Number(threshold) <= rate)
     .sort((a, b) => Number(b[0]) - Number(a[0]))[0];
   const role = tier && guild.roles.cache.get(tier[1]);
-  return `${rate} % · ${points} point${points > 1 ? 's' : ''}${role ? ` · palier ${role}` : ''}`;
+  const next = nextMilestone(rate);
+  const left = next && pointsFor(next) - points;
+  return `${rate} % · ${points} point${points > 1 ? 's' : ''}${role ? ` · palier ${role}` : ''}\n-# ${next ? `Prochain palier ${next} % dans ${left} point${left > 1 ? 's' : ''}, soit ${left} minute${left > 1 ? 's' : ''} active${left > 1 ? 's' : ''} au moins` : 'Palier maximal atteint'}`;
 }
 
 export async function showProfile(interaction) {

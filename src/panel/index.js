@@ -40,6 +40,7 @@ import { automodSection } from './pages/automod.js';
 import { serverSection } from './pages/serveur.js';
 import { SERVER_ACTIONS } from './server-actions.js';
 import { parseEmoji } from '../features/community/hall-of-fame.js';
+import { milestoneMessages, paliers, setMilestone } from '../features/community/synchro.js';
 import { logsSection } from './pages/logs.js';
 import { permissionsSection } from './pages/permissions.js';
 import { debugActive, debugBlocks } from '../features/debug/console.js';
@@ -173,6 +174,31 @@ export async function setupGuild(guild) {
     .catch((err) => log.err('publications', `échec remise en forme : ${err.message}`, { guild }));
 }
 
+function milestoneModal(guild, threshold) {
+  const current = milestoneMessages(guild.id)[threshold] ?? '';
+  const role = paliers(guild.id)[threshold];
+  return new ModalBuilder()
+    .setCustomId(id(`synchro_palier_set:${threshold}`))
+    .setTitle(`Palier de synchronisation ${threshold} %`)
+    .addLabelComponents((l) =>
+      l
+        .setLabel('Message d’annonce (vide = par défaut)')
+        .setDescription('{membre} et {taux} sont remplacés. Melchior le poste sous le message, 30 s.')
+        .setTextInputComponent((t) => {
+          t.setCustomId('message').setStyle(TextInputStyle.Paragraph).setMaxLength(300).setRequired(false).setPlaceholder(`Taux de synchronisation : ${threshold} %.`);
+          if (current) t.setValue(current);
+          return t;
+        }),
+    )
+    .addLabelComponents((l) =>
+      l.setLabel('Rôle donné à ce palier (vide = aucun)').setRoleSelectMenuComponent((r) => {
+        r.setCustomId('role').setRequired(false).setMaxValues(1);
+        if (role) r.setDefaultRoles(role);
+        return r;
+      }),
+    );
+}
+
 export function isPanelInteraction(customId) {
   return customId.startsWith(PREFIX);
 }
@@ -267,6 +293,23 @@ export async function handlePanelInteraction(interaction) {
     if (value !== 'actuel') setSetting(guild.id, 'stars_emoji', value);
     await show('communaute');
     return value === 'actuel' ? null : changed(`emoji du Hall of Fame = ${value}`);
+  }
+  if (field === 'synchro_palier') {
+    const threshold = interaction.values?.[0];
+    interaction.message?.edit(panelPage(guild)).catch(() => {});
+    return interaction.showModal(milestoneModal(guild, threshold));
+  }
+  if (field.startsWith('synchro_palier_set:') && interaction.isModalSubmit()) {
+    const threshold = Number(field.split(':')[1]);
+    const message = interaction.fields.getTextInputValue('message');
+    const roleId = interaction.fields.getSelectedRoles('role', false)?.first()?.id ?? null;
+    try {
+      setMilestone(guild, threshold, { message, roleId });
+    } catch (err) {
+      return ephemeral(`Impossible : ${err.message}.`);
+    }
+    await show('communaute');
+    return changed(`palier ${threshold} % : ${roleId ? `<@&${roleId}>` : 'sans rôle'}, ${message.trim() ? 'message perso' : 'message par défaut'}`);
   }
   if (field === 'stars_emoji_set' && interaction.isModalSubmit()) {
     const emoji = parseEmoji(interaction.fields.getTextInputValue('emoji'));

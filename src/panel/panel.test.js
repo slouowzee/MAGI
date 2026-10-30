@@ -58,3 +58,22 @@ test('/magi config : seulement dans le salon du panneau, republie sans laisser d
   assert.deepEqual(out, [['defer'], ['delete']]);
   assert.equal(setting('panel-test', 'config_page'), null);
 });
+
+test('palier de synchro réglé depuis le panneau : fenêtre préremplie, message et rôle enregistrés', async () => {
+  const { handlePanelInteraction } = await import('./index.js');
+  const { milestoneMessages, paliers } = await import('../features/community/synchro.js');
+  const role = { id: 'r-pilote', name: 'Pilote', editable: true, permissions: { has: () => false } };
+  const g = { ...guild, id: 'panel-palier', ownerId: 'owner', roles: { cache: new Collection([['r-pilote', role]]) } };
+  const out = [];
+  const base = { guild: g, member: { id: 'owner', guild: g, displayName: 'Slou' }, user: { id: 'owner' }, message: { edit: async () => out.push(['panel']) }, update: async (p) => out.push(['update', p]), reply: async (p) => out.push(['reply', p]), showModal: async (m) => out.push(['modal', m.toJSON()]) };
+  await handlePanelInteraction({ ...base, customId: 'magi-config:synchro_palier', values: ['100'] });
+  const modal = out.at(-1)[1];
+  assert.equal(modal.custom_id, 'magi-config:synchro_palier_set:100');
+  assert.deepEqual(modal.components.map((c) => c.component.type), [4, 6]);
+  await handlePanelInteraction({ ...base, customId: 'magi-config:synchro_palier_set:100', isModalSubmit: () => true, fields: { getTextInputValue: () => 'GG {membre}, {taux} !', getSelectedRoles: () => new Collection([['r-pilote', role]]) } });
+  assert.equal(out.at(-1)[0], 'update');
+  assert.equal(paliers('panel-palier')[100], 'r-pilote');
+  assert.equal(milestoneMessages('panel-palier')[100], 'GG {membre}, {taux} !');
+  const select = walk(out.at(-1)[1].components[0].toJSON()).find((c) => c.custom_id === 'magi-config:synchro_palier');
+  assert.equal(select.options.find((o) => o.value === '100').description, '@Pilote · message perso');
+});
