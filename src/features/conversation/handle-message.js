@@ -13,7 +13,8 @@ import { buttonsFor, previewsFor } from '../../core/discord/buttons.js';
 import { conversationFor, conversationPrompt, rememberAnswer } from '../../core/discord/history.js';
 import { splitMessage } from '../../core/discord/split.js';
 import { speak } from '../../core/discord/webhooks.js';
-import { LLMUnavailable } from '../../core/llm/client.js';
+import { chat, forReply, LLMUnavailable } from '../../core/llm/client.js';
+import { acceptable, examplesNote, registerOf, rememberReply, repetitionNote, staleness } from './examples.js';
 import { buildMessages, cleanReply, MAX_TOKENS } from '../../core/llm/prompts.js';
 import { respond } from '../../core/llm/respond.js';
 import { log } from '../../core/log/log.js';
@@ -115,17 +116,29 @@ export async function handleMessage(message, { catchUp = false, force = false } 
     const { turns, participants, target, included } = await conversationFor(message, persona, message.content, current, (id) => isClaimed(channelId, id));
     for (const id of included) addMessage(current, id, null, Date.now());
     const summary = wantsSummary(trigger.text);
-    const { content: reply, model, actions } = await respond({
-      messages: buildMessages(persona, summary ? [{ role: 'user', content: conversationPrompt([`${target} : ${message.content}`], target) }] : turns, length, await memoryContext(message.guild.id, participants, message.content)),
+    const guildId = message.guild.id;
+    const extra = [await memoryContext(guildId, participants, message.content), !summary && examplesNote(guildId, persona, registerOf(trigger.text)), repetitionNote(guildId, persona)].filter(Boolean).join('\n');
+    const messages = buildMessages(persona, summary ? [{ role: 'user', content: conversationPrompt([`${target} : ${message.content}`], target) }] : turns, length, extra);
+    const first = await respond({
+      messages,
       options: { num_predict: MAX_TOKENS[length] },
       member: message.member,
       message,
       persona,
       force: summary ? 'resumer' : null,
     });
+    const { actions } = first;
+    let { content: reply, model } = first;
+    const stale = !actions.length && staleness(guildId, persona, cleanReply(reply));
+    if (stale) {
+      const retry = await chat({ messages: [...messages, { role: 'assistant', content: reply }, { role: 'user', content: `Réécris ta réponse autrement : ${stale}. Même idée si elle est bonne, mais d'autres mots et une autre construction, sans reprendre aucune de tes réponses précédentes.` }], options: { num_predict: MAX_TOKENS[length] }, ...forReply() }).catch(() => null);
+      if (retry?.content?.trim() && acceptable(guildId, persona, cleanReply(retry.content))) ({ content: reply, model } = retry);
+      log.debug('conversation', `${persona} : réponse réécrite, ${stale}`, where);
+    }
     clearInterval(typing);
-    log.info('conversation', `${message.author.tag} → ${persona}, conv ${current.id}, ${model}, ${((Date.now() - started) / 1000).toFixed(1)} s`, where);
+    log.info('conversation', `${message.author.tag} → ${persona}, conv ${current.id}, ${model}${stale ? ', réécrite' : ''}, ${((Date.now() - started) / 1000).toFixed(1)} s`, where);
     const cleaned = cleanReply(reply);
+    rememberReply(guildId, persona, cleaned);
     const parts = splitMessage(cleaned).filter(Boolean);
     const sent = [];
     for (const [i, part] of parts.entries()) {

@@ -120,6 +120,16 @@ db.exec(`CREATE TABLE IF NOT EXISTS scheduled (
   done INTEGER NOT NULL DEFAULT 0
 )`);
 if (!db.query('PRAGMA table_info(scheduled)').all().some((c) => c.name === 'draft')) db.exec('ALTER TABLE scheduled ADD COLUMN draft TEXT');
+db.exec(`CREATE TABLE IF NOT EXISTS examples (
+  id INTEGER PRIMARY KEY,
+  guild_id TEXT NOT NULL,
+  persona TEXT NOT NULL,
+  register TEXT NOT NULL,
+  input TEXT NOT NULL,
+  output TEXT NOT NULL,
+  added_by TEXT,
+  created_at INTEGER NOT NULL
+)`);
 db.exec(`CREATE TABLE IF NOT EXISTS synchro (
   guild_id TEXT NOT NULL,
   user_id TEXT NOT NULL,

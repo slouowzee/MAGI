@@ -63,7 +63,7 @@ function pause(id) {
   pausedUntil.set(id, Date.now() + Math.min(COOLDOWN * 2 ** (count - 1), MAX_COOLDOWN));
 }
 
-export const forReply = () => (process.env.GEMINI_REPLY_MODEL ? { model: process.env.GEMINI_REPLY_MODEL, reasoning: 'none' } : {});
+export const forReply = () => ({ model: process.env.GEMINI_REPLY_MODEL || 'gemini-3.5-flash', reasoning: 'none' });
 export const activeProviders = () => Object.keys(PROVIDERS).filter((name) => process.env[PROVIDERS[name].key]);
 const stats = new Map();
 const listeners = new Set();
