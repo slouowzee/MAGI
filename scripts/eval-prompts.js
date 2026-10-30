@@ -41,6 +41,7 @@ const MESSAGES = [
 
 const CONVERSATIONS = [
   ['casper ?', "c'est déjà bien mieux niveau réponse", 'ça ira.', 'repos, soldat.'],
+  ['melchior ?', 'tu me fais une petite config pour un nas ?', 'bof, un truc basique, un raid 1 et des disques de 8to', 'et tu me recommandes quoi ?'],
   ['melchior, tu fais quoi ce soir ?', 'cool, et tu me conseilles quoi comme film ?', "c'est sûr", 'merci'],
   ["balthasar, j'ai eu une journée pourrie", "mon chef m'a engueulé devant tout le monde", 'ouais', 'merci, ça fait du bien'],
   ['casper, pizza ou burger ce soir ?', 'nan mais sérieux', 't’es bête mdr', 'bon je vais manger'],
@@ -52,7 +53,7 @@ const personas = named.length ? named : ['melchior', 'balthasar', 'casper'];
 
 async function reply(persona, text, lines) {
   const register = registerOf(text);
-  const extra = [examplesNote('banc', persona, register), repetitionNote('banc', persona)].filter(Boolean).join('\n');
+  const extra = [examplesNote('banc', persona, register, Math.random, text), repetitionNote('banc', persona)].filter(Boolean).join('\n');
   const messages = buildMessages(persona, [{ role: 'user', content: conversationPrompt(lines, 'slou') }], 'courte', extra);
   let answer = await chat({ messages, options: { num_predict: MAX_TOKENS.courte }, ...forReply() }).catch((err) => ({ content: `ÉCHEC : ${err.message}`, model: '-' }));
   const stale = staleness('banc', persona, cleanReply(answer.content));
@@ -91,7 +92,7 @@ async function run(persona) {
   let rewritten = 0;
   for (const text of MESSAGES) {
     const register = registerOf(text);
-    const extra = [examplesNote('banc', persona, register), repetitionNote('banc', persona)].filter(Boolean).join('\n');
+    const extra = [examplesNote('banc', persona, register, Math.random, text), repetitionNote('banc', persona)].filter(Boolean).join('\n');
     const messages = buildMessages(persona, [{ role: 'user', content: conversationPrompt([`slou : ${text}`], 'slou') }], 'courte', extra);
     const started = performance.now();
     let reply = await chat({ messages, options: { num_predict: MAX_TOKENS.courte }, ...forReply() }).catch((err) => ({ content: `ÉCHEC : ${err.message}`, model: '-' }));

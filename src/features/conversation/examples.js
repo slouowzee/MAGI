@@ -30,6 +30,7 @@ export const SEEDS = [
   example('melchior', 'bavardage', 'Tom : je m’ennuie', 'Choisis un truc que tu ne sais pas faire et donne-toi vingt minutes dessus. L’ennui tient rarement face à un problème concret.'),
   example('melchior', 'question', 'Pourquoi le ciel est bleu ?', 'Les molécules de l’air diffusent bien plus la lumière bleue que la rouge. Ce bleu te revient donc de toutes les directions du ciel, alors que le reste passe plutôt tout droit.'),
   example('melchior', 'question', 'c’est quoi la différence entre la RAM et le stockage ?', 'La RAM, c’est la mémoire de travail : très rapide, vidée à l’extinction. Le stockage garde tes fichiers durablement, mais il est bien plus lent. Peu de RAM, ça rame dès que tu ouvres trop de choses ; peu de stockage, tu ne peux plus rien enregistrer.'),
+  example('melchior', 'question', 'tu me fais une petite config pour un NAS ?', 'Pour un NAS simple et fiable :\n- **Boîtier** : 2 baies, type Synology DS223 ou QNAP TS-233\n- **Disques** : 2 × 8 To de gamme NAS (WD Red Plus, Seagate IronWolf)\n- **RAID 1** : 8 To utiles, et un disque peut lâcher sans perte\nGarde quand même une sauvegarde ailleurs : le RAID protège d’une panne, pas d’une suppression par erreur.'),
   example('melchior', 'debat', 'Pâtes ou riz ?', 'Pâtes. Plus de formes, plus de sauces, et beaucoup plus difficiles à rater. Je concède le risotto au riz.'),
   example('melchior', 'debat', 'Star Wars ou Star Trek ?', 'Star Trek, sans hésiter. Ça parle de diplomatie, d’éthique et de science, et parfois même de science à peu près correcte.'),
   example('melchior', 'nouvelle', 'j’ai eu 18 en maths !', 'Joli travail. Regarde quand même où sont partis les deux points restants, c’est souvent là qu’on apprend le plus.'),
@@ -108,17 +109,26 @@ function shuffle(list, random) {
   return list.map((item) => [random(), item]).sort((a, b) => a[0] - b[0]).map(([, item]) => item);
 }
 
-export function pickExamples(guildId, persona, register, random = Math.random) {
-  const pool = [...learnedExamples(guildId).map((e) => ({ ...e, learned: true })), ...SEEDS].filter((e) => e.persona === persona);
+const words = (text) => new Set(String(text ?? '').toLowerCase().replace(/^[^:]{1,40} : /, '').split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 2));
+
+export function closeTo(a, b) {
+  const [x, y] = [words(a), words(b)];
+  if (!x.size || !y.size) return false;
+  const shared = [...x].filter((w) => y.has(w)).length;
+  return shared / Math.min(x.size, y.size) >= 0.6;
+}
+
+export function pickExamples(guildId, persona, register, random = Math.random, text = '') {
+  const pool = [...learnedExamples(guildId).map((e) => ({ ...e, learned: true })), ...SEEDS].filter((e) => e.persona === persona && !closeTo(e.input, text));
   const same = shuffle(pool.filter((e) => e.register === register), random).sort((a, b) => Number(Boolean(b.learned)) - Number(Boolean(a.learned)));
   const others = shuffle(pool.filter((e) => e.register !== register), random);
   return [...same.slice(0, 3), ...others].slice(0, MAX_SHOWN);
 }
 
-export function examplesNote(guildId, persona, register, random = Math.random) {
-  const shown = pickExamples(guildId, persona, register, random);
-  const lines = shown.map((e) => `- « ${e.input} » → « ${e.output} »`);
-  return [`Ce message : ${REGISTERS[register]}`, lines.length && `Exemples de réponses réussies, pour le ton et la variété (jamais à recopier, ni dans la forme ni dans les images) :\n${lines.join('\n')}`].filter(Boolean).join('\n');
+export function examplesNote(guildId, persona, register, random = Math.random, text = '') {
+  const shown = pickExamples(guildId, persona, register, random, text);
+  const blocks = shown.map((e) => `« ${e.input} »\n→ ${e.output}`);
+  return [`Ce message : ${REGISTERS[register]}`, blocks.length && `Exemples de réponses réussies, pour le ton et la variété (jamais à recopier, ni dans la forme ni dans les images) :\n\n${blocks.join('\n\n')}`].filter(Boolean).join('\n');
 }
 
 const RECENT = 20;

@@ -26,7 +26,7 @@ test('banque : exemples de la bonne unité, du même type d’abord, appris en p
   assert.equal(learn('g-banque', { persona: 'casper', input: 'x', output: 'Café, et serré. Le thé, c’est de l’eau chaude qui a des ambitions.', by: 'owner' }), false);
   assert.equal(pickExamples('g-banque', 'casper', 'debat', random)[0].output, 'Café, et serré. Le thé, c’est de l’eau chaude qui a des ambitions.');
   assert.equal(learnedExamples('g-banque')[0].register, 'debat');
-  assert.match(examplesNote('g-banque', 'casper', 'debat', random), /^Ce message : Question de goût[\s\S]*« Slou : tu préfères le thé ou le café \? » → « Café, et serré/);
+  assert.match(examplesNote('g-banque', 'casper', 'debat', random), /^Ce message : Question de goût[\s\S]*« Slou : tu préfères le thé ou le café \? »\n→ Café, et serré/);
   assert.equal(unlearn('g-banque', 'Café, et serré. Le thé, c’est de l’eau chaude qui a des ambitions.'), true);
   assert.equal(learnedExamples('g-banque').length, 0);
 });
@@ -74,4 +74,13 @@ test('ton du serveur : message d’un membre ajouté par un opérateur, montré 
   assert.equal(toneCountOf('g-ton', 'lea'), 1);
   assert.equal(forgetToneOf('g-ton', 'lea'), 1);
   assert.equal(toneNote('g-ton'), '');
+});
+
+test('un exemple trop proche du message n’est pas montré, pour ne pas être recopié', async () => {
+  const { closeTo, pickExamples } = await import('./examples.js');
+  assert.ok(closeTo('tu me fais une petite config pour un NAS ?', 'tu me fais une petite config pour un nas ?'));
+  assert.ok(closeTo('Slou : pâtes ou riz ?', 'pâtes ou riz ce soir'));
+  assert.ok(!closeTo('tu me fais une petite config pour un NAS ?', 'tu me conseilles quoi comme film ?'));
+  const shown = pickExamples('g-proche', 'melchior', 'question', () => 0.5, 'tu me fais une petite config pour un nas ?');
+  assert.ok(!shown.some((e) => /NAS/.test(e.input)));
 });

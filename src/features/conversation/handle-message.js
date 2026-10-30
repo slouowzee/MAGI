@@ -117,7 +117,7 @@ export async function handleMessage(message, { catchUp = false, force = false } 
     for (const id of included) addMessage(current, id, null, Date.now());
     const summary = wantsSummary(trigger.text);
     const guildId = message.guild.id;
-    const extra = [await memoryContext(guildId, participants, message.content), !summary && examplesNote(guildId, persona, registerOf(trigger.text)), !summary && toneNote(guildId), repetitionNote(guildId, persona)].filter(Boolean).join('\n');
+    const extra = [await memoryContext(guildId, participants, message.content), !summary && examplesNote(guildId, persona, registerOf(trigger.text), Math.random, trigger.text), !summary && toneNote(guildId), repetitionNote(guildId, persona)].filter(Boolean).join('\n');
     const messages = buildMessages(persona, summary ? [{ role: 'user', content: conversationPrompt([`${target} : ${message.content}`], target) }] : turns, length, extra);
     const first = await respond({
       messages,
