@@ -157,6 +157,19 @@ test('paliers : points restants, message perso avec {membre} et {taux}, rôle v�
   assert.equal(milestoneLine(guild.id, 50, 'u1'), 'Taux de synchronisation : 50 %.');
 });
 
+test('rôles de palier rangés automatiquement, le plus haut palier en haut', async () => {
+  const { orderMilestoneRoles } = await import('./synchro.js');
+  const calls = [];
+  const names = { r25: 8, r50: 7, r100: 6, r400: 5 };
+  const roles = new Collection(Object.entries(names).map(([id, position]) => [id, { id, name: id, position, managed: false }]));
+  const guild = { id: 'g-rang', roles: { cache: roles, setPositions: async (list) => calls.push(list) }, members: { me: { roles: { highest: { position: 16 } } } } };
+  setSetting(guild.id, 'synchro_roles', JSON.stringify({ 25: 'r25', 50: 'r50', 100: 'r100', 400: 'r400' }));
+  assert.equal(await orderMilestoneRoles(guild), true);
+  assert.deepEqual(calls[0], [{ role: 'r400', position: 8 }, { role: 'r100', position: 7 }, { role: 'r50', position: 6 }, { role: 'r25', position: 5 }]);
+  for (const { role, position } of calls[0]) roles.get(role).position = position;
+  assert.equal(await orderMilestoneRoles(guild), false);
+});
+
 test("anniversaires : une fois par jour, à partir de 9 h à Paris", async () => {
   const sent = [];
   const channel = { id: 'c', isThread: () => false, send: async (p) => sent.push(p) };

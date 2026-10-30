@@ -40,7 +40,7 @@ import { automodSection } from './pages/automod.js';
 import { serverSection } from './pages/serveur.js';
 import { SERVER_ACTIONS } from './server-actions.js';
 import { parseEmoji } from '../features/community/hall-of-fame.js';
-import { milestoneMessages, paliers, setMilestone } from '../features/community/synchro.js';
+import { milestoneMessages, orderMilestoneRoles, paliers, setMilestone } from '../features/community/synchro.js';
 import { logsSection } from './pages/logs.js';
 import { permissionsSection } from './pages/permissions.js';
 import { debugActive, debugBlocks } from '../features/debug/console.js';
@@ -169,6 +169,7 @@ export async function setupGuild(guild) {
   await ensureGate(guild).catch((err) => log.err('filtre', `échec mise en place du filtre : ${err.message}`, { guild }));
   await refreshHoneypot(guild).catch((err) => log.err('honeypot', `échec mise à jour du honeypot : ${err.message}`, { guild }));
   await resyncAutomod(guild);
+  await orderMilestoneRoles(guild).catch((err) => log.err('synchro', `échec du rangement des rôles de palier : ${err.message}`, { guild }));
   await restylePublications(guild)
     .then((count) => count && log.notice('publications', `${count} publication${count > 1 ? 's' : ''} remise${count > 1 ? 's' : ''} au nouveau style`, { guild }))
     .catch((err) => log.err('publications', `échec remise en forme : ${err.message}`, { guild }));
@@ -308,6 +309,7 @@ export async function handlePanelInteraction(interaction) {
     } catch (err) {
       return ephemeral(`Impossible : ${err.message}.`);
     }
+    orderMilestoneRoles(guild).catch((err) => log.err('synchro', `échec du rangement des rôles de palier : ${err.message}`, { guild }));
     await show('communaute');
     return changed(`palier ${threshold} % : ${roleId ? `<@&${roleId}>` : 'sans rôle'}, ${message.trim() ? 'message perso' : 'message par défaut'}`);
   }

@@ -3,7 +3,7 @@ import { isOperator } from '../../core/installation.js';
 import { setSetting } from '../../core/settings.js';
 import { deleteBirthday, setBirthday, synchroOf, synchroTop } from './store.js';
 import { addReminder } from '../reminders/store.js';
-import { MILESTONES, paliers, rateOf } from './synchro.js';
+import { MILESTONES, orderMilestoneRoles, paliers, rateOf } from './synchro.js';
 import { DANGEROUS } from '../admin/role-panels.js';
 import { findChannel, targetRole } from '../admin/resolve.js';
 
@@ -135,7 +135,8 @@ export const COMMUNITY_TOOLS = [
       if (!role.editable) throw new Error(`${role.name} est au-dessus du rôle de MAGI`);
       roles[threshold] = role.id;
       setSetting(guild.id, 'synchro_roles', JSON.stringify(roles));
-      return `Rôle ${role.name} donné à ${threshold} % de synchronisation.`;
+      const ordered = await orderMilestoneRoles(guild).catch(() => false);
+      return `Rôle ${role.name} donné à ${threshold} % de synchronisation.${ordered ? ' Les rôles de palier ont été rangés, le plus haut palier en haut.' : ''}`;
     },
   },
 ];

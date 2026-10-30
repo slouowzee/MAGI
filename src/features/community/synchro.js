@@ -31,6 +31,17 @@ export function setMilestone(guild, threshold, { message = '', roleId = null }) 
   setSetting(guild.id, 'synchro_messages', JSON.stringify(messages));
 }
 
+export async function orderMilestoneRoles(guild) {
+  const top = guild.members.me?.roles?.highest?.position ?? 0;
+  const ids = [...new Set(Object.entries(paliers(guild.id)).sort((a, b) => Number(b[0]) - Number(a[0])).map(([, id]) => id))];
+  const roles = ids.map((id) => guild.roles.cache.get(id)).filter((r) => r && !r.managed && r.position < top);
+  const slots = roles.map((r) => r.position).sort((a, b) => b - a);
+  if (roles.length < 2 || roles.every((r, i) => r.position === slots[i])) return false;
+  await guild.roles.setPositions(roles.map((role, i) => ({ role: role.id, position: slots[i] })));
+  log.notice('synchro', `rôles de palier rangés, du plus haut au plus bas : ${roles.map((r) => r.name).join(' > ')}`, { guild });
+  return true;
+}
+
 export function milestoneLine(guildId, threshold, memberId, granted = []) {
   const custom = milestoneMessages(guildId)[threshold];
   const roles = granted.length ? granted.map((r) => r.name).join(', ') : '';
