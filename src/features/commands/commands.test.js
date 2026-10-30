@@ -144,6 +144,20 @@ test('/ecrire publication : couleur, images, bouton lien, section, aperçu, publ
   const updated = out.at(-1)[1].components[1].toJSON();
   assert.ok(updated.components.some((c) => c.type === 14));
   assert.deepEqual(updated.components.at(-1).components.map((b) => [b.label, b.url]), [['Rejoindre', 'https://discord.gg/x']]);
+  await handleWriteModal({ ...base, customId: `magi-write:draft:modifier:${token}` });
+  const draftModal = JSON.stringify(out.at(-1)[1]);
+  assert.match(draftModal, /"value":"Ce soir 21 h"/);
+  assert.match(draftModal, /Nouvelles images \(vide = garder\)/);
+  await handleWriteModal({ ...base, customId: `magi-write:draft:modifier-set:${token}`, fields: fieldsOf({ titre: 'Soirée jeux', texte: 'Ce soir 21 h, venez nombreux', quand: '' }, { couleur: ['violet'] }) });
+  const edited = out.at(-1)[1].components[1].toJSON();
+  assert.equal(edited.accent_color, 0x7f77dd);
+  assert.match(edited.components[0].content, /venez nombreux/);
+  assert.equal(edited.components.find((c) => c.type === 12).items.length, 2);
+  await handleWriteModal({ ...base, customId: `magi-write:draft:bouton-set:${token}`, fields: fieldsOf({ texte: 'En trop', url: 'https://x.y' }) });
+  const select = out.at(-1)[1].components[3].toJSON().components[0];
+  assert.deepEqual(select.options.map((o) => o.value), ['bouton:0', 'bouton:1', 'section:0', 'images']);
+  await handleWriteModal({ ...base, customId: select.custom_id, values: ['bouton:1'] });
+  assert.equal(out.at(-1)[1].components[1].toJSON().components.at(-1).components.length, 1);
   await handleWriteModal({ ...base, customId: `magi-write:draft:publier:${token}` });
   assert.equal(sent[0].flags, MessageFlags.IsComponentsV2);
   assert.equal(sent[0].files.length, 2);
@@ -155,7 +169,7 @@ test('/ecrire publication : couleur, images, bouton lien, section, aperçu, publ
   await openWrite({ ...base, channel, options: { getString: (k) => ({ forme: 'publication', modifier: `https://discord.com/channels/g/${channel.id}/${id}` })[k], getChannel: () => channel } });
   const modal = JSON.stringify(out.at(-1)[1]);
   assert.match(modal, /"value":"Soirée jeux"/);
-  assert.match(modal, /"value":"bleu","default":true/);
+  assert.match(modal, /"value":"violet","default":true/);
   await handleWriteModal({ ...base, customId: `magi-write:publication:${channel.id}:${id}`, isModalSubmit: () => true, fields: fieldsOf({ titre: 'Soirée jeux', texte: 'Ce soir 22 h' }, { couleur: ['vert'] }) });
   const editPreview = out.at(-1)[1];
   assert.equal(editPreview.components[1].toJSON().accent_color, 0x1d9e75);
@@ -166,6 +180,7 @@ test('/ecrire publication : couleur, images, bouton lien, section, aperçu, publ
   const final = edits[0].components[0].toJSON();
   assert.deepEqual(final.components.find((c) => c.type === 12).items.map((i) => i.media.url), ['attachment://image-1.png', 'attachment://image-2.jpg']);
   assert.match(final.components[0].content, /Ce soir 22 h/);
+  assert.equal(final.accent_color, 0x1d9e75);
   assert.equal(final.components.at(-1).components[0].label, 'Rejoindre');
 });
 

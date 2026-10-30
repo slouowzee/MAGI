@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, extname, join } from 'node:path';
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ContainerBuilder, MediaGalleryBuilder, MessageFlags, ModalBuilder, SectionBuilder, SeparatorBuilder, TextDisplayBuilder, TextInputStyle, ThumbnailBuilder } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ContainerBuilder, MediaGalleryBuilder, MessageFlags, ModalBuilder, SectionBuilder, SeparatorBuilder, StringSelectMenuBuilder, TextDisplayBuilder, TextInputStyle, ThumbnailBuilder } from 'discord.js';
 import { SIGNATURE } from '../../core/discord/embeds.js';
 import { setSetting, setting } from '../../core/settings.js';
 import { savePublication } from '../admin/publications-store.js';
@@ -63,12 +63,26 @@ export function previewPayload(draft) {
   const control = (action, label, style = ButtonStyle.Secondary) => new ButtonBuilder().setCustomId(`magi-write:draft:${action}:${draft.token}`).setLabel(label).setStyle(style);
   const when = draft.when ? ` · programmée pour <t:${Math.floor(draft.when / 1000)}:F>` : '';
   const controls = [
+    control('modifier', 'Modifier'),
     draft.buttons.length < MAX_BUTTONS && control('bouton', 'Ajouter un bouton lien'),
     draft.sections.length < MAX_SECTIONS && control('section', 'Ajouter une section'),
     control('publier', draft.editId ? 'Mettre à jour' : draft.when ? 'Programmer' : 'Publier', ButtonStyle.Success),
     control('annuler', 'Annuler'),
   ].filter(Boolean);
-  return { components: [text(`-# Aperçu${when}, visible par toi seul`), publicationCard(draft), new ActionRowBuilder().addComponents(controls)], files: newFiles(draft), attachments: [], allowedMentions: { parse: [] } };
+  const removable = [
+    ...draft.buttons.map((b, i) => ({ label: `Bouton « ${b.label} »`.slice(0, 100), value: `bouton:${i}` })),
+    ...draft.sections.map((s, i) => ({ label: `Section « ${s.text.replace(/\s+/g, ' ').slice(0, 60)} »`.slice(0, 100), value: `section:${i}` })),
+    ...(draft.images.length ? [{ label: `Les images (${draft.images.length})`, value: 'images' }] : []),
+  ];
+  const remove = removable.length ? [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`magi-write:draft:retirer:${draft.token}`).setPlaceholder('Retirer…').addOptions(removable))] : [];
+  return { components: [text(`-# Aperçu${when}, visible par toi seul`), publicationCard(draft), new ActionRowBuilder().addComponents(controls), ...remove], files: newFiles(draft), attachments: [], allowedMentions: { parse: [] } };
+}
+
+export function removeFromDraft(draft, choice) {
+  const [kind, index] = choice.split(':');
+  if (kind === 'bouton') draft.buttons.splice(Number(index), 1);
+  else if (kind === 'section') draft.sections.splice(Number(index), 1);
+  else if (kind === 'images') draft.images = [];
 }
 
 export function draftModal(action, draft) {

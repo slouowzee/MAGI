@@ -6,7 +6,7 @@ import { log } from '../../core/log/log.js';
 import { publicationEmbed } from '../admin/publications.js';
 import { savePublication } from '../admin/publications-store.js';
 import { db } from '../../core/db.js';
-import { addFromModal, COLORS, createDraft, download, draftFromMeta, draftModal, dropDraft, dropFiles, getDraft, MAX_IMAGES, MAX_TEXT, previewPayload, publicationMeta, publishDraft, storedDraft, storeFiles, textLength, updatePublication } from './publication.js';
+import { addFromModal, COLORS, createDraft, download, draftFromMeta, draftModal, dropDraft, dropFiles, getDraft, MAX_IMAGES, MAX_TEXT, previewPayload, publicationMeta, publishDraft, removeFromDraft, storedDraft, storeFiles, textLength, updatePublication } from './publication.js';
 
 const PREFIX = 'magi-write:';
 const ephemeral = { flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } };
@@ -88,6 +88,12 @@ export function parseWhen(input, now = Date.now()) {
   return { at };
 }
 
+function whenLabel(at) {
+  if (!at) return '';
+  const p = parisParts(at);
+  return `${p.day}/${p.month} ${p.hour}h${String(p.minute).padStart(2, '0')}`;
+}
+
 export function scheduleMessage({ guildId, channelId, authorId, form, title = '', text, at, draft = null }) {
   const id = Number(insertScheduled.run(guildId, channelId, authorId, form, title, text, at, null).lastInsertRowid);
   if (draft) db.query('UPDATE scheduled SET draft = ? WHERE id = ?').run(JSON.stringify(storeFiles(id, draft)), id);
@@ -158,10 +164,10 @@ export function startScheduled(client) {
 
 const messageId = (ref) => String(ref ?? '').match(/(\d{17,20})\/?$/)?.[1] ?? null;
 
-function writeModal({ form, channelId, editId, title = '', text = '', color = 'magi' }) {
+function writeModal({ form, channelId, editId, title = '', text = '', color = 'magi', customId = null, when = '', keepImages = Boolean(editId) }) {
   const publication = form === 'publication';
   const max = publication ? MAX_TEXT - 300 : 2000;
-  const modal = new ModalBuilder().setCustomId(`${PREFIX}${form}:${channelId}:${editId ?? ''}`).setTitle(editId ? 'Modifier le message de MAGI' : 'Écrire un message');
+  const modal = new ModalBuilder().setCustomId(customId ?? `${PREFIX}${form}:${channelId}:${editId ?? ''}`).setTitle(editId ? 'Modifier le message de MAGI' : customId ? 'Modifier le brouillon' : 'Écrire un message');
   const input = (id, label, style, { length, required = false, value = '', placeholder = '' }) =>
     modal.addLabelComponents((l) =>
       l.setLabel(label).setTextInputComponent((t) => {
@@ -175,9 +181,9 @@ function writeModal({ form, channelId, editId, title = '', text = '', color = 'm
   input('texte', 'Texte, publié tel quel (Markdown Discord)', TextInputStyle.Paragraph, { length: max, required: true, value: text });
   if (publication) {
     modal.addLabelComponents((l) => l.setLabel('Couleur de la barre').setStringSelectMenuComponent((m) => m.setCustomId('couleur').setRequired(false).addOptions(Object.entries(COLORS).map(([value, [name]]) => ({ label: name, value, default: value === color })))));
-    modal.addLabelComponents((l) => l.setLabel(editId ? 'Nouvelles images (vide = garder)' : `Images, jusqu’à ${MAX_IMAGES} (facultatif)`).setFileUploadComponent((u) => u.setCustomId('images').setRequired(false).setMaxValues(MAX_IMAGES)));
+    modal.addLabelComponents((l) => l.setLabel(keepImages ? 'Nouvelles images (vide = garder)' : `Images, jusqu’à ${MAX_IMAGES} (facultatif)`).setFileUploadComponent((u) => u.setCustomId('images').setRequired(false).setMaxValues(MAX_IMAGES)));
   }
-  if (!editId) input('quand', 'Quand ? Vide = tout de suite', TextInputStyle.Short, { length: 40, placeholder: WHEN_HINT });
+  if (!editId) input('quand', 'Quand ? Vide = tout de suite', TextInputStyle.Short, { length: 40, placeholder: WHEN_HINT, value: when });
   return modal;
 }
 
@@ -208,11 +214,27 @@ async function draftAction(interaction, action, token) {
   const draft = getDraft(token);
   if (!draft) return interaction.update(notice('Ce brouillon a expiré : relance /ecrire.'));
   if (action === 'bouton' || action === 'section') return interaction.showModal(draftModal(action, draft));
+  if (action === 'modifier') return interaction.showModal(writeModal({ form: 'publication', editId: draft.editId, customId: `${PREFIX}draft:modifier-set:${token}`, title: draft.title, text: draft.text, color: draft.color, when: whenLabel(draft.when), keepImages: true }));
   if (action === 'annuler') {
     dropDraft(token);
     return interaction.update(notice('Publication abandonnée.'));
   }
   await interaction.deferUpdate();
+  if (action === 'retirer') {
+    removeFromDraft(draft, interaction.values[0]);
+    return interaction.editReply(previewPayload(draft));
+  }
+  if (action === 'modifier-set') {
+    const { fields } = interaction;
+    const when = draft.editId ? { at: null } : parseWhen(fields.getTextInputValue('quand'));
+    if (when.error) return interaction.followUp({ content: when.error, ...ephemeral });
+    const next = { ...draft, title: fields.getTextInputValue('titre').trim(), text: fields.getTextInputValue('texte').trim(), color: fields.getStringSelectValues('couleur')?.[0] ?? draft.color, when: when.at };
+    const uploads = await download(fields.getUploadedFiles('images', false)?.values(), 'image');
+    if (uploads.length) next.images = uploads;
+    if (textLength(next) > MAX_TEXT) return interaction.followUp({ content: `Trop de texte : une publication est limitée à ${MAX_TEXT} caractères en tout.`, ...ephemeral });
+    Object.assign(draft, next);
+    return interaction.editReply(previewPayload(draft));
+  }
   if (action === 'bouton-set' || action === 'section-set') {
     const problem = await addFromModal(interaction, draft, action.slice(0, -'-set'.length));
     if (problem) return interaction.followUp({ content: problem, ...ephemeral });
