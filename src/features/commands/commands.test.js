@@ -214,7 +214,7 @@ test('mentions et emojis écrits en texte : convertis, ambigus et inconnus signa
   assert.deepEqual(unknown, ['@Léa (plusieurs correspondances)', '@personne', ':inconnu:']);
 });
 
-test('clic droit « Publier avec MAGI » : brouillon repris du message, original supprimé à la publication', async () => {
+test('clic droit « Publier avec MAGI » : brouillon repris du message, salon au choix, original gardé', async () => {
   const { draftFromMessage, handleWriteModal } = await import('./write.js');
   const { out, sent, channel, base } = publishing('g-clic', '323456789012345678');
   const deleted = [];
@@ -222,7 +222,6 @@ test('clic droit « Publier avec MAGI » : brouillon repris du message, original
   const source = { id: 'src', channel, author: { id: 'op' }, content: 'Tournoi samedi <@1>', attachments: new Collection([['a', { url: PNG, name: 'affiche.png', contentType: 'image/png' }]]) };
   await draftFromMessage({ ...base, targetMessage: source });
   const preview = out.at(-1)[1];
-  assert.match(JSON.stringify(preview.components[0].toJSON()), /message d’origine sera supprimé/);
   assert.match(preview.components[1].toJSON().components[0].content, /^Tournoi samedi <@1>$/);
   assert.equal(preview.files.length, 1);
   const where = preview.components.at(-1).toJSON().components[0];
@@ -236,9 +235,7 @@ test('clic droit « Publier avec MAGI » : brouillon repris du message, original
   await handleWriteModal({ ...base, customId: publish });
   assert.equal(sent.length, 1);
   assert.equal(sent[0][0], 'annonces');
-  assert.deepEqual(deleted, ['src']);
-  await draftFromMessage({ ...base, targetMessage: { ...source, author: { id: 'autre' } } });
-  assert.ok(!JSON.stringify(out.at(-1)[1].components[0].toJSON()).includes('supprimé'));
+  assert.deepEqual(deleted, []);
 });
 
 test('publication : une ligne --- devient un séparateur, y compris dans une section avec vignette', async () => {

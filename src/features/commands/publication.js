@@ -84,7 +84,7 @@ export function previewPayload(draft) {
   ];
   const remove = removable.length ? [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`magi-write:draft:retirer:${draft.token}`).setPlaceholder('Retirer…').addOptions(removable))] : [];
   const where = draft.editId ? [] : [new ActionRowBuilder().addComponents(new ChannelSelectMenuBuilder().setCustomId(`magi-write:draft:salon:${draft.token}`).setPlaceholder('Salon de publication').setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setDefaultChannels(draft.channelId))];
-  return { components: [text(`-# Aperçu · dans <#${draft.channelId}>${when}, visible par toi seul${draft.sourceId ? '\n-# Ton message d’origine sera supprimé à la publication.' : ''}`), publicationCard(draft), new ActionRowBuilder().addComponents(controls), ...remove, ...where], files: newFiles(draft), attachments: [], allowedMentions: { parse: [] } };
+  return { components: [text(`-# Aperçu · dans <#${draft.channelId}>${when}, visible par toi seul`), publicationCard(draft), new ActionRowBuilder().addComponents(controls), ...remove, ...where], files: newFiles(draft), attachments: [], allowedMentions: { parse: [] } };
 }
 
 export function removeFromDraft(draft, choice) {
