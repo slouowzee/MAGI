@@ -6,11 +6,14 @@ import { log } from '../../core/log/log.js';
 import { publicationEmbed } from '../admin/publications.js';
 import { savePublication } from '../admin/publications-store.js';
 import { db } from '../../core/db.js';
+import { resolveMentions, unknownNote } from './mentions.js';
 import { addFromModal, COLORS, createDraft, download, draftFromMeta, draftModal, dropDraft, dropFiles, getDraft, MAX_IMAGES, MAX_TEXT, previewPayload, publicationMeta, publishDraft, removeFromDraft, storedDraft, storeFiles, textLength, updatePublication } from './publication.js';
 
 const PREFIX = 'magi-write:';
 const ephemeral = { flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } };
 const FORMS = { publication: 'Publication encadrée', message: 'Message simple de MAGI', ...Object.fromEntries(Object.entries(PERSONAS).map(([k, p]) => [k, `Voix de ${p.name}`])) };
+
+export const PUBLISH_FROM_MESSAGE = 'Publier avec MAGI';
 
 export const WRITE_COMMANDS = [
   {
@@ -39,6 +42,7 @@ export const WRITE_COMMANDS = [
       ],
     },
   },
+  { tier: 'operateurs', data: { name: PUBLISH_FROM_MESSAGE, type: ApplicationCommandType.Message } },
 ];
 
 const MAX_DELAY = 366 * 86_400_000;
@@ -228,17 +232,20 @@ async function draftAction(interaction, action, token) {
     const { fields } = interaction;
     const when = draft.editId ? { at: null } : parseWhen(fields.getTextInputValue('quand'));
     if (when.error) return interaction.followUp({ content: when.error, ...ephemeral });
-    const next = { ...draft, title: fields.getTextInputValue('titre').trim(), text: fields.getTextInputValue('texte').trim(), color: fields.getStringSelectValues('couleur')?.[0] ?? draft.color, when: when.at };
+    const { title, text, unknown } = resolveDraftText(guild, fields);
+    const next = { ...draft, title, text, color: fields.getStringSelectValues('couleur')?.[0] ?? draft.color, when: when.at };
     const uploads = await download(fields.getUploadedFiles('images', false)?.values(), 'image');
     if (uploads.length) next.images = uploads;
     if (textLength(next) > MAX_TEXT) return interaction.followUp({ content: `Trop de texte : une publication est limitée à ${MAX_TEXT} caractères en tout.`, ...ephemeral });
     Object.assign(draft, next);
-    return interaction.editReply(previewPayload(draft));
+    await interaction.editReply(previewPayload(draft));
+    return unknown.length ? interaction.followUp({ content: unknownNote(unknown), ...ephemeral }) : null;
   }
   if (action === 'bouton-set' || action === 'section-set') {
-    const problem = await addFromModal(interaction, draft, action.slice(0, -'-set'.length));
-    if (problem) return interaction.followUp({ content: problem, ...ephemeral });
-    return interaction.editReply(previewPayload(draft));
+    const { error, note } = await addFromModal(interaction, draft, action.slice(0, -'-set'.length));
+    if (error) return interaction.followUp({ content: error, ...ephemeral });
+    await interaction.editReply(previewPayload(draft));
+    return note ? interaction.followUp({ content: note, ...ephemeral }) : null;
   }
   if (action !== 'publier') return null;
   dropDraft(token);
@@ -251,6 +258,7 @@ async function draftAction(interaction, action, token) {
     log.notice('commandes', `${interaction.member} a modifié une publication : ${target.url}`, { channel });
     return interaction.editReply(notice(`Publication modifiée : ${target.url}`));
   }
+  if (draft.sourceId) await channel.messages.delete(draft.sourceId).catch(() => {});
   if (draft.when) {
     const id = scheduleMessage({ guildId: guild.id, channelId: channel.id, authorId: interaction.user.id, form: 'publication', title: draft.title, text: draft.text, at: draft.when, draft });
     log.notice('commandes', `${interaction.member} a programmé une publication dans ${channel} pour <t:${Math.floor(draft.when / 1000)}:f>`, { channel });
@@ -261,10 +269,29 @@ async function draftAction(interaction, action, token) {
   return interaction.editReply(notice(`Publié : ${sent.url}`));
 }
 
+function resolveDraftText(guild, fields) {
+  const title = resolveMentions(guild, fields.getTextInputValue('titre').trim());
+  const text = resolveMentions(guild, fields.getTextInputValue('texte').trim());
+  return { title: title.text, text: text.text, unknown: [...new Set([...title.unknown, ...text.unknown])] };
+}
+
+export async function draftFromMessage(interaction) {
+  if (!isOperator(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits : publier au nom de MAGI est réservé aux opérateurs MAGI.", ...ephemeral });
+  const source = interaction.targetMessage;
+  if (!source.content.trim() && !source.attachments.size) return interaction.reply({ content: 'Ce message est vide : rien à publier.', ...ephemeral });
+  await interaction.deferReply(ephemeral);
+  const images = await download(source.attachments.values(), 'image');
+  const draft = createDraft({ guildId: interaction.guild.id, channelId: source.channel.id, authorId: interaction.user.id, title: '', text: source.content.trim(), color: 'magi', images, sourceId: source.author.id === interaction.user.id ? source.id : null });
+  if (textLength(draft) > MAX_TEXT) return interaction.editReply({ content: `Trop de texte : une publication est limitée à ${MAX_TEXT} caractères en tout.` });
+  return interaction.editReply({ ...previewPayload(draft), flags: MessageFlags.IsComponentsV2 });
+}
+
 async function startDraft(interaction, channel, editId, when) {
   const { guild, fields } = interaction;
-  const values = { guildId: guild.id, channelId: channel.id, authorId: interaction.user.id, editId: editId || null, when, title: fields.getTextInputValue('titre').trim(), text: fields.getTextInputValue('texte').trim(), color: fields.getStringSelectValues('couleur')?.[0] ?? 'magi' };
   await interaction.deferReply(ephemeral);
+  await guild.members.fetch?.().catch(() => {});
+  const { title, text, unknown } = resolveDraftText(guild, fields);
+  const values = { guildId: guild.id, channelId: channel.id, authorId: interaction.user.id, editId: editId || null, when, title, text, color: fields.getStringSelectValues('couleur')?.[0] ?? 'magi' };
   const uploads = await download(fields.getUploadedFiles('images', false)?.values(), 'image');
   let draft;
   if (editId) {
@@ -275,7 +302,8 @@ async function startDraft(interaction, channel, editId, when) {
     if (uploads.length) draft.images = uploads;
   } else draft = createDraft({ ...values, images: uploads });
   if (textLength(draft) > MAX_TEXT) return interaction.editReply({ content: `Trop de texte : une publication est limitée à ${MAX_TEXT} caractères en tout.` });
-  return interaction.editReply({ ...previewPayload(draft), flags: MessageFlags.IsComponentsV2 });
+  await interaction.editReply({ ...previewPayload(draft), flags: MessageFlags.IsComponentsV2 });
+  return unknown.length ? interaction.followUp({ content: unknownNote(unknown), ...ephemeral }) : null;
 }
 
 export async function handleWriteModal(interaction) {
@@ -292,36 +320,39 @@ export async function handleWriteModal(interaction) {
   const { guild } = interaction;
   const channel = guild.channels.cache.get(channelId);
   if (!channel) return interaction.reply({ content: 'Salon introuvable.', ...ephemeral });
-  const text = interaction.fields.getTextInputValue('texte');
+  const raw = interaction.fields.getTextInputValue('texte');
   const when = editId ? { at: null } : parseWhen(interaction.fields.getTextInputValue('quand'));
-  if (when.error) return interaction.reply({ content: `${when.error}\n-# Ton texte :\n${text}`.slice(0, 2000), ...ephemeral });
+  if (when.error) return interaction.reply({ content: `${when.error}\n-# Ton texte :\n${raw}`.slice(0, 2000), ...ephemeral });
   if (form === 'publication') {
     const legacy = editId && !publicationMeta(guild.id, editId);
     if (!legacy) return startDraft(interaction, channel, editId, when.at);
   }
-  const title = form === 'publication' ? interaction.fields.getTextInputValue('titre') : '';
+  await interaction.deferReply(ephemeral);
+  await guild.members.fetch?.().catch(() => {});
+  const { text, unknown } = resolveMentions(guild, raw);
+  const note = unknown.length ? `\n-# ${unknownNote(unknown)}` : '';
+  const title = form === 'publication' ? resolveMentions(guild, interaction.fields.getTextInputValue('titre')).text : '';
   if (editId) {
     const target = await channel.messages.fetch(editId).catch(() => null);
-    if (!target) return interaction.reply({ content: 'Message introuvable.', ...ephemeral });
+    if (!target) return interaction.editReply({ content: 'Message introuvable.' });
     const color = COLORS[interaction.fields.getStringSelectValues?.('couleur')?.[0]]?.[1];
     const embed = form === 'publication' ? publicationEmbed(guild, { titre: title, texte: text, entete: false }) : null;
     if (embed && color) embed.setColor(color);
     await target.edit(embed ? { content: null, embeds: [embed] } : { content: text, embeds: [] });
     log.notice('commandes', `${interaction.member} a réécrit un message de MAGI : ${target.url}`, { channel });
-    return interaction.reply({ content: `Message modifié : ${target.url}`, ...ephemeral });
+    return interaction.editReply({ content: `Message modifié : ${target.url}${note}` });
   }
   if (when.at) {
     const id = scheduleMessage({ guildId: guild.id, channelId: channel.id, authorId: interaction.user.id, form, title, text, at: when.at });
     log.notice('commandes', `${interaction.member} a programmé un message (${FORMS[form].toLowerCase()}) dans ${channel} pour <t:${Math.floor(when.at / 1000)}:f>`, { channel });
-    return interaction.reply({
-      content: `Message n°${id} programmé dans ${channel} pour <t:${Math.floor(when.at / 1000)}:F> (<t:${Math.floor(when.at / 1000)}:R>).`,
+    return interaction.editReply({
+      content: `Message n°${id} programmé dans ${channel} pour <t:${Math.floor(when.at / 1000)}:F> (<t:${Math.floor(when.at / 1000)}:R>).${note}`,
       components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}annuler:${id}`).setLabel('Annuler').setStyle(ButtonStyle.Danger))],
-      ...ephemeral,
     });
   }
   const sent = await publish(guild, channel, form, title, text);
   log.notice('commandes', `${interaction.member} a publié un message (${FORMS[form].toLowerCase()}) : ${sent.url}`, { channel });
-  return interaction.reply({ content: `Publié : ${sent.url}`, ...ephemeral });
+  return interaction.editReply({ content: `Publié : ${sent.url}${note}` });
 }
 
 const TWO_WEEKS = 14 * 86_400_000 - 60_000;

@@ -5,6 +5,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ContainerBuilder, MediaGa
 import { SIGNATURE } from '../../core/discord/embeds.js';
 import { setSetting, setting } from '../../core/settings.js';
 import { savePublication } from '../admin/publications-store.js';
+import { resolveMentions, unknownNote } from './mentions.js';
 
 export const COLORS = { magi: ['Rouge MAGI', 0xd65c62], bleu: ['Bleu', 0x378add], vert: ['Vert', 0x1d9e75], jaune: ['Jaune', 0xef9f27], orange: ['Orange', 0xd85a30], violet: ['Violet', 0x7f77dd], rose: ['Rose', 0xd4537e], gris: ['Gris', 0x888780] };
 export const MAX_IMAGES = 10;
@@ -43,7 +44,8 @@ export async function download(attachments, prefix) {
 export function publicationCard(draft, { final = false } = {}) {
   const ref = (file) => (file.data || final ? `attachment://${file.name}` : file.url);
   const card = new ContainerBuilder().setAccentColor(COLORS[draft.color]?.[1] ?? COLORS.magi[1]);
-  card.addTextDisplayComponents(text([draft.title && `### ${draft.title}`, draft.text].filter(Boolean).join('\n')));
+  const head = [draft.title && `### ${draft.title}`, draft.text].filter(Boolean).join('\n');
+  if (head) card.addTextDisplayComponents(text(head));
   if (draft.images.length) card.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(draft.images.map((file) => (item) => item.setURL(ref(file)))));
   for (const section of draft.sections) {
     card.addSeparatorComponents(new SeparatorBuilder());
@@ -75,7 +77,7 @@ export function previewPayload(draft) {
     ...(draft.images.length ? [{ label: `Les images (${draft.images.length})`, value: 'images' }] : []),
   ];
   const remove = removable.length ? [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`magi-write:draft:retirer:${draft.token}`).setPlaceholder('Retirer…').addOptions(removable))] : [];
-  return { components: [text(`-# Aperçu${when}, visible par toi seul`), publicationCard(draft), new ActionRowBuilder().addComponents(controls), ...remove], files: newFiles(draft), attachments: [], allowedMentions: { parse: [] } };
+  return { components: [text(`-# Aperçu${when}, visible par toi seul${draft.sourceId ? '\n-# Ton message d’origine sera supprimé à la publication.' : ''}`), publicationCard(draft), new ActionRowBuilder().addComponents(controls), ...remove], files: newFiles(draft), attachments: [], allowedMentions: { parse: [] } };
 }
 
 export function removeFromDraft(draft, choice) {
@@ -102,14 +104,15 @@ export async function addFromModal(interaction, draft, action) {
   const value = interaction.fields.getTextInputValue('texte').trim();
   if (action === 'bouton') {
     const url = interaction.fields.getTextInputValue('url').trim();
-    if (!/^https?:\/\/\S+$/.test(url)) return 'Le lien doit commencer par https:// (ou http://).';
+    if (!/^https?:\/\/\S+$/.test(url)) return { error: 'Le lien doit commencer par https:// (ou http://).' };
     draft.buttons.push({ label: value, url });
-    return null;
+    return {};
   }
-  const section = { text: value, thumb: (await download(interaction.fields.getUploadedFiles('vignette', false)?.values(), `vignette-${draft.sections.length + 1}`))[0] ?? null };
-  if (textLength({ ...draft, sections: [...draft.sections, section] }) > MAX_TEXT) return `Trop de texte : une publication est limitée à ${MAX_TEXT} caractères en tout.`;
+  const { text: resolved, unknown } = resolveMentions(interaction.guild, value);
+  const section = { text: resolved, thumb: (await download(interaction.fields.getUploadedFiles('vignette', false)?.values(), `vignette-${draft.sections.length + 1}`))[0] ?? null };
+  if (textLength({ ...draft, sections: [...draft.sections, section] }) > MAX_TEXT) return { error: `Trop de texte : une publication est limitée à ${MAX_TEXT} caractères en tout.` };
   draft.sections.push(section);
-  return null;
+  return { note: unknownNote(unknown) };
 }
 
 export function draftFromMeta(meta, target, fields) {

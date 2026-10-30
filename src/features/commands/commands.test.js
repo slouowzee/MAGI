@@ -13,13 +13,13 @@ test('commandes enregistrées selon le module, /magi, /ecrire et /clear toujours
   let sent = [];
   const guild = { id: 'g-commandes', commands: { set: async (list) => (sent = list) } };
   await syncCommands(guild);
-  assert.deepEqual(sent.map((c) => c.name), ['Vérifier (Melchior)', 'Avis de Casper', 'Soutien de Balthasar', 'Résumer depuis ici', 'chuchoter', 'magi', 'ecrire', 'clear', 'profil', 'lookup', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick']);
+  assert.deepEqual(sent.map((c) => c.name), ['Vérifier (Melchior)', 'Avis de Casper', 'Soutien de Balthasar', 'Résumer depuis ici', 'chuchoter', 'magi', 'ecrire', 'clear', 'Publier avec MAGI', 'profil', 'lookup', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick']);
   setModules(guild.id, Object.keys(MODULES).filter((m) => m !== 'commandes'));
   await syncCommands(guild);
-  assert.deepEqual(sent.map((c) => c.name), ['magi', 'ecrire', 'clear', 'profil', 'lookup', 'classement', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick']);
+  assert.deepEqual(sent.map((c) => c.name), ['magi', 'ecrire', 'clear', 'Publier avec MAGI', 'profil', 'lookup', 'classement', 'warn', 'mute', 'unmute', 'ban', 'unban', 'kick']);
   assert.ok(COMMANDS.every((c) => c.data.name.length <= 32));
   const perms = Object.fromEntries(sent.map((c) => [c.name, c.default_member_permissions]));
-  assert.deepEqual(perms, { magi: '32', ecrire: '32', clear: '8192', profil: null, lookup: '8192', classement: null, warn: '8192', mute: '1099511627776', unmute: '1099511627776', ban: '4', unban: '4', kick: '2' });
+  assert.deepEqual(perms, { magi: '32', ecrire: '32', clear: '8192', 'Publier avec MAGI': '32', profil: null, lookup: '8192', classement: null, warn: '8192', mute: '1099511627776', unmute: '1099511627776', ban: '4', unban: '4', kick: '2' });
   assert.ok(COMMANDS.every((c) => c.perms || c.tier in { membres: 1, moderation: 1, operateurs: 1 }));
 });
 
@@ -86,11 +86,11 @@ test('date des messages programmés : heure de Paris, lendemain si passée, erre
 test('/ecrire programmé : enregistré, annulable, publié à l’heure', async () => {
   const { cancelScheduled, handleWriteModal, scheduledMessages, sendDueMessages } = await import('./write.js');
   const sent = [];
-  const guild = { id: 'g-prog', ownerId: 'op', channels: { cache: new Map() } };
+  const guild = { id: 'g-prog', ownerId: 'op', channels: { cache: new Map() }, members: { cache: new Collection(), fetch: async () => {} }, roles: { cache: new Collection() } };
   const channel = { id: 'c-prog', guild, toString: () => '<#c-prog>', send: async (p) => (sent.push(p), { url: 'https://discord.com/x' }) };
   guild.channels.cache.set(channel.id, channel);
   const replies = [];
-  const submit = (quand) => handleWriteModal({ customId: 'magi-write:message:c-prog:', guild, member: { id: 'op', guild, toString: () => '<@op>' }, user: { id: 'op' }, isModalSubmit: () => true, fields: { getTextInputValue: (k) => ({ texte: 'Soirée jeux ce soir', quand })[k] }, reply: async (p) => replies.push(p) });
+  const submit = (quand) => handleWriteModal({ customId: 'magi-write:message:c-prog:', guild, member: { id: 'op', guild, toString: () => '<@op>' }, user: { id: 'op' }, isModalSubmit: () => true, fields: { getTextInputValue: (k) => ({ texte: 'Soirée jeux ce soir', quand })[k] }, reply: async (p) => replies.push(p), deferReply: async () => {}, editReply: async (p) => replies.push(p) });
   await submit('demain 32h');
   assert.match(replies.at(-1).content, /Date non comprise[\s\S]*Soirée jeux ce soir/);
   await submit('dans 1h');
@@ -113,7 +113,7 @@ const fieldsOf = (values, selects = {}, files = {}) => ({ getTextInputValue: (k)
 function publishing(guildId, messageId) {
   const out = [];
   const sent = [];
-  const guild = { id: guildId, ownerId: 'op', name: 'Test', channels: { cache: new Map() } };
+  const guild = { id: guildId, ownerId: 'op', name: 'Test', channels: { cache: new Map() }, members: { cache: new Collection(), fetch: async () => {} }, roles: { cache: new Collection() } };
   const channel = { id: `${guildId}-c`, guild, toString: () => `<#${guildId}-c>`, send: async (p) => (sent.push(p), { id: messageId, url: `https://discord.com/${messageId}` }), messages: { fetch: async () => channel.target } };
   guild.channels.cache.set(channel.id, channel);
   const base = { guild, member: { id: 'op', guild, toString: () => '<@op>' }, user: { id: 'op' }, client: { user: { id: 'magi' } }, reply: async (p) => out.push(['reply', p]), deferReply: async () => out.push(['defer']), editReply: async (p) => out.push(['edit', p]), deferUpdate: async () => out.push(['deferUpdate']), update: async (p) => out.push(['update', p]), followUp: async (p) => out.push(['followUp', p]), showModal: async (m) => out.push(['modal', m.toJSON()]) };
@@ -197,4 +197,38 @@ test('/ecrire publication programmée : images gardées jusqu’à l’envoi pui
   assert.equal(sent[0].files.length, 1);
   assert.equal(sent[0].files[0].name, 'image-1.png');
   assert.ok(!existsSync(join(tmpdir(), 'programmes', String(row.id))));
+});
+
+test('mentions et emojis écrits en texte : convertis, ambigus et inconnus signalés', async () => {
+  const { resolveMentions } = await import('./mentions.js');
+  const member = (id, displayName, username) => [id, { id, displayName, user: { username, globalName: null } }];
+  const guild = {
+    id: 'g',
+    members: { cache: new Collection([member('1', 'Yui', 'yui.traces'), member('2', 'Miss Fortune', 'mf'), member('3', 'Léa', 'lea'), member('4', 'Léa', 'lea2')]) },
+    roles: { cache: new Collection([['g', { id: 'g', name: '@everyone' }], ['r1', { id: 'r1', name: 'Modération' }]]) },
+    channels: { cache: new Collection([['c1', { id: 'c1', name: '💬・general' }], ['c2', { id: 'c2', name: 'règles' }]]) },
+    emojis: { cache: new Collection([['e1', { id: 'e1', name: 'pepe', animated: false }], ['e2', { id: 'e2', name: 'dance', animated: true }]]) },
+  };
+  const { text, unknown } = resolveMentions(guild, '# Soirée\nSalut @Miss Fortune et @yui, voir #general et #règles, ping @Modération :pepe: :dance: :inconnu: @Léa @personne @everyone a@b.fr 10:30:45 <@1>');
+  assert.equal(text, '# Soirée\nSalut <@2> et <@1>, voir <#c1> et <#c2>, ping <@&r1> <:pepe:e1> <a:dance:e2> :inconnu: @Léa @personne @everyone a@b.fr 10:30:45 <@1>');
+  assert.deepEqual(unknown, ['@Léa (plusieurs correspondances)', '@personne', ':inconnu:']);
+});
+
+test('clic droit « Publier avec MAGI » : brouillon repris du message, original supprimé à la publication', async () => {
+  const { draftFromMessage, handleWriteModal } = await import('./write.js');
+  const { out, sent, channel, base } = publishing('g-clic', '323456789012345678');
+  const deleted = [];
+  channel.messages.delete = async (id) => deleted.push(id);
+  const source = { id: 'src', channel, author: { id: 'op' }, content: 'Tournoi samedi <@1>', attachments: new Collection([['a', { url: PNG, name: 'affiche.png', contentType: 'image/png' }]]) };
+  await draftFromMessage({ ...base, targetMessage: source });
+  const preview = out.at(-1)[1];
+  assert.match(JSON.stringify(preview.components[0].toJSON()), /message d’origine sera supprimé/);
+  assert.match(preview.components[1].toJSON().components[0].content, /^Tournoi samedi <@1>$/);
+  assert.equal(preview.files.length, 1);
+  const publish = preview.components[2].toJSON().components.find((b) => b.label === 'Publier').custom_id;
+  await handleWriteModal({ ...base, customId: publish });
+  assert.equal(sent.length, 1);
+  assert.deepEqual(deleted, ['src']);
+  await draftFromMessage({ ...base, targetMessage: { ...source, author: { id: 'autre' } } });
+  assert.ok(!JSON.stringify(out.at(-1)[1].components[0].toJSON()).includes('supprimé'));
 });

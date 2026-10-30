@@ -10,7 +10,7 @@ import { datedTranscript } from '../conversation/channel.js';
 import { memoryContext } from '../memory/context.js';
 import { log } from '../../core/log/log.js';
 import { openPanel } from '../../panel/index.js';
-import { clear, openWrite, WRITE_COMMANDS } from './write.js';
+import { clear, draftFromMessage, openWrite, PUBLISH_FROM_MESSAGE, WRITE_COMMANDS } from './write.js';
 import { MANUAL_COMMANDS, MANUAL_NAMES, runManual } from '../moderation/manual.js';
 import { LOOKUP_COMMANDS, showLookup, showProfile } from '../moderation/lookup.js';
 import { LEADERBOARD_COMMANDS, showLeaderboard } from '../community/leaderboard.js';
@@ -125,35 +125,28 @@ async function status(interaction) {
   await interaction.reply({ content: statusReport(), ...ephemeral });
 }
 
+const MAGI_SUBCOMMANDS = { statut: status, config: openPanel };
+const HANDLERS = {
+  [SUMMARY]: summarizeFrom,
+  chuchoter: whisper,
+  ecrire: openWrite,
+  [PUBLISH_FROM_MESSAGE]: draftFromMessage,
+  clear,
+  profil: showProfile,
+  lookup: showLookup,
+  classement: showLeaderboard,
+};
+
 export function isCommand(interaction) {
   return interaction.isChatInputCommand?.() || interaction.isMessageContextMenuCommand?.();
 }
 
 export async function handleCommand(interaction) {
   if (!interaction.inGuild()) return;
-  const run = ASK[interaction.commandName]
-    ? () => askPersona(interaction, ASK[interaction.commandName])
-    : interaction.commandName === SUMMARY
-      ? () => summarizeFrom(interaction)
-      : interaction.commandName === 'chuchoter'
-        ? () => whisper(interaction)
-        : interaction.commandName === 'magi' && interaction.options.getSubcommand(false) === 'statut'
-          ? () => status(interaction)
-          : interaction.commandName === 'magi' && interaction.options.getSubcommand(false) === 'config'
-            ? () => openPanel(interaction)
-            : interaction.commandName === 'ecrire'
-              ? () => openWrite(interaction)
-              : interaction.commandName === 'clear'
-                ? () => clear(interaction)
-                : interaction.commandName === 'profil'
-                  ? () => showProfile(interaction)
-                  : interaction.commandName === 'lookup'
-                    ? () => showLookup(interaction)
-                    : interaction.commandName === 'classement'
-                      ? () => showLeaderboard(interaction)
-                      : MANUAL_NAMES.has(interaction.commandName)
-                        ? () => runManual(interaction)
-                        : null;
+  const name = interaction.commandName;
+  const sub = name === 'magi' ? interaction.options.getSubcommand(false) : null;
+  const handler = ASK[name] ? (i) => askPersona(i, ASK[name]) : name === 'magi' ? MAGI_SUBCOMMANDS[sub] : (HANDLERS[name] ?? (MANUAL_NAMES.has(name) ? runManual : null));
+  const run = handler && (() => handler(interaction));
   if (!run) return;
   try {
     await run();
