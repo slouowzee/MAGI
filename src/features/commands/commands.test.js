@@ -1,5 +1,9 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Collection, MessageFlags } from 'discord.js';
 
 process.env.DB_PATH = ':memory:';
 const { COMMANDS, statusReport, syncCommands } = await import('./commands.js');
@@ -101,4 +105,81 @@ test('/ecrire programmé : enregistré, annulable, publié à l’heure', async 
   assert.deepEqual(sent.map((p) => p.content), ['Soirée jeux ce soir']);
   assert.equal(scheduledMessages('g-prog').length, 0);
   assert.equal(cancelScheduled(first.id, 'g-prog'), false);
+});
+
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+const fieldsOf = (values, selects = {}, files = {}) => ({ getTextInputValue: (k) => values[k] ?? '', getStringSelectValues: (k) => selects[k] ?? [], getUploadedFiles: (k) => files[k] ?? null });
+
+function publishing(guildId, messageId) {
+  const out = [];
+  const sent = [];
+  const guild = { id: guildId, ownerId: 'op', name: 'Test', channels: { cache: new Map() } };
+  const channel = { id: `${guildId}-c`, guild, toString: () => `<#${guildId}-c>`, send: async (p) => (sent.push(p), { id: messageId, url: `https://discord.com/${messageId}` }), messages: { fetch: async () => channel.target } };
+  guild.channels.cache.set(channel.id, channel);
+  const base = { guild, member: { id: 'op', guild, toString: () => '<@op>' }, user: { id: 'op' }, client: { user: { id: 'magi' } }, reply: async (p) => out.push(['reply', p]), deferReply: async () => out.push(['defer']), editReply: async (p) => out.push(['edit', p]), deferUpdate: async () => out.push(['deferUpdate']), update: async (p) => out.push(['update', p]), followUp: async (p) => out.push(['followUp', p]), showModal: async (m) => out.push(['modal', m.toJSON()]) };
+  return { out, sent, guild, channel, base };
+}
+
+test('/ecrire publication : couleur, images, bouton lien, section, aperçu, publication puis modification', async () => {
+  const { handleWriteModal, openWrite } = await import('./write.js');
+  const { publicationMeta } = await import('./publication.js');
+  const id = '123456789012345678';
+  const { out, sent, channel, base } = publishing('g-pub', id);
+  const uploads = new Collection([['u1', { url: PNG, name: 'chat.png', contentType: 'image/png' }], ['u2', { url: PNG, name: 'chien.JPG', contentType: 'image/jpeg' }], ['u3', { url: PNG, name: 'notes.txt', contentType: 'text/plain' }]]);
+  await handleWriteModal({ ...base, customId: `magi-write:publication:${channel.id}:`, isModalSubmit: () => true, fields: fieldsOf({ titre: 'Soirée jeux', texte: 'Ce soir 21 h', quand: '' }, { couleur: ['bleu'] }, { images: uploads }) });
+  const preview = out.at(-1)[1];
+  const card = preview.components[1].toJSON();
+  assert.equal(card.accent_color, 0x378add);
+  assert.match(card.components[0].content, /^### Soirée jeux\nCe soir 21 h$/);
+  assert.deepEqual(card.components.find((c) => c.type === 12).items.map((i) => i.media.url), ['attachment://image-1.png', 'attachment://image-2.jpg']);
+  assert.equal(preview.files.length, 2);
+  const controls = preview.components[2].toJSON().components.map((b) => b.custom_id);
+  const token = controls[0].split(':').at(-1);
+  await handleWriteModal({ ...base, customId: controls[0] });
+  assert.equal(out.at(-1)[0], 'modal');
+  await handleWriteModal({ ...base, customId: `magi-write:draft:bouton-set:${token}`, fields: fieldsOf({ texte: 'Rejoindre', url: 'pas un lien' }) });
+  assert.match(out.at(-1)[1].content, /https:\/\//);
+  await handleWriteModal({ ...base, customId: `magi-write:draft:bouton-set:${token}`, fields: fieldsOf({ texte: 'Rejoindre', url: 'https://discord.gg/x' }) });
+  await handleWriteModal({ ...base, customId: `magi-write:draft:section-set:${token}`, fields: fieldsOf({ texte: 'Programme : Among Us puis Mario Kart' }) });
+  const updated = out.at(-1)[1].components[1].toJSON();
+  assert.ok(updated.components.some((c) => c.type === 14));
+  assert.deepEqual(updated.components.at(-1).components.map((b) => [b.label, b.url]), [['Rejoindre', 'https://discord.gg/x']]);
+  await handleWriteModal({ ...base, customId: `magi-write:draft:publier:${token}` });
+  assert.equal(sent[0].flags, MessageFlags.IsComponentsV2);
+  assert.equal(sent[0].files.length, 2);
+  assert.match(out.at(-1)[1].components[0].toJSON().content, /^Publié : /);
+  assert.deepEqual(publicationMeta('g-pub', id).images, ['image-1.png', 'image-2.jpg']);
+
+  const edits = [];
+  channel.target = { id, url: `https://discord.com/${id}`, author: { id: 'magi' }, flags: { has: () => true }, attachments: new Collection([['a1', { id: 'a1', name: 'image-1.png', url: 'https://cdn/1.png' }], ['a2', { id: 'a2', name: 'image-2.jpg', url: 'https://cdn/2.jpg' }]]), edit: async (p) => edits.push(p) };
+  await openWrite({ ...base, channel, options: { getString: (k) => ({ forme: 'publication', modifier: `https://discord.com/channels/g/${channel.id}/${id}` })[k], getChannel: () => channel } });
+  const modal = JSON.stringify(out.at(-1)[1]);
+  assert.match(modal, /"value":"Soirée jeux"/);
+  assert.match(modal, /"value":"bleu","default":true/);
+  await handleWriteModal({ ...base, customId: `magi-write:publication:${channel.id}:${id}`, isModalSubmit: () => true, fields: fieldsOf({ titre: 'Soirée jeux', texte: 'Ce soir 22 h' }, { couleur: ['vert'] }) });
+  const editPreview = out.at(-1)[1];
+  assert.equal(editPreview.components[1].toJSON().accent_color, 0x1d9e75);
+  assert.equal(editPreview.files.length, 0);
+  const update = editPreview.components[2].toJSON().components.find((b) => b.label === 'Mettre à jour').custom_id;
+  await handleWriteModal({ ...base, customId: update });
+  assert.deepEqual(edits[0].attachments.map((a) => a.id), ['a1', 'a2']);
+  const final = edits[0].components[0].toJSON();
+  assert.deepEqual(final.components.find((c) => c.type === 12).items.map((i) => i.media.url), ['attachment://image-1.png', 'attachment://image-2.jpg']);
+  assert.match(final.components[0].content, /Ce soir 22 h/);
+  assert.equal(final.components.at(-1).components[0].label, 'Rejoindre');
+});
+
+test('/ecrire publication programmée : images gardées jusqu’à l’envoi puis effacées', async () => {
+  const { handleWriteModal, scheduledMessages, sendDueMessages } = await import('./write.js');
+  const { out, sent, guild, channel, base } = publishing('g-pub-prog', '223456789012345678');
+  await handleWriteModal({ ...base, customId: `magi-write:publication:${channel.id}:`, isModalSubmit: () => true, fields: fieldsOf({ titre: '', texte: 'Tournoi demain', quand: 'dans 1h' }, {}, { images: new Collection([['u1', { url: PNG, name: 'affiche.png', contentType: 'image/png' }]]) }) });
+  const controls = out.at(-1)[1].components[2].toJSON().components;
+  assert.ok(controls.some((b) => b.label === 'Programmer'));
+  await handleWriteModal({ ...base, customId: controls.find((b) => b.label === 'Programmer').custom_id });
+  const [row] = scheduledMessages('g-pub-prog');
+  assert.ok(existsSync(join(tmpdir(), 'programmes', String(row.id), 'image-1.png')));
+  await sendDueMessages({ guilds: { cache: new Map([[guild.id, guild]]) } }, Date.now() + 2 * 3_600_000);
+  assert.equal(sent[0].files.length, 1);
+  assert.equal(sent[0].files[0].name, 'image-1.png');
+  assert.ok(!existsSync(join(tmpdir(), 'programmes', String(row.id))));
 });

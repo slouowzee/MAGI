@@ -1,4 +1,4 @@
-import { ActionRowBuilder, ApplicationCommandOptionType as O, ButtonBuilder, ButtonStyle, ApplicationCommandType, ChannelType, MessageFlags, ModalBuilder, PermissionFlagsBits as P, TextInputBuilder, TextInputStyle } from 'discord.js';
+import { ActionRowBuilder, ApplicationCommandOptionType as O, ButtonBuilder, ButtonStyle, ApplicationCommandType, ChannelType, MessageFlags, ModalBuilder, PermissionFlagsBits as P, TextDisplayBuilder, TextInputStyle } from 'discord.js';
 import { PERSONAS } from '../../core/personas.js';
 import { isOperator } from '../../core/installation.js';
 import { speak } from '../../core/discord/webhooks.js';
@@ -6,6 +6,7 @@ import { log } from '../../core/log/log.js';
 import { publicationEmbed } from '../admin/publications.js';
 import { savePublication } from '../admin/publications-store.js';
 import { db } from '../../core/db.js';
+import { addFromModal, COLORS, createDraft, download, draftFromMeta, draftModal, dropDraft, dropFiles, getDraft, MAX_IMAGES, MAX_TEXT, previewPayload, publicationMeta, publishDraft, storedDraft, storeFiles, textLength, updatePublication } from './publication.js';
 
 const PREFIX = 'magi-write:';
 const ephemeral = { flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } };
@@ -46,7 +47,7 @@ const PARIS = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', year:
 const UNITS = { m: 60_000, min: 60_000, h: 3_600_000, j: 86_400_000, jour: 86_400_000, jours: 86_400_000 };
 const DAYS_AHEAD = { "aujourd'hui": 0, demain: 1, 'après-demain': 2 };
 
-const insertScheduled = db.query('INSERT INTO scheduled (guild_id, channel_id, author_id, form, title, text, due_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+const insertScheduled = db.query('INSERT INTO scheduled (guild_id, channel_id, author_id, form, title, text, due_at, draft) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
 const dueScheduled = db.query('SELECT * FROM scheduled WHERE done = 0 AND due_at <= ? ORDER BY due_at');
 const pendingScheduled = db.query('SELECT * FROM scheduled WHERE guild_id = ? AND done = 0 ORDER BY due_at');
 const closeScheduled = db.query('UPDATE scheduled SET done = 1 WHERE id = ? AND guild_id = ? AND done = 0');
@@ -87,12 +88,20 @@ export function parseWhen(input, now = Date.now()) {
   return { at };
 }
 
-export function scheduleMessage({ guildId, channelId, authorId, form, title = '', text, at }) {
-  return Number(insertScheduled.run(guildId, channelId, authorId, form, title, text, at).lastInsertRowid);
+export function scheduleMessage({ guildId, channelId, authorId, form, title = '', text, at, draft = null }) {
+  const id = Number(insertScheduled.run(guildId, channelId, authorId, form, title, text, at, null).lastInsertRowid);
+  if (draft) db.query('UPDATE scheduled SET draft = ? WHERE id = ?').run(JSON.stringify(storeFiles(id, draft)), id);
+  return id;
 }
 
 export const scheduledMessages = (guildId) => pendingScheduled.all(guildId);
 export const cancelScheduled = (id, guildId) => closeScheduled.run(id, guildId).changes > 0;
+
+function cancelByUser(id, guildId) {
+  const cancelled = cancelScheduled(id, guildId);
+  if (cancelled) dropFiles(id);
+  return cancelled;
+}
 
 async function publish(guild, channel, form, title, text) {
   if (PERSONAS[form]) return speak(channel, form, text);
@@ -110,7 +119,8 @@ export async function sendDueMessages(client, now = Date.now()) {
       log.err('commandes', `message programmé n°${row.id} non envoyé : salon supprimé`, { guild });
       continue;
     }
-    await publish(guild, channel, row.form, row.title, row.text)
+    await (row.draft ? publishDraft(guild, channel, storedDraft(row.id, JSON.parse(row.draft))) : publish(guild, channel, row.form, row.title, row.text))
+      .finally(() => dropFiles(row.id))
       .then((sent) => log.notice('commandes', `message programmé n°${row.id} de <@${row.author_id}> publié : ${sent.url}`, { channel }))
       .catch((err) => log.err('commandes', `échec du message programmé n°${row.id} : ${err.message}`, { channel }));
   }
@@ -135,7 +145,7 @@ export const SCHEDULE_TOOLS = [
     parameters: { type: 'object', properties: { numero: { type: 'integer' } }, required: ['numero'] },
     access: 'operator',
     async run({ guild, member, args }) {
-      if (!cancelScheduled(Number(args.numero), guild.id)) return `Aucun message programmé n°${args.numero} en attente.`;
+      if (!cancelByUser(Number(args.numero), guild.id)) return `Aucun message programmé n°${args.numero} en attente.`;
       log.notice('commandes', `${member} a annulé le message programmé n°${args.numero}`, { guild });
       return `Message programmé n°${args.numero} annulé.`;
     },
@@ -148,17 +158,27 @@ export function startScheduled(client) {
 
 const messageId = (ref) => String(ref ?? '').match(/(\d{17,20})\/?$/)?.[1] ?? null;
 
-function writeModal({ form, channelId, editId, title = '', text = '' }) {
-  const rows = [];
-  if (form === 'publication') rows.push(new TextInputBuilder().setCustomId('titre').setLabel('Titre (facultatif)').setStyle(TextInputStyle.Short).setMaxLength(256).setRequired(false).setValue(title));
-  const body = new TextInputBuilder().setCustomId('texte').setLabel('Texte, publié tel quel (Markdown Discord)').setStyle(TextInputStyle.Paragraph).setMaxLength(form === 'publication' ? 4000 : 2000).setRequired(true);
-  if (text) body.setValue(text.slice(0, form === 'publication' ? 4000 : 2000));
-  rows.push(body);
-  if (!editId) rows.push(new TextInputBuilder().setCustomId('quand').setLabel('Quand ? Vide = tout de suite').setStyle(TextInputStyle.Short).setMaxLength(40).setRequired(false).setPlaceholder(WHEN_HINT));
-  return new ModalBuilder()
-    .setCustomId(`${PREFIX}${form}:${channelId}:${editId ?? ''}`)
-    .setTitle(editId ? 'Modifier le message de MAGI' : 'Écrire un message')
-    .addComponents(rows.map((input) => new ActionRowBuilder().addComponents(input)));
+function writeModal({ form, channelId, editId, title = '', text = '', color = 'magi' }) {
+  const publication = form === 'publication';
+  const max = publication ? MAX_TEXT - 300 : 2000;
+  const modal = new ModalBuilder().setCustomId(`${PREFIX}${form}:${channelId}:${editId ?? ''}`).setTitle(editId ? 'Modifier le message de MAGI' : 'Écrire un message');
+  const input = (id, label, style, { length, required = false, value = '', placeholder = '' }) =>
+    modal.addLabelComponents((l) =>
+      l.setLabel(label).setTextInputComponent((t) => {
+        t.setCustomId(id).setStyle(style).setMaxLength(length).setRequired(required);
+        if (value) t.setValue(value.slice(0, length));
+        if (placeholder) t.setPlaceholder(placeholder);
+        return t;
+      }),
+    );
+  if (publication) input('titre', 'Titre (facultatif)', TextInputStyle.Short, { length: 256, value: title });
+  input('texte', 'Texte, publié tel quel (Markdown Discord)', TextInputStyle.Paragraph, { length: max, required: true, value: text });
+  if (publication) {
+    modal.addLabelComponents((l) => l.setLabel('Couleur de la barre').setStringSelectMenuComponent((m) => m.setCustomId('couleur').setRequired(false).addOptions(Object.entries(COLORS).map(([value, [name]]) => ({ label: name, value, default: value === color })))));
+    modal.addLabelComponents((l) => l.setLabel(editId ? 'Nouvelles images (vide = garder)' : `Images, jusqu’à ${MAX_IMAGES} (facultatif)`).setFileUploadComponent((u) => u.setCustomId('images').setRequired(false).setMaxValues(MAX_IMAGES)));
+  }
+  if (!editId) input('quand', 'Quand ? Vide = tout de suite', TextInputStyle.Short, { length: 40, placeholder: WHEN_HINT });
+  return modal;
 }
 
 export async function openWrite(interaction) {
@@ -170,36 +190,104 @@ export async function openWrite(interaction) {
   if (PERSONAS[form]) return interaction.reply({ content: 'Les messages des unités ne se modifient pas : choisis Publication encadrée ou Message simple.', ...ephemeral });
   const target = await channel.messages.fetch(editId).catch(() => null);
   if (!target || target.author.id !== interaction.client.user.id) return interaction.reply({ content: `Message de MAGI introuvable dans ${channel} : donne son lien, et le salon s'il est ailleurs.`, ...ephemeral });
+  if (target.flags.has(MessageFlags.IsComponentsV2)) {
+    const meta = publicationMeta(interaction.guild.id, target.id);
+    if (!meta || form !== 'publication') return interaction.reply({ content: meta ? 'C’est une publication encadrée : choisis la forme Publication encadrée.' : 'Ce message de MAGI ne vient pas de /ecrire, il ne se modifie pas ici.', ...ephemeral });
+    return interaction.showModal(writeModal({ form, channelId: channel.id, editId, title: meta.title, text: meta.text, color: meta.color }));
+  }
   const embed = target.embeds[0];
   return interaction.showModal(writeModal({ form, channelId: channel.id, editId, title: embed?.title ?? '', text: embed?.description ?? target.content }));
 }
 
 export const isWriteModal = (id) => id.startsWith(PREFIX);
 
+const notice = (content, components = []) => ({ components: [new TextDisplayBuilder().setContent(content), ...components], attachments: [], allowedMentions: { parse: [] } });
+
+async function draftAction(interaction, action, token) {
+  const { guild } = interaction;
+  const draft = getDraft(token);
+  if (!draft) return interaction.update(notice('Ce brouillon a expiré : relance /ecrire.'));
+  if (action === 'bouton' || action === 'section') return interaction.showModal(draftModal(action, draft));
+  if (action === 'annuler') {
+    dropDraft(token);
+    return interaction.update(notice('Publication abandonnée.'));
+  }
+  await interaction.deferUpdate();
+  if (action === 'bouton-set' || action === 'section-set') {
+    const problem = await addFromModal(interaction, draft, action.slice(0, -'-set'.length));
+    if (problem) return interaction.followUp({ content: problem, ...ephemeral });
+    return interaction.editReply(previewPayload(draft));
+  }
+  if (action !== 'publier') return null;
+  dropDraft(token);
+  const channel = guild.channels.cache.get(draft.channelId);
+  if (!channel) return interaction.editReply(notice('Salon introuvable.'));
+  if (draft.editId) {
+    const target = await channel.messages.fetch(draft.editId).catch(() => null);
+    if (!target) return interaction.editReply(notice('Publication introuvable.'));
+    await updatePublication(guild, target, draft);
+    log.notice('commandes', `${interaction.member} a modifié une publication : ${target.url}`, { channel });
+    return interaction.editReply(notice(`Publication modifiée : ${target.url}`));
+  }
+  if (draft.when) {
+    const id = scheduleMessage({ guildId: guild.id, channelId: channel.id, authorId: interaction.user.id, form: 'publication', title: draft.title, text: draft.text, at: draft.when, draft });
+    log.notice('commandes', `${interaction.member} a programmé une publication dans ${channel} pour <t:${Math.floor(draft.when / 1000)}:f>`, { channel });
+    return interaction.editReply(notice(`Publication n°${id} programmée dans ${channel} pour <t:${Math.floor(draft.when / 1000)}:F> (<t:${Math.floor(draft.when / 1000)}:R>).`, [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}annuler:${id}`).setLabel('Annuler').setStyle(ButtonStyle.Danger))]));
+  }
+  const sent = await publishDraft(guild, channel, draft);
+  log.notice('commandes', `${interaction.member} a publié une publication encadrée : ${sent.url}`, { channel });
+  return interaction.editReply(notice(`Publié : ${sent.url}`));
+}
+
+async function startDraft(interaction, channel, editId, when) {
+  const { guild, fields } = interaction;
+  const values = { guildId: guild.id, channelId: channel.id, authorId: interaction.user.id, editId: editId || null, when, title: fields.getTextInputValue('titre').trim(), text: fields.getTextInputValue('texte').trim(), color: fields.getStringSelectValues('couleur')?.[0] ?? 'magi' };
+  await interaction.deferReply(ephemeral);
+  const uploads = await download(fields.getUploadedFiles('images', false)?.values(), 'image');
+  let draft;
+  if (editId) {
+    const target = await channel.messages.fetch(editId).catch(() => null);
+    const meta = target && publicationMeta(guild.id, target.id);
+    if (!meta) return interaction.editReply({ content: 'Publication introuvable.' });
+    draft = draftFromMeta(meta, target, values);
+    if (uploads.length) draft.images = uploads;
+  } else draft = createDraft({ ...values, images: uploads });
+  if (textLength(draft) > MAX_TEXT) return interaction.editReply({ content: `Trop de texte : une publication est limitée à ${MAX_TEXT} caractères en tout.` });
+  return interaction.editReply({ ...previewPayload(draft), flags: MessageFlags.IsComponentsV2 });
+}
+
 export async function handleWriteModal(interaction) {
   if (!isOperator(interaction.member)) return interaction.reply({ content: 'Réservé aux opérateurs MAGI.', ...ephemeral });
   const [form, channelId, editId] = interaction.customId.slice(PREFIX.length).split(':');
+  if (form === 'draft') return draftAction(interaction, channelId, editId);
   if (form === 'annuler') {
-    const cancelled = cancelScheduled(Number(channelId), interaction.guild.id);
+    const cancelled = cancelByUser(Number(channelId), interaction.guild.id);
     if (cancelled) log.notice('commandes', `${interaction.member} a annulé le message programmé n°${channelId}`, { guild: interaction.guild });
-    return interaction.update({ content: cancelled ? `Message programmé n°${channelId} annulé.` : 'Ce message est déjà parti ou annulé.', components: [] });
+    const content = cancelled ? `Message programmé n°${channelId} annulé.` : 'Ce message est déjà parti ou annulé.';
+    return interaction.update(interaction.message?.flags?.has(MessageFlags.IsComponentsV2) ? notice(content) : { content, components: [] });
   }
   if (!interaction.isModalSubmit()) return;
   const { guild } = interaction;
   const channel = guild.channels.cache.get(channelId);
   if (!channel) return interaction.reply({ content: 'Salon introuvable.', ...ephemeral });
   const text = interaction.fields.getTextInputValue('texte');
+  const when = editId ? { at: null } : parseWhen(interaction.fields.getTextInputValue('quand'));
+  if (when.error) return interaction.reply({ content: `${when.error}\n-# Ton texte :\n${text}`.slice(0, 2000), ...ephemeral });
+  if (form === 'publication') {
+    const legacy = editId && !publicationMeta(guild.id, editId);
+    if (!legacy) return startDraft(interaction, channel, editId, when.at);
+  }
   const title = form === 'publication' ? interaction.fields.getTextInputValue('titre') : '';
-  const payload = form === 'publication' ? { content: null, embeds: [publicationEmbed(guild, { titre: title, texte: text, entete: false })] } : { content: text, embeds: [] };
   if (editId) {
     const target = await channel.messages.fetch(editId).catch(() => null);
     if (!target) return interaction.reply({ content: 'Message introuvable.', ...ephemeral });
-    await target.edit(payload);
+    const color = COLORS[interaction.fields.getStringSelectValues?.('couleur')?.[0]]?.[1];
+    const embed = form === 'publication' ? publicationEmbed(guild, { titre: title, texte: text, entete: false }) : null;
+    if (embed && color) embed.setColor(color);
+    await target.edit(embed ? { content: null, embeds: [embed] } : { content: text, embeds: [] });
     log.notice('commandes', `${interaction.member} a réécrit un message de MAGI : ${target.url}`, { channel });
     return interaction.reply({ content: `Message modifié : ${target.url}`, ...ephemeral });
   }
-  const when = parseWhen(interaction.fields.getTextInputValue('quand'));
-  if (when.error) return interaction.reply({ content: `${when.error}\n-# Ton texte :\n${text}`.slice(0, 2000), ...ephemeral });
   if (when.at) {
     const id = scheduleMessage({ guildId: guild.id, channelId: channel.id, authorId: interaction.user.id, form, title, text, at: when.at });
     log.notice('commandes', `${interaction.member} a programmé un message (${FORMS[form].toLowerCase()}) dans ${channel} pour <t:${Math.floor(when.at / 1000)}:f>`, { channel });

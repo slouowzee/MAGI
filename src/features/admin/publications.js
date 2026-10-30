@@ -1,4 +1,4 @@
-import { PermissionFlagsBits } from 'discord.js';
+import { MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { framed, SIGNATURE } from '../../core/discord/embeds.js';
 import { deletePublication, findPublication, recentPublications, renamePublication, savePublication } from './publications-store.js';
 import { setSetting, setting } from '../../core/settings.js';
@@ -123,6 +123,7 @@ export const PUBLICATION_TOOLS = [
     async run({ guild, args }) {
       const publication = existing(guild, args.publication);
       const message = await fetchPublication(guild, publication);
+      if (message.flags.has(MessageFlags.IsComponentsV2)) throw new Error('cette publication a été écrite avec /ecrire : modifie-la avec /ecrire et l’option modifier');
       await message.edit({ embeds: [publicationEmbed(guild, args, kindOf(message))] });
       if (args.titre?.trim()) renamePublication(publication.id, args.titre.trim());
       return `Publication modifiée : ${message.url}`;
