@@ -14,7 +14,7 @@ import { conversationFor, conversationPrompt, rememberAnswer } from '../../core/
 import { splitMessage } from '../../core/discord/split.js';
 import { speak } from '../../core/discord/webhooks.js';
 import { chat, forReply, LLMUnavailable } from '../../core/llm/client.js';
-import { acceptable, examplesNote, registerOf, rememberReply, repetitionNote, staleness } from './examples.js';
+import { acceptable, examplesNote, registerOf, rememberReply, repetitionNote, staleness, toneNote } from './examples.js';
 import { buildMessages, cleanReply, MAX_TOKENS } from '../../core/llm/prompts.js';
 import { respond } from '../../core/llm/respond.js';
 import { log } from '../../core/log/log.js';
@@ -117,7 +117,7 @@ export async function handleMessage(message, { catchUp = false, force = false } 
     for (const id of included) addMessage(current, id, null, Date.now());
     const summary = wantsSummary(trigger.text);
     const guildId = message.guild.id;
-    const extra = [await memoryContext(guildId, participants, message.content), !summary && examplesNote(guildId, persona, registerOf(trigger.text)), repetitionNote(guildId, persona)].filter(Boolean).join('\n');
+    const extra = [await memoryContext(guildId, participants, message.content), !summary && examplesNote(guildId, persona, registerOf(trigger.text)), !summary && toneNote(guildId), repetitionNote(guildId, persona)].filter(Boolean).join('\n');
     const messages = buildMessages(persona, summary ? [{ role: 'user', content: conversationPrompt([`${target} : ${message.content}`], target) }] : turns, length, extra);
     const first = await respond({
       messages,

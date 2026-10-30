@@ -23,6 +23,7 @@ import { birthdayOfUser, synchroOf } from '../community/store.js';
 import { nextMilestone, paliers, pointsFor, rateOf } from '../community/synchro.js';
 import { pendingReminders } from '../reminders/store.js';
 import { factsAbout, forgetUser, summariesAbout } from '../memory/store.js';
+import { forgetToneOf, toneCountOf } from '../conversation/examples.js';
 import { moduleEnabled } from '../../core/config.js';
 import { gateRole } from '../security/gate.js';
 import { activeInfractions, casesOf, purgeMember, recordOf } from './store.js';
@@ -221,10 +222,11 @@ export async function showMemory(interaction) {
   const { guild, user } = interaction;
   const facts = await factsAbout(guild.id, user.id, 50).catch(() => []);
   const summaries = (await summariesAbout(guild.id, user.id, 100).catch(() => [])).length;
+  const tone = toneCountOf(guild.id, user.id);
   const container = new ContainerBuilder().setAccentColor(COLOR).addTextDisplayComponents(text(`### Ce que MAGI retient de toi\n${facts.length ? clipList(facts.map((f) => `- ${f}`), 25).join('\n') : 'Aucun souvenir.'}`));
-  container.addTextDisplayComponents(text(`-# ${summaries ? `Et ${summaries} résumé${summaries > 1 ? 's' : ''} de conversations auxquelles tu as participé.` : 'Aucun résumé de conversation.'} MAGI s’en sert pour te répondre avec le contexte, rien d’autre.`));
-  if (facts.length || summaries) {
-    container.addTextDisplayComponents(text('Tout oublier efface tes souvenirs et ces résumés, définitivement.')).addActionRowComponents(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}oublier-ok:${user.id}`).setLabel('Tout oublier').setStyle(ButtonStyle.Danger)));
+  container.addTextDisplayComponents(text(`-# ${summaries ? `Et ${summaries} résumé${summaries > 1 ? 's' : ''} de conversations auxquelles tu as participé.` : 'Aucun résumé de conversation.'} MAGI s’en sert pour te répondre avec le contexte, rien d’autre.${tone ? `\n-# ${tone} de tes messages servent d’exemple du ton du serveur, pour que les unités parlent comme la bande.` : ''}`));
+  if (facts.length || summaries || tone) {
+    container.addTextDisplayComponents(text('Tout oublier efface tes souvenirs, ces résumés et tes messages d’exemple, définitivement.')).addActionRowComponents(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}oublier-ok:${user.id}`).setLabel('Tout oublier').setStyle(ButtonStyle.Danger)));
   }
   return interaction.reply({ components: [container], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
 }
@@ -239,8 +241,10 @@ async function forgetMe(interaction, confirmed) {
     });
   }
   const { facts, summaries } = await forgetUser(guild.id, user.id);
-  log.notice('memoire', `<@${user.id}> a fait effacer ce que MAGI retenait : ${facts} souvenir${facts > 1 ? 's' : ''}, ${summaries} résumé${summaries > 1 ? 's' : ''}`, { guild });
-  return interaction.update({ content: `C’est oublié : ${facts} souvenir${facts > 1 ? 's' : ''} et ${summaries} résumé${summaries > 1 ? 's' : ''} de conversation effacés.`, components: [] });
+  const tone = forgetToneOf(guild.id, user.id);
+  const extra = tone ? `, ${tone} message${tone > 1 ? 's' : ''} d’exemple` : '';
+  log.notice('memoire', `<@${user.id}> a fait effacer ce que MAGI retenait : ${facts} souvenir${facts > 1 ? 's' : ''}, ${summaries} résumé${summaries > 1 ? 's' : ''}${extra}`, { guild });
+  return interaction.update({ content: `C’est oublié : ${facts} souvenir${facts > 1 ? 's' : ''}, ${summaries} résumé${summaries > 1 ? 's' : ''} de conversation${extra} effacés.`, components: [] });
 }
 
 export async function handleLookupInteraction(interaction) {

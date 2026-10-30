@@ -306,6 +306,11 @@ export async function handlePanelInteraction(interaction) {
     await show('reponses');
     return changed(`emoji de la banque d'exemples (${key === 'examples_good' ? 'ajout' : 'retrait'}) = ${emoji}`);
   }
+  if (field === 'tone_forget') {
+    const removed = forgetExample(guild.id, Number(interaction.values?.[0]));
+    await show('reponses');
+    return removed ? changed('message retiré du ton du serveur') : null;
+  }
   if (field === 'examples_forget') {
     const removed = forgetExample(guild.id, Number(interaction.values?.[0]));
     await show('reponses');

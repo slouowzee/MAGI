@@ -5,7 +5,7 @@ import { personaOf, REPLY_HEADER } from '../../core/discord/webhooks.js';
 import { displayName } from '../../core/discord/history.js';
 import { log } from '../../core/log/log.js';
 import { sameEmoji } from '../community/hall-of-fame.js';
-import { learn, unlearn } from './examples.js';
+import { learn, learnTone, unlearn } from './examples.js';
 
 export const GOOD_CHOICES = { '👍': 'Pouce levé', '⭐': 'Étoile', '💯': 'Cent', '🧠': 'Cerveau', '✅': 'Validé' };
 export const BAD_CHOICES = { '👎': 'Pouce baissé', '❌': 'Croix', '🗑️': 'Corbeille', '🚫': 'Interdit' };
@@ -27,13 +27,25 @@ export async function handleExampleReaction(reaction, user) {
   if (!good && !sameEmoji(reaction.emoji, badEmoji(guildId))) return null;
   if (reaction.partial) await reaction.fetch().catch(() => null);
   const message = reaction.message.partial ? await reaction.message.fetch().catch(() => null) : reaction.message;
-  const persona = message && personaOf(message);
-  if (!persona) return null;
+  if (!message?.guild) return null;
+  const persona = personaOf(message);
+  const human = !persona && !message.author?.bot && !message.webhookId;
+  if (!persona && !human) return null;
   const member = await message.guild.members.fetch(user.id).catch(() => null);
   if (!member || !isOperator(member)) return null;
   const output = message.content.replace(REPLY_HEADER, '').trim();
   if (!output) return null;
   const { guild } = message;
+  if (human && !good) {
+    if (!unlearn(guildId, output)) return null;
+    log.notice('exemples', `${member} a retiré un message de ${displayName(message)} du ton du serveur`, { guild });
+    return 'retiree';
+  }
+  if (human) {
+    if (!learnTone(guildId, { authorId: message.author.id, author: displayName(message), text: output, by: user.id })) return null;
+    log.notice('exemples', `${member} a ajouté un message de ${displayName(message)} au ton du serveur : « ${output.slice(0, 80)} »`, { guild });
+    return 'ton';
+  }
   if (!good) {
     if (!unlearn(guildId, output)) return null;
     log.notice('exemples', `${member} a retiré une réponse de ${PERSONAS[persona].name} de la banque d'exemples`, { guild });

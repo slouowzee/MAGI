@@ -58,3 +58,20 @@ test('réaction d’un opérateur : ajoute la réponse et son message d’origin
   assert.equal(await react('👎', 'owner'), 'retiree');
   assert.equal(learnedExamples('g-retour').length, 0);
 });
+
+test('ton du serveur : message d’un membre ajouté par un opérateur, montré sans auteur, effacé par /oublier', async () => {
+  const { handleExampleReaction } = await import('./feedback.js');
+  const { forgetToneOf, toneCountOf, toneNote, toneSamples } = await import('./examples.js');
+  const members = { owner: { id: 'owner' } };
+  const guild = { id: 'g-ton', ownerId: 'owner', channels: { cache: new Map() }, members: { fetch: async (id) => members[id] } };
+  members.owner.guild = guild;
+  const said = { guild, guildId: guild.id, webhookId: null, author: { id: 'lea', bot: false, username: 'lea' }, member: { displayName: 'Léa' }, content: 'wsh la team, ce soir on lance une partie ou bien ?' };
+  assert.equal(await handleExampleReaction({ emoji: { name: '👍', id: null }, message: said }, { id: 'owner', bot: false }), 'ton');
+  assert.deepEqual(toneSamples('g-ton').map((e) => [e.authorId, e.author, e.output]), [['lea', 'Léa', 'wsh la team, ce soir on lance une partie ou bien ?']]);
+  assert.match(toneNote('g-ton'), /« wsh la team, ce soir on lance une partie ou bien \? »/);
+  assert.ok(!toneNote('g-ton').includes('Léa'));
+  assert.equal(await handleExampleReaction({ emoji: { name: '👍', id: null }, message: { ...said, author: { id: 'bot', bot: true } } }, { id: 'owner', bot: false }), null);
+  assert.equal(toneCountOf('g-ton', 'lea'), 1);
+  assert.equal(forgetToneOf('g-ton', 'lea'), 1);
+  assert.equal(toneNote('g-ton'), '');
+});

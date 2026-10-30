@@ -74,7 +74,27 @@ const removeOne = db.query('DELETE FROM examples WHERE id = ? AND guild_id = ?')
 const removeByOutput = db.query('DELETE FROM examples WHERE guild_id = ? AND output = ?');
 const findOutput = db.query('SELECT id FROM examples WHERE guild_id = ? AND output = ?');
 
-export const learnedExamples = (guildId) => ofGuild.all(guildId);
+export const TONE = 'serveur';
+const MAX_TONE = 4;
+const toneOf = db.query("SELECT * FROM examples WHERE guild_id = ? AND persona = 'serveur' ORDER BY id DESC");
+const toneOfAuthor = db.query("SELECT count(*) AS n FROM examples WHERE guild_id = ? AND persona = 'serveur' AND input LIKE ?");
+const forgetAuthor = db.query("DELETE FROM examples WHERE guild_id = ? AND persona = 'serveur' AND input LIKE ?");
+
+export const learnedExamples = (guildId) => ofGuild.all(guildId).filter((e) => e.persona !== TONE);
+export const toneSamples = (guildId) => toneOf.all(guildId).map((e) => ({ ...e, authorId: e.input.split(':')[0], author: e.input.split(':').slice(1).join(':') }));
+export const toneCountOf = (guildId, userId) => toneOfAuthor.get(guildId, `${userId}:%`).n;
+export const forgetToneOf = (guildId, userId) => forgetAuthor.run(guildId, `${userId}:%`).changes;
+
+export function learnTone(guildId, { authorId, author, text, by }, now = Date.now()) {
+  if (findOutput.get(guildId, text)) return false;
+  insert.run(guildId, TONE, registerOf(text), `${authorId}:${author}`, text.slice(0, 500), by, now);
+  return true;
+}
+
+export function toneNote(guildId, random = Math.random) {
+  const samples = shuffle(toneSamples(guildId), random).slice(0, MAX_TONE);
+  return samples.length ? `Façon de parler de la bande sur ce serveur, pour t'en imprégner légèrement (vocabulaire, expressions, niveau de langue), sans recopier ces messages ni imiter quelqu'un en particulier :\n${samples.map((e) => `- « ${e.output.replace(/\s+/g, ' ')} »`).join('\n')}` : '';
+}
 export const forgetExample = (guildId, id) => removeOne.run(id, guildId).changes > 0;
 export const unlearn = (guildId, output) => removeByOutput.run(guildId, output).changes > 0;
 
