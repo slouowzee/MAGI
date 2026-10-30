@@ -75,6 +75,31 @@ test('classement : synchro par pages de 10, boutons aux bords désactivés', asy
   assert.match(JSON.stringify(leaderboard(guild).toJSON()), /coupée/);
 });
 
+test('Hall of Fame : carte enrichie avec auteur, contexte, galerie de 4 médias et bouton vers le message', async () => {
+  const { starCard } = await import('./hall-of-fame.js');
+  const image = (n) => [`a${n}`, { url: `https://cdn/x${n}.png`, contentType: 'image/png' }];
+  const message = {
+    content: 'La réaction ?',
+    url: 'https://discord.com/channels/g/c/m',
+    createdTimestamp: 1_793_000_000_000,
+    channel: { id: 'c' },
+    author: { username: 'mf', displayAvatarURL: () => 'https://cdn/mf.png' },
+    member: { displayName: 'Miss Fortune', displayAvatarURL: () => 'https://cdn/mf.png' },
+    attachments: new Collection([image(1), image(2), image(3), image(4), image(5)]),
+    embeds: [],
+  };
+  const parent = { content: 't’as vu sa tête quand il a perdu ?', author: { username: 'yui' }, member: { displayName: 'Yui' }, attachments: new Collection(), embeds: [] };
+  const card = starCard(message, { count: 12, emoji: '🔥', parent }).toJSON();
+  const shown = JSON.stringify(card);
+  assert.equal(card.accent_color, 0xd85a30);
+  assert.match(shown, /### 🔥 12 · Miss Fortune\\n-# <#c> · <t:1793000000:f>/);
+  assert.match(shown, /-# ↪ Yui : t’as vu sa tête quand il a perdu \?\\nLa réaction \?/);
+  assert.equal(card.components.find((c) => c.type === 12).items.length, 4);
+  const link = card.components.at(-1).components[0];
+  assert.deepEqual([link.style, link.url, link.label], [5, message.url, 'Aller au message']);
+  assert.equal(starCard({ ...message, attachments: new Collection() }, { count: 3, emoji: '❤', parent: null }).toJSON().accent_color, 0xe24b4a);
+});
+
 test("anniversaires : une fois par jour, à partir de 9 h à Paris", async () => {
   const sent = [];
   const channel = { id: 'c', isThread: () => false, send: async (p) => sent.push(p) };

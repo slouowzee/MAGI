@@ -1,4 +1,4 @@
-import { EmbedBuilder } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ContainerBuilder, MediaGalleryBuilder, MessageFlags, SectionBuilder, TextDisplayBuilder, ThumbnailBuilder } from 'discord.js';
 import { activePersonas, channelSetting, moduleEnabled, option } from '../../core/config.js';
 import { setSetting, setting } from '../../core/settings.js';
 import { speak } from '../../core/discord/webhooks.js';
@@ -10,6 +10,10 @@ import { log } from '../../core/log/log.js';
 export const EMOJI_CHOICES = { '🔥': 'Flamme', '⭐': 'Étoile', '🏆': 'Trophée', '💯': 'Cent', '❤️': 'Cœur', '👑': 'Couronne', '✨': 'Étincelles', '😂': 'Rire' };
 const DEFAULT = '🔥';
 const bare = (text) => String(text ?? '').replace(/\uFE0F/g, '');
+const COLORS = Object.fromEntries(Object.entries({ '🔥': 0xd85a30, '💯': 0xe24b4a, '❤️': 0xe24b4a, '🏆': 0xba7517, '⭐': 0xef9f27, '👑': 0xef9f27, '✨': 0xef9f27, '😂': 0xef9f27 }).map(([emoji, color]) => [bare(emoji), color]));
+const MAX_MEDIA = 4;
+const text = (content) => new TextDisplayBuilder().setContent(content);
+const clip = (value, max) => (value.length > max ? `${value.slice(0, max - 1)}…` : value);
 
 export const wallEmoji = (guildId) => setting(guildId, 'stars_emoji') ?? DEFAULT;
 
@@ -25,15 +29,22 @@ export function parseEmoji(text) {
   return null;
 }
 
-export function starEmbed(message) {
-  const embed = new EmbedBuilder()
-    .setColor(0xf5c542)
-    .setAuthor({ name: displayName(message), iconURL: message.author.displayAvatarURL?.() })
-    .setDescription(`${describe(message).slice(0, 3500) || '*(pièce jointe)*'}\n\n[Voir le message](${message.url})`)
-    .setTimestamp(message.createdTimestamp);
-  const image = [...(message.attachments?.values() ?? [])].find((a) => a.contentType?.startsWith('image/'));
-  if (image) embed.setImage(image.url);
-  return embed;
+export function starCard(message, { count, emoji, parent = null }) {
+  const media = [
+    ...[...(message.attachments?.values() ?? [])].filter((a) => /^(image|video)\//.test(a.contentType ?? '')).map((a) => a.url),
+    ...(message.embeds ?? []).map((e) => e.image?.url ?? e.thumbnail?.url).filter(Boolean),
+  ].slice(0, MAX_MEDIA);
+  const content = media.length && /^https?:\/\/\S+$/.test(message.content.trim()) ? '' : message.content.trim();
+  const body = content || (media.length ? '' : describe(message));
+  const header = `### ${emoji} ${count} · ${displayName(message)}\n-# <#${message.channel.id}> · <t:${Math.floor(message.createdTimestamp / 1000)}:f>`;
+  const avatar = message.member?.displayAvatarURL?.({ size: 128 }) ?? message.author.displayAvatarURL?.({ size: 128 });
+  const card = new ContainerBuilder().setAccentColor(COLORS[bare(emoji)] ?? 0xf5c542);
+  if (avatar) card.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(avatar)));
+  else card.addTextDisplayComponents(text(header));
+  const lines = [parent && `-# ↪ ${displayName(parent)} : ${clip(describe(parent).replace(/\s+/g, ' '), 120)}`, body && clip(body, 3000)].filter(Boolean);
+  if (lines.length) card.addTextDisplayComponents(text(lines.join('\n')));
+  if (media.length) card.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(media.map((url) => (item) => item.setURL(url))));
+  return card.addActionRowComponents(new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(message.url).setLabel('Aller au message')));
 }
 
 export async function handleStar(reaction) {
@@ -55,7 +66,9 @@ export async function handleStar(reaction) {
     const { content } = await chat({ messages: buildMessages(persona, [{ role: 'user', content: prompt }], 'courte'), options: { num_predict: MAX_TOKENS.courte }, ...forReply() });
     comment = cleanReply(content) || comment;
   } catch {}
-  const posted = await speak(wall, persona, comment, { embeds: [starEmbed(message)] }).catch((err) => {
+  const parent = message.reference?.messageId ? await message.fetchReference().catch(() => null) : null;
+  const card = starCard(message, { count: reaction.count, emoji: STAR, parent });
+  const posted = await speak(wall, persona, undefined, { components: [text(comment), card], flags: MessageFlags.IsComponentsV2 }).catch((err) => {
     setSetting(guild.id, `star:${message.id}`, null);
     throw err;
   });

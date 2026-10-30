@@ -50,12 +50,13 @@ export function replyHeader(msg) {
   return `-# ↪ <@${msg.author.id}> [${escapeMarkdown(snippet)}](${msg.url})`;
 }
 
-function payload(channel, persona, content, { components, embeds, mentions = [], replyTo }) {
+function payload(channel, persona, content, { components, embeds, flags, mentions = [], replyTo }) {
   const { name, avatar } = PERSONAS[persona];
   return {
     content: replyTo ? `${replyHeader(replyTo)}\n${content}` : content,
     components,
     embeds,
+    flags,
     withComponents: Boolean(components?.length),
     username: name,
     avatarURL: avatar,
