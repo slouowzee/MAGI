@@ -1,7 +1,7 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ContainerBuilder, MediaGalleryBuilder, MessageFlags, SectionBuilder, TextDisplayBuilder, ThumbnailBuilder } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ContainerBuilder, MediaGalleryBuilder, MessageFlags, SectionBuilder, TextDisplayBuilder, ThumbnailBuilder } from 'discord.js';
 import { activePersonas, channelSetting, moduleEnabled, option } from '../../core/config.js';
 import { setSetting, setting } from '../../core/settings.js';
-import { speak } from '../../core/discord/webhooks.js';
+import { editSpoken, personaOf, speak } from '../../core/discord/webhooks.js';
 import { describe, displayName } from '../../core/discord/history.js';
 import { chat, forReply } from '../../core/llm/client.js';
 import { buildMessages, cleanReply, MAX_TOKENS } from '../../core/llm/prompts.js';
@@ -13,6 +13,8 @@ const bare = (text) => String(text ?? '').replace(/\uFE0F/g, '');
 const HEAT = [[25, 0xa32d2d], [15, 0xe24b4a], [10, 0xd85a30], [5, 0xef9f27], [0, 0xfac775]];
 export const heat = (count) => HEAT.find(([min]) => count >= min)[1];
 const MAX_MEDIA = 4;
+const REFRESH_DELAY = 3_000;
+const refreshing = new Map();
 const text = (content) => new TextDisplayBuilder().setContent(content);
 const clip = (value, max) => (value.length > max ? `${value.slice(0, max - 1)}…` : value);
 
@@ -47,15 +49,40 @@ export function starCard(message, { count, emoji, parent = null }) {
   return card.addActionRowComponents(new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(message.url).setLabel('Aller au message')));
 }
 
-export async function handleStar(reaction) {
+export async function refreshCard(guild, message, postedId) {
+  const wall = channelSetting(guild, 'stars_channel');
+  const posted = wall && (await wall.messages.fetch(postedId).catch(() => null));
+  const comment = posted?.components?.[0];
+  const persona = posted && personaOf(posted);
+  if (!persona || comment?.type !== ComponentType.TextDisplay) return false;
+  const fresh = await message.fetch().catch(() => message);
+  const emoji = wallEmoji(guild.id);
+  const count = fresh.reactions?.cache.find((r) => sameEmoji(r.emoji, emoji))?.count ?? 0;
+  const parent = fresh.reference?.messageId ? await fresh.fetchReference().catch(() => null) : null;
+  await editSpoken(wall, persona, posted.id, { components: [text(comment.content), starCard(fresh, { count, emoji, parent })] });
+  return true;
+}
+
+function scheduleRefresh(guild, message, postedId) {
+  clearTimeout(refreshing.get(message.id));
+  const timer = setTimeout(() => {
+    refreshing.delete(message.id);
+    refreshCard(guild, message, postedId).catch((err) => log.err('etoiles', `échec de la mise à jour de la carte : ${err.message}`, { guild }));
+  }, REFRESH_DELAY);
+  refreshing.set(message.id, timer);
+}
+
+export async function handleStar(reaction, { added = true } = {}) {
   const guildId = reaction.message.guildId ?? reaction.message.guild?.id;
   if (!guildId || !sameEmoji(reaction.emoji, wallEmoji(guildId))) return;
   if (reaction.partial) await reaction.fetch().catch(() => null);
   const message = reaction.message.partial ? await reaction.message.fetch().catch(() => null) : reaction.message;
   const guild = message?.guild;
   if (!guild || !moduleEnabled(guild.id, 'etoiles') || message.author?.id === guild.client.user.id) return;
+  const entry = setting(guild.id, `star:${message.id}`);
+  if (entry) return entry === 'en cours' ? undefined : scheduleRefresh(guild, message, entry);
   const wall = channelSetting(guild, 'stars_channel');
-  if (!wall || message.channel.id === wall.id || setting(guild.id, `star:${message.id}`)) return;
+  if (!added || !wall || message.channel.id === wall.id) return;
   if (reaction.count < (setting(guild.id, 'stars_test') ? 1 : Number(option(guild.id, 'stars_threshold')))) return;
   setSetting(guild.id, `star:${message.id}`, 'en cours');
   const persona = activePersonas(guild.id).includes('casper') ? 'casper' : activePersonas(guild.id)[0];

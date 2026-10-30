@@ -106,6 +106,7 @@ client.on(Events.MessageCreate, async (message) => {
   await handleMessage(message);
 });
 client.on(Events.MessageReactionAdd, (reaction) => handleStar(reaction).catch((err) => log.err('etoiles', err.message, { guild: reaction.message.guild })));
+client.on(Events.MessageReactionRemove, (reaction) => handleStar(reaction, { added: false }).catch((err) => log.err('etoiles', err.message, { guild: reaction.message.guild })));
 client.on(Events.VoiceStateUpdate, (before, after) => handleVoiceState(before, after).catch((err) => log.err('vocal', err.message, { guild: after.guild })));
 
 for (const signal of ['SIGINT', 'SIGTERM']) {

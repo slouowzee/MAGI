@@ -80,3 +80,7 @@ async function withWebhook(channel, persona, action) {
 export function speak(channel, persona, content, options = {}) {
   return withWebhook(channel, persona, (wh) => wh.send(payload(channel, persona, content, options)));
 }
+
+export function editSpoken(channel, persona, messageId, { components }) {
+  return withWebhook(channel, persona, (wh) => wh.editMessage(messageId, { components, withComponents: true, threadId: channel.isThread() ? channel.id : undefined }));
+}

@@ -101,6 +101,44 @@ test('Hall of Fame : carte enrichie avec auteur, contexte, galerie de 4 médias 
   assert.deepEqual([1, 5, 10, 15, 30].map(heat), [0xfac775, 0xef9f27, 0xd85a30, 0xe24b4a, 0xa32d2d]);
 });
 
+test('Hall of Fame : la carte suit les réactions, le commentaire de Casper ne bouge pas', async () => {
+  const { refreshCard } = await import('./hall-of-fame.js');
+  const { PERSONAS } = await import('../../core/personas.js');
+  const edits = [];
+  const guild = { id: 'g-hof', channels: { cache: new Collection() } };
+  const posted = { id: 'p1', webhookId: 'w', applicationId: 'app', client: { application: { id: 'app' } }, author: { username: PERSONAS.casper.name }, components: [{ type: 10, content: 'Un feu pour une phrase pareille.' }] };
+  const wall = {
+    id: 'mur',
+    isThread: () => false,
+    client: { user: { id: 'magi' } },
+    messages: { fetch: async (id) => (id === 'p1' ? posted : null) },
+    fetchWebhooks: async () => new Collection(),
+    createWebhook: async ({ name }) => ({ name, owner: { id: 'magi' }, editMessage: async (id, p) => edits.push([id, p]) }),
+  };
+  guild.channels.cache.set('mur', wall);
+  setSetting(guild.id, 'stars_channel', 'mur');
+  const message = {
+    content: 'Sur ce message',
+    url: 'https://discord.com/channels/g/c/m',
+    createdTimestamp: 1_793_000_000_000,
+    channel: { id: 'c' },
+    author: { username: 'slou', displayAvatarURL: () => 'https://cdn/s.png' },
+    member: { displayName: 'Slou', displayAvatarURL: () => 'https://cdn/s.png' },
+    attachments: new Collection(),
+    embeds: [],
+    reactions: { cache: new Collection([['🔥', { emoji: { name: '🔥', id: null }, count: 11 }]]) },
+  };
+  message.fetch = async () => message;
+  assert.equal(await refreshCard(guild, message, 'p1'), true);
+  const [id, payload] = edits[0];
+  assert.equal(id, 'p1');
+  assert.equal(payload.components[0].toJSON().content, 'Un feu pour une phrase pareille.');
+  const card = payload.components[1].toJSON();
+  assert.equal(card.accent_color, 0xd85a30);
+  assert.match(card.components[0].components[0].content, /^### 🔥 11 · Slou/);
+  assert.equal(await refreshCard(guild, message, 'inconnu'), false);
+});
+
 test("anniversaires : une fois par jour, à partir de 9 h à Paris", async () => {
   const sent = [];
   const channel = { id: 'c', isThread: () => false, send: async (p) => sent.push(p) };
