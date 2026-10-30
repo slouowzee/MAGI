@@ -28,11 +28,11 @@ export const READ_TOOLS = [
     access: 'operator',
     readonly: true,
     async run({ guild }) {
-      return [...guild.roles.cache.values()]
+      const lines = [...guild.roles.cache.values()]
         .filter((r) => r.id !== guild.id)
         .sort((a, b) => b.position - a.position)
-        .map((r) => `- ${r.name}${r.managed ? ' (intégration)' : ''} : ${r.members.size} membre(s)`)
-        .join('\n');
+        .map((r, i) => `${i + 1}. ${r.name}${r.managed ? ' (intégration)' : ''}${r.id === guild.members.me.roles.highest.id ? ' (rôle de MAGI : rien au-dessus ne peut être modifié)' : ''} : ${r.members.size} membre(s)`);
+      return `Hiérarchie, du plus haut (1) au plus bas :\n${lines.join('\n')}`;
     },
   },
   {

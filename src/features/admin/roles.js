@@ -45,10 +45,29 @@ export const ROLE_TOOLS = [
     async run({ guild, args, reason }) {
       const role = targetRole(guild, args.role);
       const below = /everyone/i.test(String(args.au_dessus_de)) ? guild.roles.everyone : targetRole(guild, args.au_dessus_de);
+      if (role.position === below.position + 1) return `Rien à changer : ${role.name} était déjà juste au-dessus de ${below.name}.`;
       const position = below.position + (role.position > below.position ? 1 : 0);
       if (position >= guild.members.me.roles.highest.position) throw new Error('cette position est au-dessus du rôle de MAGI');
       await role.setPosition(position, { reason });
       return `${role.name} placé au-dessus de ${below.name}.`;
+    },
+  },
+  {
+    name: 'ordonner_roles',
+    description:
+      "Range plusieurs rôles dans l'ordre exact donné, du plus haut au plus bas, en une seule fois : pour inverser ou trier une série (paliers, couleurs, grades). Les rôles restent dans la même zone de la hiérarchie. À préférer à une suite de deplacer_role. Donne la liste complète dans l'ordre final voulu.",
+    parameters: { type: 'object', properties: { roles: { type: 'array', items: { type: 'string' }, description: 'Noms ou mentions des rôles, du plus haut au plus bas dans le résultat voulu.' } }, required: ['roles'] },
+    access: 'operator',
+    async run({ guild, args, reason }) {
+      const roles = (args.roles ?? []).map((ref) => targetRole(guild, ref));
+      if (roles.length < 2) throw new Error('il faut au moins deux rôles à ranger');
+      if (new Set(roles.map((r) => r.id)).size !== roles.length) throw new Error('un rôle apparaît deux fois');
+      const order = (list) => list.map((r) => r.name).join(' > ');
+      const before = order([...roles].sort((a, b) => b.position - a.position));
+      if (before === order(roles)) return `Rien à changer : l'ordre est déjà ${before}.`;
+      const slots = roles.map((r) => r.position).sort((a, b) => b - a);
+      await guild.roles.setPositions(roles.map((role, i) => ({ role: role.id, position: slots[i] })), { reason });
+      return `Ordre appliqué, du plus haut au plus bas : ${order(roles)} (avant : ${before}).`;
     },
   },
   {
