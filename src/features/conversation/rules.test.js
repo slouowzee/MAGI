@@ -37,12 +37,13 @@ test('merci écrit à la va-vite : reconnu', () => {
   assert.equal(quickReaction('merci de me dire comment faire'), null);
 });
 
-test('réaction de l’unité : son emote si le serveur l’a, sinon l’emoji classique', () => {
+test('réaction de l’unité : son emote si l’application l’a, sinon l’emoji classique', async () => {
   const emote = (name) => ({ id: name, name });
-  const guild = { emojis: { cache: [emote('casper_love'), emote('casper_dodo'), emote('melchior_clope'), emote('balthasar_love')] } };
+  const { loadEmotes } = await import('../../core/discord/emotes.js');
+  await loadEmotes({ application: { emojis: { fetch: async () => new Map(['casper_love', 'casper_dodo', 'melchior_clope', 'balthasar_love'].map((name) => [name, emote(name)])) } } });
   const of = (text, persona) => {
     const quick = quickReaction(text);
-    return unitReaction(guild, persona, quick.kind, quick.emoji);
+    return unitReaction(persona, quick.kind, quick.emoji);
   };
   assert.equal(of('merci', 'casper').name, 'casper_love');
   assert.equal(of('bonne nuit', 'casper').name, 'casper_dodo');
@@ -50,5 +51,25 @@ test('réaction de l’unité : son emote si le serveur l’a, sinon l’emoji c
   assert.equal(of('merci', 'balthasar').name, 'balthasar_love');
   assert.equal(of('ça ira', 'casper'), '👌');
   assert.equal(of('merci', undefined), '❤️');
-  assert.equal(unitReaction({}, 'casper', 'merci', '❤️'), '❤️');
+  assert.equal(unitReaction('melchior', 'merci', '❤️'), '❤️');
+  await loadEmotes({ application: { emojis: { fetch: async () => new Map() } } });
+});
+
+test('réaction d’humeur : rare, jamais de fête sur une mauvaise nouvelle, rien sur une confidence chez Casper', async () => {
+  const { loadEmotes } = await import('../../core/discord/emotes.js');
+  const { moodReaction, quietReaction } = await import('./rules.js');
+  const names = ['casper_fete', 'casper_nargue', 'casper_cache', 'balthasar_inquiete', 'melchior_loupe'];
+  await loadEmotes({ application: { emojis: { fetch: async () => new Map(names.map((name) => [name, { id: name, name }])) } } });
+  const sure = () => 0;
+  assert.equal(moodReaction('casper', 'nouvelle', "j'ai eu mon code du premier coup !", sure).name, 'casper_fete');
+  assert.equal(moodReaction('casper', 'nouvelle', "j'ai eu mon code", () => 0.5), null);
+  assert.equal(moodReaction('casper', 'nouvelle', 'je viens de me faire larguer', sure), null);
+  assert.equal(moodReaction('balthasar', 'nouvelle', 'je viens de me faire larguer', sure).name, 'balthasar_inquiete');
+  assert.equal(moodReaction('casper', 'confidence', 'je me sens seul', sure), null);
+  assert.equal(moodReaction('casper', 'bavardage', 'je fais des crêpes', sure), null);
+  assert.equal(quietReaction('casper', sure).name, 'casper_cache');
+  assert.equal(quietReaction('melchior', sure).name, 'melchior_loupe');
+  assert.equal(quietReaction('casper', () => 0.5), null);
+  assert.equal(quietReaction('balthasar', sure), null);
+  await loadEmotes({ application: { emojis: { fetch: async () => new Map() } } });
 });

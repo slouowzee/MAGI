@@ -2,7 +2,8 @@ import { pickPersona, randomPersona, startsNewTopic } from './router.js';
 import { addMessage, answered, awaitingAnswer, closeConversation, endFollowUp, followUpConversation, isClaimed, locateConversation, openConversation } from './threads.js';
 import { activePersonas, isMuted, moduleEnabled, personaForChannel } from '../../core/config.js';
 import { memoryContext, summarizeConversation } from '../memory/context.js';
-import { floodCheck, quickReaction, unitReaction } from './rules.js';
+import { floodCheck, moodReaction, quickReaction, unitReaction } from './rules.js';
+import { unitEmote } from '../../core/discord/emotes.js';
 import { PERSONAS } from '../../core/personas.js';
 import { runVote } from '../vote/vote.js';
 import { announce } from '../presence/presence.js';
@@ -47,7 +48,7 @@ export async function handleMessage(message, { catchUp = false, force = false } 
   if (following && notForMagi(message.content)) {
     endFollowUp(following);
     addMessage(following, message.id, message.author.id, now, `${message.member?.displayName ?? message.author.username} : ${message.content}`);
-    await message.react(unitReaction(message.guild, following.persona, 'ignore', '👌')).catch(() => {});
+    await message.react(unitReaction(following.persona, 'ignore', '👌')).catch(() => {});
     log.debug('conversation', `${message.author.tag} : pas pour MAGI, suite arrêtée`, { channel: message.channel });
     return;
   }
@@ -67,14 +68,17 @@ export async function handleMessage(message, { catchUp = false, force = false } 
   const quick = quickReaction(message.content);
   if (quick && (quick.always || !awaitingAnswer(conversation, message.author.id, now))) {
     if (conversation) addMessage(conversation, message.id, message.author.id, now, line);
-    await message.react(unitReaction(message.guild, PERSONAS[trigger.persona] ? trigger.persona : conversation?.persona, quick.kind, quick.emoji)).catch(() => {});
+    await message.react(unitReaction(PERSONAS[trigger.persona] ? trigger.persona : conversation?.persona, quick.kind, quick.emoji)).catch(() => {});
     if (quick.ends) summarizeConversation(message.client, closeConversation(conversation));
     return;
   }
 
   const flood = floodCheck(message.author.id, message.createdTimestamp);
   if (flood !== 'ok') {
-    if (flood === 'warn') await speak(message.channel, 'balthasar', 'Doucement. Une question à la fois, je ne vais nulle part.').catch(() => {});
+    if (flood === 'warn') {
+      const facepalm = unitEmote('casper', 'facepalm');
+      await (facepalm ? message.react(facepalm) : speak(message.channel, 'balthasar', 'Doucement. Une question à la fois, je ne vais nulle part.')).catch(() => {});
+    }
     return;
   }
   const question = trigger.text || message.content;
@@ -107,6 +111,10 @@ export async function handleMessage(message, { catchUp = false, force = false } 
     }
     persona = pick.persona ?? randomPersona(Math.random, allowed);
     log.debug('conversation', `routage : ${persona} (${pick.reason})`, where);
+  }
+  if (catchUp) {
+    const dodo = unitEmote(persona, 'dodo');
+    if (dodo) message.react(dodo).catch(() => {});
   }
   const length = wantsDetail(trigger.text) ? 'detaillee' : 'courte';
   const typing = setInterval(() => message.channel.sendTyping().catch(() => {}), 8_000);
@@ -148,9 +156,14 @@ export async function handleMessage(message, { catchUp = false, force = false } 
       sent.push(posted.id);
     }
     answered(current, { persona, messageIds: sent, userId: message.author.id, asked: cleaned.endsWith('?'), text: cleaned });
+    const mood = !catchUp && moodReaction(persona, registerOf(trigger.text), trigger.text);
+    if (mood) message.react(mood).catch(() => {});
   } catch (err) {
     log.err('conversation', `échec ${persona} → ${message.author.tag} : ${err.message}`, where);
-    if (err instanceof LLMUnavailable) await speak(message.channel, 'melchior', 'Unité hors ligne.').catch(() => {});
+    if (err instanceof LLMUnavailable) {
+      const offline = unitEmote('melchior', 'erreur');
+      await (offline ? message.react(offline) : speak(message.channel, 'melchior', 'Unité hors ligne.')).catch(() => {});
+    }
   } finally {
     clearInterval(typing);
     live.done();

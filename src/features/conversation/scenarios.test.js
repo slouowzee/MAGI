@@ -228,8 +228,11 @@ test('« ça ira » ou « repos » après une réponse : une réaction, pas de r
 test('fin de conversation : l’unité qui parlait réagit avec son emote', async () => {
   const w = world('emote');
   await w.say('slou', 'casper, ça va ?');
-  w.guild.emojis = { cache: new Collection([['1', { id: '1', name: 'casper_pouce' }], ['2', { id: '2', name: 'melchior_lunettes' }]]) };
+  const { loadEmotes } = await import('../../core/discord/emotes.js');
+  const load = (names) => loadEmotes({ application: { emojis: { fetch: async () => new Map(names.map((name) => [name, { id: name, name }])) } } });
+  await load(['casper_pouce', 'melchior_lunettes']);
   const fin = await w.say('slou', 'ça ira.');
+  await load([]);
   expect(fin.answers).toHaveLength(0);
   expect(fin.reactions.map((r) => r.name)).toEqual(['casper_pouce']);
 });

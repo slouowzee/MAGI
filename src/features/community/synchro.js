@@ -1,3 +1,4 @@
+import { unitEmote } from '../../core/discord/emotes.js';
 import { activePersonas, isMuted, moduleEnabled } from '../../core/config.js';
 import { saveSynchro, synchroOf } from './store.js';
 import { listSettings, setSetting, setting } from '../../core/settings.js';
@@ -9,6 +10,7 @@ const COOLDOWN = 60_000;
 const NOTICE_TTL = 30_000;
 const NOTICE = 'synchro_notice:';
 export const MILESTONES = [25, 50, 75, 100, 150, 200, 300, 400];
+const MILESTONE_EMOTES = [['casper', 'fete'], ['melchior', 'pouce'], ['balthasar', 'fiere']];
 
 export const rateOf = (points) => Math.min(400, Math.floor(Math.sqrt(points) * 4));
 export const pointsFor = (rate) => Math.ceil((rate / 4) ** 2);
@@ -88,7 +90,8 @@ export async function trackActivity(message, now = message.createdTimestamp) {
   if (earned.length) await member.roles.add(earned, `MAGI : taux de synchronisation ${after} %`).catch(() => {});
   const persona = activePersonas(guild.id).includes('melchior') ? 'melchior' : activePersonas(guild.id)[0];
   const role = earned.length ? `, accès ${earned.map((r) => r.name).join(', ')} accordé` : '';
-  message.react('📈').catch(() => {});
+  const [unit, emote] = MILESTONE_EMOTES[MILESTONES.indexOf(reached.at(-1)) % MILESTONE_EMOTES.length];
+  message.react(unitEmote(unit, emote, '📈')).catch(() => {});
   if (!isMuted(message.channel)) {
     const notice = await speak(message.channel, persona, milestoneLine(guild.id, reached.at(-1), member.id, earned), { replyTo: message }).catch(() => null);
     if (notice) {

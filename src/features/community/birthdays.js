@@ -2,6 +2,7 @@ import { activePersonas, channelSetting, moduleEnabled } from '../../core/config
 import { birthdaysToday } from './store.js';
 import { setSetting, setting } from '../../core/settings.js';
 import { speak } from '../../core/discord/webhooks.js';
+import { unitEmote } from '../../core/discord/emotes.js';
 import { chat, forReply } from '../../core/llm/client.js';
 import { buildMessages, cleanReply, MAX_TOKENS } from '../../core/llm/prompts.js';
 import { log } from '../../core/log/log.js';
@@ -36,7 +37,8 @@ export async function celebrate(guild, now = Date.now(), { force = false } = {})
       const { content } = await chat({ messages: buildMessages(persona, [{ role: 'user', content: `C'est l'anniversaire de ${member.displayName} aujourd'hui. Souhaite-le-lui en une phrase, sans citer son pseudo (il sera mentionné avant ton message).` }], 'courte'), options: { num_predict: MAX_TOKENS.courte }, ...forReply() });
       text = cleanReply(content) || text;
     } catch {}
-    await speak(channel, persona, `<@${member.id}> ${text}`, { mentions: [member.id] });
+    const posted = await speak(channel, persona, `<@${member.id}> ${text}`, { mentions: [member.id] });
+    for (const emote of [unitEmote('balthasar', 'bisou', '🎂'), unitEmote('casper', 'fete', '🎉')]) await posted.react?.(emote).catch(() => {});
     log.info('anniversaires', `anniversaire de ${member.user.tag} souhaité`, { guild });
     sent++;
   }

@@ -1,3 +1,5 @@
+import { unitEmote } from '../../core/discord/emotes.js';
+
 const NAMES = /(?<![\p{L}\p{N}])(?:magi|melchior|balthasar|casper)(?![\p{L}\p{N}])/giu;
 
 const QUICK = [
@@ -16,9 +18,33 @@ const UNIT_EMOTES = {
   balthasar: { conge: 'the', fin: 'pouce', merci: 'love', nuit: 'dodo', bye: 'salut', rire: 'rire', ok: 'pouce', ignore: 'inquiete' },
 };
 
-export function unitReaction(guild, persona, kind, fallback) {
+export function unitReaction(persona, kind, fallback) {
   const name = UNIT_EMOTES[persona]?.[kind];
-  return (name && guild?.emojis?.cache.find((e) => e.name === `${persona}_${name}`)) || fallback;
+  return name ? unitEmote(persona, name, fallback) : fallback;
+}
+
+const MOOD_CHANCE = 0.3;
+const MOOD_EMOTES = {
+  casper: { nouvelle: 'fete', souci: 'choc', chambrage: 'nargue', debat: 'juge' },
+  melchior: { nouvelle: 'pouce', souci: 'hmm', chambrage: 'juge', debat: 'loupe' },
+  balthasar: { nouvelle: 'fiere', souci: 'inquiete', confidence: 'inquiete', chambrage: 'gene' },
+};
+const BAD_NEWS = /perdu|rat[ée]|larg|plaqu|vir[ée]|licenci|mort|d[ée]c[èe]s|enterr|accident|cass[ée]|vol[ée]|recal|malade|hospital|[ée]chou|rupture/i;
+
+export function moodReaction(persona, register, text, random = Math.random) {
+  if (random() >= MOOD_CHANCE) return null;
+  const mood = register === 'nouvelle' && BAD_NEWS.test(text) ? 'confidence' : register;
+  const name = MOOD_EMOTES[persona]?.[mood];
+  return name ? unitEmote(persona, name) : null;
+}
+
+const QUIET_CHANCE = 1 / 3;
+const QUIET_EMOTES = { casper: ['cache', 'nargue', 'juge'], melchior: ['loupe', 'hmm'] };
+
+export function quietReaction(persona, random = Math.random) {
+  const names = QUIET_EMOTES[persona];
+  if (!names || random() >= QUIET_CHANCE) return null;
+  return unitEmote(persona, names[Math.floor(random() * names.length)]);
 }
 
 function normalize(text) {

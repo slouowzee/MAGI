@@ -1,3 +1,4 @@
+import { loadEmotes } from './core/discord/emotes.js';
 import { Client, Events, GatewayIntentBits, Partials } from 'discord.js';
 import { handleMessage } from './features/conversation/handle-message.js';
 import { moderate } from './features/moderation/index.js';
@@ -57,6 +58,7 @@ const client = new Client({
 
 client.once(Events.ClientReady, async (c) => {
   await attachDiscord(c);
+  await loadEmotes(c);
   for (const guild of c.guilds.cache.values()) await setupGuild(guild);
   const stopped = Number(setting('global', 'last_stop') ?? 0);
   const offline = stopped && Date.now() - stopped < 30 * 60_000 ? Math.max(1, Math.round((Date.now() - stopped) / 1000)) : null;

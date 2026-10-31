@@ -6,6 +6,7 @@ import { interventionsAllowed } from './interventions.js';
 import { activePersonas, moduleEnabled } from '../../core/config.js';
 import { memoryContext } from '../memory/context.js';
 import { addMessage, answered, openConversation } from './threads.js';
+import { quietReaction } from './rules.js';
 import { log } from '../../core/log/log.js';
 
 const COOLDOWN = 30 * 60_000;
@@ -47,6 +48,12 @@ export async function maybeIntervene(message) {
   if (choice === 'ignorer') return;
 
   lastIntervention.set(channelId, Date.now());
+  const quiet = quietReaction(choice);
+  if (quiet) {
+    log.info('conversation', `réaction ${choice} sur le message de ${message.author.tag}`, { channel: message.channel });
+    await message.react(quiet).catch(() => {});
+    return;
+  }
   log.info('conversation', `intervention ${choice} après ${message.author.tag}`, { channel: message.channel });
   const { turns, participants, target } = await conversationFor(message, choice, message.content);
   const extra = [SPONTANEOUS, await memoryContext(message.guild.id, participants, message.content)].filter(Boolean).join('\n');
