@@ -57,7 +57,7 @@ test('réaction de l’unité : son emote si l’application l’a, sinon l’em
 
 test('réaction d’humeur : rare, jamais de fête sur une mauvaise nouvelle, rien sur une confidence chez Casper', async () => {
   const { loadEmotes } = await import('../../core/discord/emotes.js');
-  const { moodReaction, quietReaction } = await import('./rules.js');
+  const { moodReaction, quietChoices, quietEmote } = await import('./rules.js');
   const names = ['casper_fete', 'casper_nargue', 'casper_cache', 'balthasar_inquiete', 'melchior_loupe'];
   await loadEmotes({ application: { emojis: { fetch: async () => new Map(names.map((name) => [name, { id: name, name }])) } } });
   const sure = () => 0;
@@ -67,9 +67,10 @@ test('réaction d’humeur : rare, jamais de fête sur une mauvaise nouvelle, ri
   assert.equal(moodReaction('balthasar', 'nouvelle', 'je viens de me faire larguer', sure).name, 'balthasar_inquiete');
   assert.equal(moodReaction('casper', 'confidence', 'je me sens seul', sure), null);
   assert.equal(moodReaction('casper', 'bavardage', 'je fais des crêpes', sure), null);
-  assert.equal(quietReaction('casper', sure).name, 'casper_cache');
-  assert.equal(quietReaction('melchior', sure).name, 'melchior_loupe');
-  assert.equal(quietReaction('casper', () => 0.5), null);
-  assert.equal(quietReaction('balthasar', sure), null);
+  assert.deepEqual(quietChoices(['casper', 'melchior', 'balthasar']).map((q) => q.choice), ['casper_nargue', 'casper_cache', 'casper_fete', 'melchior_loupe']);
+  assert.deepEqual(quietChoices(['melchior']).map((q) => q.choice), ['melchior_loupe']);
+  assert.equal(quietEmote('casper_cache').name, 'casper_cache');
+  assert.equal(quietEmote('casper'), null);
+  assert.equal(quietEmote('ignorer'), null);
   await loadEmotes({ application: { emojis: { fetch: async () => new Map() } } });
 });

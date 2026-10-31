@@ -38,13 +38,19 @@ export function moodReaction(persona, register, text, random = Math.random) {
   return name ? unitEmote(persona, name) : null;
 }
 
-const QUIET_CHANCE = 1 / 3;
-const QUIET_EMOTES = { casper: ['cache', 'nargue', 'juge'], melchior: ['loupe', 'hmm'] };
+const QUIET_EMOTES = {
+  casper: { mdr: 'franchement drôle', nargue: 'à taquiner', juge: 'choix douteux', choc: 'surprenant', cache: 'potin à suivre en douce', demon: 'plan fourbe', fete: 'bonne nouvelle à fêter' },
+  melchior: { hmm: 'affirmation douteuse sans enjeu', loupe: 'détail curieux', lunettes: 'remarque bien vue' },
+  balthasar: { rire: 'drôle et tendre', fiere: 'quelqu’un a bien réussi', love: 'moment attendrissant', the: 'moment calme et agréable', gene: 'situation gênante' },
+};
 
-export function quietReaction(persona, random = Math.random) {
-  const names = QUIET_EMOTES[persona];
-  if (!names || random() >= QUIET_CHANCE) return null;
-  return unitEmote(persona, names[Math.floor(random() * names.length)]);
+export function quietChoices(personas) {
+  return personas.flatMap((persona) => Object.entries(QUIET_EMOTES[persona] ?? {}).filter(([name]) => unitEmote(persona, name)).map(([name, when]) => ({ choice: `${persona}_${name}`, when })));
+}
+
+export function quietEmote(choice) {
+  const [persona, name] = choice.split('_');
+  return name ? unitEmote(persona, name) : null;
 }
 
 function normalize(text) {
