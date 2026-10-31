@@ -151,6 +151,9 @@ export function examplesNote(guildId, persona, register, random = Math.random, t
 
 const RECENT = 20;
 const recent = new Map();
+const QUESTION_RUN = 10 * 60_000;
+const questionRuns = new Map();
+const asks = (text) => /\?[\s*_»"')]*$/.test(text);
 const CLICHES = [/\bprends soin de toi\b/i, /^je t'[ée]coute\b/i, /\bj'ai (?:pas|autre chose) (?:que [çc]a|[àa] faire)\b/i, /\bne m'appelle pas pour rien\b/i, /\bje (?:retourne|repars) [àa] mes (?:affaires|occupations)\b/i, /\bcertificat de bonne conduite\b/i, /\bop[ée]rationnel(?:le)?s?\b/i, /\btest (?:r[ée]ussi|rat[ée])\b/i, /\bprotocole\b/i, /\bje (?:range|pose) les vannes\b/i, /^c'est une (?:excellente|super|tr[èe]s bonne) nouvelle/i, /\bje prends note\b/i, /\bmes (?:capteurs|circuits)\b/i, /hypoth[èe]se not[ée]e/i, /\bje vois [çc]a\b/i, /garde un peu de s[ée]rieux/i, /\baucune donn[ée]e\b/i, /\bfascinant\b/i, /\bint[ée]ressant,? (?:tr[èe]s )?int[ée]ressant\b/i, /\bsignal stable\b/i, /\bnot[ée]\.\s*$/i, /\bje (?:range|note) [çc]a\b/i, /\bquelle surprise\b/i, /\btest r[ée]ussi\b/i];
 const opening = (text) => text.toLowerCase().replace(/^-#[^\n]*\n/, '').replace(/[^\p{L}\p{N}\s']/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 3).join(' ');
 
@@ -161,11 +164,20 @@ export function recentReplies(guildId, persona) {
 export function rememberReply(guildId, persona, text) {
   const key = `${guildId}:${persona}`;
   recent.set(key, [...recentReplies(guildId, persona), text].slice(-RECENT));
+  questionRuns.set(key, { count: asks(text) ? questionRun(guildId, persona) + 1 : 0, at: Date.now() });
+}
+
+function questionRun(guildId, persona) {
+  const run = questionRuns.get(`${guildId}:${persona}`);
+  return run && Date.now() - run.at <= QUESTION_RUN ? run.count : 0;
 }
 
 export function repetitionNote(guildId, persona) {
   const starts = [...new Set(recentReplies(guildId, persona).slice(-8).map((t) => t.replace(/\s+/g, ' ').split(' ').slice(0, 5).join(' ')))];
-  return starts.length ? `Débuts de tes dernières réponses, à ne pas réutiliser : ${starts.map((s) => `« ${s}… »`).join(', ')}.` : '';
+  const notes = [];
+  if (starts.length) notes.push(`Débuts de tes dernières réponses, à ne pas réutiliser : ${starts.map((s) => `« ${s}… »`).join(', ')}.`);
+  if (questionRun(guildId, persona) >= 1) notes.push("Ta dernière réponse finissait par une question : cette fois, réagis ou donne ton avis sans en reposer une, sauf s'il te manque une information indispensable pour répondre.");
+  return notes.join('\n');
 }
 
 export function acceptable(guildId, persona, text) {
@@ -175,6 +187,7 @@ export function acceptable(guildId, persona, text) {
 export function staleness(guildId, persona, text) {
   const cliche = CLICHES.find((pattern) => pattern.test(text));
   if (cliche) return `elle contient une formule usée (« ${text.match(cliche)[0]} »)`;
+  if (asks(text) && questionRun(guildId, persona) >= 2) return 'elle finit encore par une question, comme tes deux réponses précédentes : réagis ou donne ton avis, sans question';
   const start = opening(text);
   if (start.split(' ').length >= 3 && recentReplies(guildId, persona).some((t) => opening(t) === start)) return `elle commence comme une de tes réponses récentes (« ${start} »)`;
   return null;

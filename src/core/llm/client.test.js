@@ -263,3 +263,30 @@ test('Groq : seuls les derniers outils sautent quand la requête est trop grosse
   assert.deepEqual(others.at(-1).body.tools.map((t) => t.function.name), ['resumer']);
   delete process.env.GROQ_API_KEY;
 });
+
+test('image : un modèle sans vision attend et ne met pas en pause ceux qui voient', async () => {
+  const { clearPauses, llmStatus } = await import('./client.js');
+  clearPauses();
+  delete process.env.MISTRAL_API_KEY;
+  process.env.GEMINI_API_KEY = 'test';
+  process.env.GROQ_API_KEY = 'test';
+  process.env.GEMINI_MODEL = 'seul';
+  process.env.GEMINI_BACKUP_MODEL = 'seul';
+  otherResponse = () => ok('groq ok');
+  const messages = [{ role: 'user', content: [{ type: 'text', text: 'regarde' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } }] }];
+  const after = (ms) => () => Bun.sleep(ms).then(() => ok('gemini ok'));
+  geminiResponse = after(380);
+  assert.equal((await chat({ messages, timeoutMs: 900 })).content, 'gemini ok');
+  assert.deepEqual(calls, ['gemini']);
+  geminiResponse = after(5_000);
+  assert.equal((await chat({ messages, timeoutMs: 400 })).content, 'groq ok');
+  assert.equal(llmStatus().find((m) => m.model === 'seul').paused, null);
+  geminiResponse = after(5_000);
+  assert.equal((await chat({ messages: [{ role: 'user', content: 'texte' }], timeoutMs: 300 })).content, 'groq ok');
+  assert.ok(llmStatus().find((m) => m.model === 'seul').paused);
+  calls.length = 0;
+  geminiResponse = () => ok('gemini ok');
+  assert.equal((await chat({ messages, timeoutMs: 900 })).content, 'gemini ok');
+  assert.deepEqual(calls, ['gemini']);
+  clearPauses();
+});

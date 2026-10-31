@@ -1,7 +1,7 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 
-const { examplesNote, learn, learnedExamples, pickExamples, registerOf, rememberReply, REGISTERS, SEEDS, staleness, unlearn } = await import('./examples.js');
+const { examplesNote, learn, learnedExamples, pickExamples, registerOf, rememberReply, repetitionNote, REGISTERS, SEEDS, staleness, unlearn } = await import('./examples.js');
 
 test('type de message reconnu, bavardage par défaut', () => {
   const cases = {
@@ -42,6 +42,19 @@ test('réponse usée : formule toute faite ou même début qu’une réponse ré
   assert.match(staleness('g-use', 'casper', 'Franchement ton bot, il est où ?'), /commence comme/);
   assert.equal(staleness('g-use', 'casper', 'Bravo, trois semaines bien investies.'), null);
   assert.equal(staleness('g-use', 'melchior', 'Franchement ton bot a intérêt à faire le café.'), null);
+});
+
+test('relances : une note après une question, une réécriture à la troisième d’affilée', () => {
+  assert.doesNotMatch(repetitionNote('g-relance', 'casper'), /question/);
+  rememberReply('g-relance', 'casper', 'Tu fais quoi ce soir ?');
+  assert.match(repetitionNote('g-relance', 'casper'), /finissait par une question/);
+  assert.equal(staleness('g-relance', 'casper', 'Et tu joues à quoi ?'), null);
+  rememberReply('g-relance', 'casper', 'Et tu joues à quoi ?');
+  assert.match(staleness('g-relance', 'casper', 'C’est pour quand ?'), /finit encore par une question/);
+  assert.equal(staleness('g-relance', 'casper', 'Bon choix, celle-là.'), null);
+  rememberReply('g-relance', 'casper', 'Bon choix, celle-là.');
+  assert.doesNotMatch(repetitionNote('g-relance', 'casper'), /question/);
+  assert.equal(staleness('g-relance', 'casper', 'C’est pour quand ?'), null);
 });
 
 test('réaction d’un opérateur : ajoute la réponse et son message d’origine, retire avec l’autre emoji, ignore les autres', async () => {

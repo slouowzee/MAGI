@@ -6,6 +6,7 @@ export class ContentRefused extends Error {}
 const COOLDOWN = 60_000;
 const MAX_COOLDOWN = 30 * 60_000;
 const STAGGER = 5_000;
+const MEDIA_PATIENCE = 25_000;
 const RETRY_DELAYS = [2_000, 5_000];
 
 const PROVIDERS = {
@@ -133,6 +134,7 @@ async function post(url, headers, body, timeoutMs, signal) {
 }
 
 const isMedia = (p) => p.type === 'image_url';
+const hasMedia = (messages) => messages.some((m) => Array.isArray(m.content) && m.content.some(isMedia));
 const isVideo = (p) => isMedia(p) && /^data:(?:video|audio)\//.test(p.image_url.url);
 
 function hideMedia(messages, hidden) {
@@ -144,7 +146,7 @@ function hideMedia(messages, hidden) {
       content: m.content.map((p) => {
         if (!hidden(p)) return p;
         found = true;
-        return { type: 'text', text: '(impossible à afficher, tu ne la vois pas)' };
+        return { type: 'text', text: "(impossible à afficher, tu ne la vois pas : dis-le simplement, sans inventer son contenu ni réagir comme si tu l'avais vue)" };
       }),
     };
   });
@@ -218,14 +220,19 @@ function result(message, model) {
   return { content: message.content, toolCalls, message, model };
 }
 
-function candidates(model) {
+function candidates(model, media) {
   const all = [];
   for (const name of activeProviders().filter((p) => !debugState.forced || p === debugState.forced)) {
     const models = name === 'gemini' && model ? [model, ...PROVIDERS.gemini.models()] : PROVIDERS[name].models();
     for (const m of new Set(models)) all.push({ provider: name, model: m, id: `${name}/${m}` });
   }
-  const awake = all.filter((c) => Date.now() >= (pausedUntil.get(c.id) ?? 0));
-  return awake.length ? awake : all;
+  const ready = (list) => {
+    const awake = list.filter((c) => Date.now() >= (pausedUntil.get(c.id) ?? 0));
+    return awake.length ? awake : list;
+  };
+  if (!media) return ready(all);
+  const blind = (c) => PROVIDERS[c.provider].media === 'none';
+  return [...ready(all.filter((c) => !blind(c))), ...ready(all.filter(blind))];
 }
 
 function race(list, args, deadline, stagger) {
@@ -236,6 +243,8 @@ function race(list, args, deadline, stagger) {
     let failure = null;
     let transient = false;
     let timer = null;
+    const media = hasMedia(args.messages);
+    const seeUntil = media ? Date.now() + Math.min(MEDIA_PATIENCE, (deadline - Date.now()) / 2) : 0;
     const finish = (outcome) => {
       if (done) return;
       done = true;
@@ -249,6 +258,11 @@ function race(list, args, deadline, stagger) {
     const launch = () => {
       clearTimeout(timer);
       if (done || next >= list.length) return settle();
+      const hold = PROVIDERS[list[next].provider].media === 'none' ? seeUntil - Date.now() : 0;
+      if (hold > 0 && running.size) {
+        timer = setTimeout(launch, hold);
+        return;
+      }
       const candidate = list[next++];
       const left = deadline - Date.now();
       if (left <= 0) return settle();
@@ -262,7 +276,7 @@ function race(list, args, deadline, stagger) {
           strikes.delete(candidate.id);
           track(candidate.id, { ms: Date.now() - started });
           for (const { candidate: slower, started: since } of running.values()) {
-            if (since > started) continue;
+            if (media || since > started) continue;
             pause(slower.id);
             log.info('llm', `${slower.model} : plus lent que ${candidate.model}`);
           }
@@ -313,7 +327,7 @@ async function attempt({ messages, format, options, tools, model, reasoning, tim
       log.info('llm', `aucun modèle disponible, nouvel essai dans ${delay / 1000} s`);
       await Bun.sleep(delay);
     }
-    const outcome = await race(candidates(model), { messages, format, options, tools, model, reasoning }, deadline, Math.min(STAGGER, timeoutMs / 3));
+    const outcome = await race(candidates(model, hasMedia(messages)), { messages, format, options, tools, model, reasoning }, deadline, Math.min(STAGGER, timeoutMs / 3));
     if (outcome.answer) return outcome.answer;
     if (outcome.refused) throw outcome.refused;
     failure = outcome.failure ?? failure;
