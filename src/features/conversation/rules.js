@@ -11,9 +11,9 @@ const QUICK = [
 ];
 
 const UNIT_EMOTES = {
-  casper: { conge: 'pouce', fin: 'pouce', merci: 'love', nuit: 'dodo', bye: 'pouce', rire: 'mdr', ok: 'pouce', ignore: 'facepalm' },
-  melchior: { conge: 'clope', fin: 'lunettes', merci: 'lunettes', nuit: 'cafe', bye: 'cafe', rire: 'lunettes', ok: 'lunettes', ignore: 'hmm' },
-  balthasar: { conge: 'the', fin: 'the', merci: 'fiere', nuit: 'dodo', bye: 'the', rire: 'the', ok: 'the', ignore: 'inquiete' },
+  casper: { conge: 'classe', fin: 'pouce', merci: 'love', nuit: 'dodo', bye: 'salut', rire: 'mdr', ok: 'pouce', ignore: 'facepalm' },
+  melchior: { conge: 'clope', fin: 'lunettes', merci: 'love', nuit: 'dodo', bye: 'cafe', rire: 'lunettes', ok: 'pouce', ignore: 'hmm' },
+  balthasar: { conge: 'the', fin: 'pouce', merci: 'love', nuit: 'dodo', bye: 'salut', rire: 'rire', ok: 'pouce', ignore: 'inquiete' },
 };
 
 export function unitReaction(guild, persona, kind, fallback) {

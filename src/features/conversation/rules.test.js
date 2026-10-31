@@ -39,7 +39,7 @@ test('merci écrit à la va-vite : reconnu', () => {
 
 test('réaction de l’unité : son emote si le serveur l’a, sinon l’emoji classique', () => {
   const emote = (name) => ({ id: name, name });
-  const guild = { emojis: { cache: [emote('casper_love'), emote('casper_dodo'), emote('melchior_clope'), emote('balthasar_fiere')] } };
+  const guild = { emojis: { cache: [emote('casper_love'), emote('casper_dodo'), emote('melchior_clope'), emote('balthasar_love')] } };
   const of = (text, persona) => {
     const quick = quickReaction(text);
     return unitReaction(guild, persona, quick.kind, quick.emoji);
@@ -47,7 +47,7 @@ test('réaction de l’unité : son emote si le serveur l’a, sinon l’emoji c
   assert.equal(of('merci', 'casper').name, 'casper_love');
   assert.equal(of('bonne nuit', 'casper').name, 'casper_dodo');
   assert.equal(of('repos, soldat.', 'melchior').name, 'melchior_clope');
-  assert.equal(of('merci', 'balthasar').name, 'balthasar_fiere');
+  assert.equal(of('merci', 'balthasar').name, 'balthasar_love');
   assert.equal(of('ça ira', 'casper'), '👌');
   assert.equal(of('merci', undefined), '❤️');
   assert.equal(unitReaction({}, 'casper', 'merci', '❤️'), '❤️');
