@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { inline, mediaOf, mp4Seconds } from './media.js';
+import { emotesOf, inline, mediaOf, mp4Seconds } from './media.js';
 
 function mp4(seconds) {
   const header = Buffer.alloc(32);
@@ -14,6 +14,15 @@ const realFetch = globalThis.fetch;
 globalThis.fetch = (url, init) => (files[url] ? Promise.resolve(new Response(files[url], { headers: { 'content-type': url.endsWith('webp') ? 'image/webp' : 'video/mp4' } })) : realFetch(url, init));
 
 const gifv = (video) => ({ embeds: [{ data: { type: 'gifv' }, video: { url: video }, thumbnail: { url: 'https://gif.test/fixe.webp' } }] });
+
+test('emotes du serveur : une image par emote distincte, animées comprises', () => {
+  expect(emotesOf({ content: 'ok <:casper_juge:12> <a:danse:34> <:casper_juge:12>' })).toEqual([
+    { url: 'https://cdn.discordapp.com/emojis/12.png?size=96', label: 'emote :casper_juge:' },
+    { url: 'https://cdn.discordapp.com/emojis/34.png?size=96', label: 'emote :danse:' },
+  ]);
+  expect(emotesOf({ content: 'rien' })).toEqual([]);
+  expect(emotesOf({})).toEqual([]);
+});
 
 test('durée lue dans l’en-tête mp4', () => {
   expect(mp4Seconds(mp4(0.3))).toBe(0.3);

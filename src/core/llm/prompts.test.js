@@ -7,6 +7,8 @@ test('retire les emojis et les émoticônes', () => {
   assert.equal(cleanReply('Ça marche 👍🏽 :)'), 'Ça marche');
   assert.equal(cleanReply('Je suis là 🫂.'), 'Je suis là.');
   assert.equal(cleanReply('❤️ courage'), 'courage');
+  assert.equal(cleanReply('Je vois le genre :casper_juge:.'), 'Je vois le genre.');
+  assert.equal(cleanReply('À 12:30:45, std::vector.'), 'À 12:30:45, std::vector.');
 });
 
 test('garde le texte, la ponctuation et le code intacts', () => {

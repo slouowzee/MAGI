@@ -2,7 +2,7 @@ import { MessageFlags } from 'discord.js';
 import { PERSONAS, personaLabel } from '../personas.js';
 import { personaOf, REPLY_HEADER } from './webhooks.js';
 import { isOperator } from '../installation.js';
-import { inline, mediaOf } from './media.js';
+import { emotesOf, inline, mediaOf } from './media.js';
 
 const MAX_MESSAGES = 12;
 const MAX_CONTEXT = 20;
@@ -105,7 +105,7 @@ function record(msg, botId) {
 async function attachMedia(records) {
   const wanted = [];
   for (const record of [...records].reverse()) {
-    for (const item of (record.msg ? mediaOf(record.msg) : []).reverse()) if (wanted.length < MAX_MEDIA) wanted.push({ record, item });
+    for (const item of (record.msg ? [...emotesOf(record.msg), ...mediaOf(record.msg)] : []).reverse()) if (wanted.length < MAX_MEDIA) wanted.push({ record, item });
   }
   wanted.reverse();
   const parts = [];
@@ -114,7 +114,7 @@ async function attachMedia(records) {
     if (!data) continue;
     const n = parts.length / 2 + 1;
     record.pieces = [...(record.pieces ?? []), n];
-    parts.push({ type: 'text', text: `Pièce jointe n°${n} :` }, { type: 'image_url', image_url: { url: data } });
+    parts.push({ type: 'text', text: `Pièce jointe n°${n}${item.label ? ` (${item.label})` : ''} :` }, { type: 'image_url', image_url: { url: data } });
   }
   return parts;
 }

@@ -27,6 +27,11 @@ export function mediaOf(msg) {
   return items;
 }
 
+export function emotesOf(msg) {
+  const emotes = new Map((msg.content ?? '').matchAll(/<a?:(\w+):(\d+)>/g).map(([, name, id]) => [id, name]));
+  return [...emotes].map(([id, name]) => ({ url: `https://cdn.discordapp.com/emojis/${id}.png?size=96`, label: `emote :${name}:` }));
+}
+
 export function mp4Seconds(buffer) {
   const at = buffer.indexOf('mvhd');
   if (at < 0 || at + 32 > buffer.length) return null;
