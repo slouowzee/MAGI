@@ -44,6 +44,7 @@ const CONVERSATIONS = [
   ['melchior ?', 'tu me fais une petite config pour un nas ?', 'bof, un truc basique, un raid 1 et des disques de 8to', 'et tu me recommandes quoi ?'],
   ['melchior, tu fais quoi ce soir ?', 'cool, et tu me conseilles quoi comme film ?', "c'est sûr", 'merci'],
   ['balthasar ?', "j'ai le nez qui coule", "peut être bien oui, d'autres idées ?", 'oki, merki'],
+  ['balthasar, décris-moi ton emote où tu dors sous la couette', 'et elle te ressemble ?', "oui oui, je sais qu'il est tard mais je bosse. bref, elle te plaît ton emote ?", 'oui reine fatima', 'il me reste la doc du bot à écrire'],
   ["balthasar, j'ai eu une journée pourrie", "mon chef m'a engueulé devant tout le monde", 'ouais', 'merci, ça fait du bien'],
   ['casper, je fais des emotes', "pour ici, j'en ai déjà ajouté certaines", "j'aime bien celle où tu fais un facepalm", "c'est des petits scénarios", "j'en referai d'autres demain"],
   ['casper, pizza ou burger ce soir ?', 'nan mais sérieux', 't’es bête mdr', 'bon je vais manger'],

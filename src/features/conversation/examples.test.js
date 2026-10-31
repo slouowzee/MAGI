@@ -57,6 +57,15 @@ test('relances : une note après une question, une réécriture à la troisième
   assert.equal(staleness('g-relance', 'casper', 'C’est pour quand ?'), null);
 });
 
+test('rabâchage : se reposer se dit une fois, la deuxième est réécrite', () => {
+  assert.equal(staleness('g-lit', 'balthasar', 'Tu devrais aller dormir.'), null);
+  rememberReply('g-lit', 'balthasar', 'Tu devrais aller dormir.');
+  for (const text of ['Allez, file au lit.', 'Éteins tout et va vraiment te coucher.', 'Laisse tes yeux se reposer.', 'Le travail attendra bien demain.', 'Prends le temps de dormir.', 'À force de veiller si tard.']) assert.match(staleness('g-lit', 'balthasar', text), /redit/, text);
+  assert.equal(staleness('g-lit', 'balthasar', 'Elle me plaît beaucoup, cette emote.'), null);
+  assert.equal(staleness('g-lit', 'casper', 'Allez, file au lit.'), null);
+  assert.match(staleness('g-lit', 'balthasar', 'Ne m’appelle pas comme ça.'.replace('’', "'")), /formule usée/);
+});
+
 test('réaction d’un opérateur : ajoute la réponse et son message d’origine, retire avec l’autre emoji, ignore les autres', async () => {
   const { handleExampleReaction } = await import('./feedback.js');
   const { learnedExamples } = await import('./examples.js');

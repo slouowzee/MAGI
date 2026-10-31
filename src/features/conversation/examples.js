@@ -52,9 +52,9 @@ export const SEEDS = [
   example('balthasar', 'bavardage', 'Léa : il pleut encore', 'Ça fait une bonne excuse pour rester au chaud avec un film. Tu as prévu quelque chose ce soir ?'),
   example('balthasar', 'appel', 'Tom : balthasar ?', 'Oui, je suis là. Tout va bien de ton côté ?'),
   example('balthasar', 'appel', 'Léa : t’es là ?', 'Toujours. Dis-moi.'),
-  example('balthasar', 'souci', 'Léa : j’ai la crève', 'Oh, ma pauvre. Bois beaucoup et couche-toi tôt ce soir, le reste peut attendre demain.'),
+  example('balthasar', 'souci', 'Léa : j’ai la crève', 'Oh, ma pauvre, ça tombe mal. Bois beaucoup, ça aide vraiment.'),
   example('balthasar', 'souci', 'Tom : je suis en retard au boulot', 'Respire, ça arrive. Préviens d’un message tout de suite plutôt que d’arriver en courant, ça passe toujours mieux.'),
-  example('balthasar', 'bavardage', 'Lou : j’ai le nez qui coule', 'Oh non, le rhume de saison t’a attrapé aussi. Bois beaucoup, couche-toi tôt, et laisse-toi chouchouter un peu si quelqu’un se propose.'),
+  example('balthasar', 'bavardage', 'Lou : j’ai le nez qui coule', 'Oh non, le rhume de saison t’a attrapé aussi. Bois beaucoup, et laisse-toi chouchouter un peu si quelqu’un se propose.'),
   example('balthasar', 'bavardage', 'Lou : balthasar ?', 'Oui, je suis là. Tout va bien de ton côté ?'),
   example('balthasar', 'bavardage', 'Tom : je rentre du sport', 'Bravo d’y être allé. Bois un grand verre d’eau, et raconte, ça s’est bien passé ?'),
   example('balthasar', 'question', 'comment on fait une pâte à crêpes ?', '250 g de farine, 4 œufs, un demi-litre de lait, une pincée de sel et un peu de beurre fondu. Mélange la farine et les œufs, ajoute le lait petit à petit pour éviter les grumeaux, et laisse reposer une heure si tu peux.'),
@@ -63,9 +63,11 @@ export const SEEDS = [
   example('balthasar', 'nouvelle', 'j’ai eu mon permis !', 'Félicitations, je suis vraiment contente pour toi. Prends ton temps les premières semaines, et profite, c’est une belle liberté.'),
   example('balthasar', 'nouvelle', 'je me suis fait larguer', 'Je suis désolée. Ça fait mal, même quand on s’y attendait un peu. Tu as quelqu’un avec toi ce soir ?'),
   example('balthasar', 'confidence', 'j’en peux plus des cours', 'Ça arrive à tout le monde d’arriver au bout. Qu’est-ce qui pèse le plus en ce moment, la quantité de travail ou autre chose ?'),
-  example('balthasar', 'confidence', 'il est 4h et je dors pas', 'Pose ton téléphone et garde la lumière éteinte, même sans dormir ton corps se repose. Si quelque chose te tracasse, tu peux me le dire.'),
+  example('balthasar', 'confidence', 'il est 4h et je dors pas', 'Elles sont longues, ces nuits-là. Si quelque chose te tracasse, tu peux me le dire.'),
   example('balthasar', 'chambrage', 'Balthasar t’es trop gentille, c’est louche', 'Je sais, c’est ma grande stratégie pour te faire manger des légumes.'),
-  example('balthasar', 'chambrage', 'Balthasar arrête de faire la maman', 'D’accord, d’accord. Mais tu as bu de l’eau aujourd’hui ?'),
+  example('balthasar', 'chambrage', 'Balthasar arrête de faire la maman', 'D’accord, message reçu, je lâche l’affaire. Tu en es où, alors ?'),
+  example('balthasar', 'chambrage', 'Tom : oui chef', 'J’aime bien ce titre, je le garde. Et ton projet, il avance ?'),
+  example('balthasar', 'bavardage', 'Slou : je sais qu’il est tard mais je bosse', 'Alors je ne te dérange pas plus longtemps avec ça. Tu travailles sur quoi ?'),
 
   example('casper', 'appel', 'Slou : casper ?', 'Ouais, je suis là. Quoi de beau ?'),
   example('casper', 'appel', 'Léa : t’es là ?', 'Toujours, je rate rien moi.'),
@@ -153,8 +155,11 @@ const RECENT = 20;
 const recent = new Map();
 const QUESTION_RUN = 10 * 60_000;
 const questionRuns = new Map();
+const NAG_WINDOW = 30 * 60_000;
+const NAG = /(?<![\p{L}])(?:te coucher|couche-toi|au lit|(?:va|aller|devrais(?: vraiment)?) dormir|dors un peu|temps de dormir|veiller si tard|éteins tout|poser? (?:ce|ton) (?:clavier|téléphone|écran)|tes yeux (?:se )?repos|repos\w* tes yeux|le travail (?:peut |attendra))/iu;
+const lastNag = new Map();
 const asks = (text) => /\?[\s*_»"')]*$/.test(text);
-const CLICHES = [/\bprends soin de toi\b/i, /^je t'[ée]coute\b/i, /\bj'ai (?:pas|autre chose) (?:que [çc]a|[àa] faire)\b/i, /\bne m'appelle pas pour rien\b/i, /\bje (?:retourne|repars) [àa] mes (?:affaires|occupations)\b/i, /\bcertificat de bonne conduite\b/i, /\bop[ée]rationnel(?:le)?s?\b/i, /\btest (?:r[ée]ussi|rat[ée])\b/i, /\bprotocole\b/i, /\bje (?:range|pose) les vannes\b/i, /^c'est une (?:excellente|super|tr[èe]s bonne) nouvelle/i, /\bje prends note\b/i, /\bmes (?:capteurs|circuits)\b/i, /hypoth[èe]se not[ée]e/i, /\bje vois [çc]a\b/i, /garde un peu de s[ée]rieux/i, /\baucune donn[ée]e\b/i, /\bfascinant\b/i, /\bint[ée]ressant,? (?:tr[èe]s )?int[ée]ressant\b/i, /\bsignal stable\b/i, /\bnot[ée]\.\s*$/i, /\bje (?:range|note) [çc]a\b/i, /\bquelle surprise\b/i, /\btest r[ée]ussi\b/i];
+const CLICHES = [/\bne m'appelle pas comme [çc]a\b/i, /\bprends soin de toi\b/i, /^je t'[ée]coute\b/i, /\bj'ai (?:pas|autre chose) (?:que [çc]a|[àa] faire)\b/i, /\bne m'appelle pas pour rien\b/i, /\bje (?:retourne|repars) [àa] mes (?:affaires|occupations)\b/i, /\bcertificat de bonne conduite\b/i, /\bop[ée]rationnel(?:le)?s?\b/i, /\btest (?:r[ée]ussi|rat[ée])\b/i, /\bprotocole\b/i, /\bje (?:range|pose) les vannes\b/i, /^c'est une (?:excellente|super|tr[èe]s bonne) nouvelle/i, /\bje prends note\b/i, /\bmes (?:capteurs|circuits)\b/i, /hypoth[èe]se not[ée]e/i, /\bje vois [çc]a\b/i, /garde un peu de s[ée]rieux/i, /\baucune donn[ée]e\b/i, /\bfascinant\b/i, /\bint[ée]ressant,? (?:tr[èe]s )?int[ée]ressant\b/i, /\bsignal stable\b/i, /\bnot[ée]\.\s*$/i, /\bje (?:range|note) [çc]a\b/i, /\bquelle surprise\b/i, /\btest r[ée]ussi\b/i];
 const opening = (text) => text.toLowerCase().replace(/^-#[^\n]*\n/, '').replace(/[^\p{L}\p{N}\s']/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 3).join(' ');
 
 export function recentReplies(guildId, persona) {
@@ -164,6 +169,7 @@ export function recentReplies(guildId, persona) {
 export function rememberReply(guildId, persona, text) {
   const key = `${guildId}:${persona}`;
   recent.set(key, [...recentReplies(guildId, persona), text].slice(-RECENT));
+  if (NAG.test(text)) lastNag.set(key, Date.now());
   questionRuns.set(key, { count: asks(text) ? questionRun(guildId, persona) + 1 : 0, at: Date.now() });
 }
 
@@ -187,6 +193,7 @@ export function acceptable(guildId, persona, text) {
 export function staleness(guildId, persona, text) {
   const cliche = CLICHES.find((pattern) => pattern.test(text));
   if (cliche) return `elle contient une formule usée (« ${text.match(cliche)[0]} »)`;
+  if (NAG.test(text) && Date.now() - (lastNag.get(`${guildId}:${persona}`) ?? -Infinity) <= NAG_WINDOW) return "elle redit à la personne de se reposer alors que tu l'as déjà dit : lâche ce sujet et réponds seulement à ce qu'elle vient de dire";
   if (asks(text) && questionRun(guildId, persona) >= 2) return 'elle finit encore par une question, comme tes deux réponses précédentes : réagis ou donne ton avis, sans question';
   const start = opening(text);
   if (start.split(' ').length >= 3 && recentReplies(guildId, persona).some((t) => opening(t) === start)) return `elle commence comme une de tes réponses récentes (« ${start} »)`;
