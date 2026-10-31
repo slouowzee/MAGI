@@ -1,13 +1,25 @@
 const NAMES = /(?<![\p{L}\p{N}])(?:magi|melchior|balthasar|casper)(?![\p{L}\p{N}])/giu;
 
 const QUICK = [
-  { emoji: '🫡', ends: true, always: true, words: ['repos', 'repos soldat', 'rompez', 'à vos ordres', 'a vos ordres', 'garde à vous', 'au rapport', 'dispose', 'disposez'] },
-  { emoji: '👌', ends: true, always: true, words: ['ça ira', 'ca ira', "c'est sûr", "c'est sur", 'pas de souci', 'pas de soucis', 'pas de problème', 'pas de probleme', "t'inquiète", "t'inquiete", 'tkt', 'ça roule', 'ca roule', 'bien vu', "c'est clair", 'carrément', 'carrement', 'grave', 'laisse tomber', "c'est bon", 'on verra', 'si tu le dis', 'bref', 'exactement', 'exact', 'effectivement', 'clairement', 'trop vrai', 'en effet', 'je sais', 'je vois', "j'avoue", 'ah ok', "ah d'accord", 'oki', 'okk', 'ok ok', 'ok cool'] },
-  { emoji: '❤️', ends: true, words: ['merci', 'merci beaucoup', 'merci bien', 'thx', 'thanks', 'ok merci', 'super merci', 'top merci', 'nickel merci', 'parfait merci', 'merci pour tout', 'c gentil', "c'est gentil", 'trop gentil'] },
-  { emoji: '👋', ends: true, words: ['bonne nuit', 'bonne soirée', 'bonne journée', 'à plus', 'a plus', 'a+', '++', 'bye', 'ciao', 'tchao', 'à demain', 'a demain', 'au revoir', 'salut et merci', 'je file', 'je te laisse'] },
-  { emoji: '😄', ends: false, words: ['mdr', 'ptdr', 'lol', 'xd', 'haha', 'hahaha', 'ahah', 'ahahah', 'jpp', 'excellent', 'énorme', 'enorme', 'pas mal'] },
-  { emoji: '👍', ends: false, words: ['ok', 'okay', "d'accord", 'dac', 'ça marche', 'ca marche', 'top', 'cool', 'parfait', 'nickel', 'génial', 'genial', 'compris', 'noté', 'note', 'vu', 'yes', 'ouais', 'oui'] },
+  { kind: 'conge', emoji: '🫡', ends: true, always: true, words: ['repos', 'repos soldat', 'rompez', 'à vos ordres', 'a vos ordres', 'garde à vous', 'au rapport', 'dispose', 'disposez'] },
+  { kind: 'fin', emoji: '👌', ends: true, always: true, words: ['ça ira', 'ca ira', "c'est sûr", "c'est sur", 'pas de souci', 'pas de soucis', 'pas de problème', 'pas de probleme', "t'inquiète", "t'inquiete", 'tkt', 'ça roule', 'ca roule', 'bien vu', "c'est clair", 'carrément', 'carrement', 'grave', 'laisse tomber', "c'est bon", 'on verra', 'si tu le dis', 'bref', 'exactement', 'exact', 'effectivement', 'clairement', 'trop vrai', 'en effet', 'je sais', 'je vois', "j'avoue", 'ah ok', "ah d'accord", 'oki', 'okk', 'ok ok', 'ok cool'] },
+  { kind: 'merci', emoji: '❤️', ends: true, words: ['merci', 'merci beaucoup', 'merci bien', 'thx', 'thanks', 'ok merci', 'super merci', 'top merci', 'nickel merci', 'parfait merci', 'merci pour tout', 'c gentil', "c'est gentil", 'trop gentil'] },
+  { kind: 'nuit', emoji: '👋', ends: true, words: ['bonne nuit'] },
+  { kind: 'bye', emoji: '👋', ends: true, words: ['bonne soirée', 'bonne journée', 'à plus', 'a plus', 'a+', '++', 'bye', 'ciao', 'tchao', 'à demain', 'a demain', 'au revoir', 'salut et merci', 'je file', 'je te laisse'] },
+  { kind: 'rire', emoji: '😄', ends: false, words: ['mdr', 'ptdr', 'lol', 'xd', 'haha', 'hahaha', 'ahah', 'ahahah', 'jpp', 'excellent', 'énorme', 'enorme', 'pas mal'] },
+  { kind: 'ok', emoji: '👍', ends: false, words: ['ok', 'okay', "d'accord", 'dac', 'ça marche', 'ca marche', 'top', 'cool', 'parfait', 'nickel', 'génial', 'genial', 'compris', 'noté', 'note', 'vu', 'yes', 'ouais', 'oui'] },
 ];
+
+const UNIT_EMOTES = {
+  casper: { conge: 'pouce', fin: 'pouce', merci: 'love', nuit: 'dodo', bye: 'pouce', rire: 'mdr', ok: 'pouce', ignore: 'facepalm' },
+  melchior: { conge: 'clope', fin: 'lunettes', merci: 'lunettes', nuit: 'cafe', bye: 'cafe', rire: 'lunettes', ok: 'lunettes', ignore: 'hmm' },
+  balthasar: { conge: 'the', fin: 'the', merci: 'fiere', nuit: 'dodo', bye: 'the', rire: 'the', ok: 'the', ignore: 'inquiete' },
+};
+
+export function unitReaction(guild, persona, kind, fallback) {
+  const name = UNIT_EMOTES[persona]?.[kind];
+  return (name && guild?.emojis?.cache.find((e) => e.name === `${persona}_${name}`)) || fallback;
+}
 
 function normalize(text) {
   return text

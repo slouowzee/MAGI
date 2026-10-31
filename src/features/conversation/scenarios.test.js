@@ -225,6 +225,15 @@ test('« ça ira » ou « repos » après une réponse : une réaction, pas de r
   expect(conge.reactions).toEqual(['🫡']);
 });
 
+test('fin de conversation : l’unité qui parlait réagit avec son emote', async () => {
+  const w = world('emote');
+  await w.say('slou', 'casper, ça va ?');
+  w.guild.emojis = { cache: new Collection([['1', { id: '1', name: 'casper_pouce' }], ['2', { id: '2', name: 'melchior_lunettes' }]]) };
+  const fin = await w.say('slou', 'ça ira.');
+  expect(fin.answers).toHaveLength(0);
+  expect(fin.reactions.map((r) => r.name)).toEqual(['casper_pouce']);
+});
+
 test('chacun garde sa suite sans le nom dans le même salon', async () => {
   const w = world('suites');
   await w.say('slou', 'melchior, explique les vecteurs');

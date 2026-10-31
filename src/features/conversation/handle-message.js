@@ -2,7 +2,7 @@ import { pickPersona, randomPersona, startsNewTopic } from './router.js';
 import { addMessage, answered, awaitingAnswer, closeConversation, endFollowUp, followUpConversation, isClaimed, locateConversation, openConversation } from './threads.js';
 import { activePersonas, isMuted, moduleEnabled, personaForChannel } from '../../core/config.js';
 import { memoryContext, summarizeConversation } from '../memory/context.js';
-import { floodCheck, quickReaction } from './rules.js';
+import { floodCheck, quickReaction, unitReaction } from './rules.js';
 import { PERSONAS } from '../../core/personas.js';
 import { runVote } from '../vote/vote.js';
 import { announce } from '../presence/presence.js';
@@ -47,7 +47,7 @@ export async function handleMessage(message, { catchUp = false, force = false } 
   if (following && notForMagi(message.content)) {
     endFollowUp(following);
     addMessage(following, message.id, message.author.id, now, `${message.member?.displayName ?? message.author.username} : ${message.content}`);
-    await message.react('👌').catch(() => {});
+    await message.react(unitReaction(message.guild, following.persona, 'ignore', '👌')).catch(() => {});
     log.debug('conversation', `${message.author.tag} : pas pour MAGI, suite arrêtée`, { channel: message.channel });
     return;
   }
@@ -67,7 +67,7 @@ export async function handleMessage(message, { catchUp = false, force = false } 
   const quick = quickReaction(message.content);
   if (quick && (quick.always || !awaitingAnswer(conversation, message.author.id, now))) {
     if (conversation) addMessage(conversation, message.id, message.author.id, now, line);
-    await message.react(quick.emoji).catch(() => {});
+    await message.react(unitReaction(message.guild, PERSONAS[trigger.persona] ? trigger.persona : conversation?.persona, quick.kind, quick.emoji)).catch(() => {});
     if (quick.ends) summarizeConversation(message.client, closeConversation(conversation));
     return;
   }
