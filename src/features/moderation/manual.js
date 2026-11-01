@@ -6,8 +6,8 @@ import { recordInfraction } from './store.js';
 import { excludedOf, latestCase, openCase, updateCase } from './cases.js';
 import { notifySanction } from './appeal.js';
 
-export const DURATIONS = { '10m': ['10 min', 10 * 60_000], '1h': ['1 h', 3_600_000], '6h': ['6 h', 6 * 3_600_000], '24h': ['24 h', 86_400_000], '7j': ['7 j', 7 * 86_400_000], '28j': ['28 j', 28 * 86_400_000] };
-export const PURGES = { aucun: ['Aucun', 0], '24h': ['Dernières 24 h', 86_400], '7j': ['7 derniers jours', 604_800] };
+export const DURATIONS = { __proto__: null, '10m': ['10 min', 10 * 60_000], '1h': ['1 h', 3_600_000], '6h': ['6 h', 6 * 3_600_000], '24h': ['24 h', 86_400_000], '7j': ['7 j', 7 * 86_400_000], '28j': ['28 j', 28 * 86_400_000] };
+export const PURGES = { __proto__: null, aucun: ['Aucun', 0], '24h': ['Dernières 24 h', 86_400], '7j': ['7 derniers jours', 604_800] };
 export const RIGHTS = { warn: P.ManageMessages, mute: P.ModerateMembers, unmute: P.ModerateMembers, ban: P.BanMembers, unban: P.BanMembers, kick: P.KickMembers };
 const NEEDS = { warn: 'Gérer les messages', mute: 'Exclure temporairement des membres', unmute: 'Exclure temporairement des membres', ban: 'Bannir des membres', unban: 'Bannir des membres', kick: 'Expulser des membres' };
 const ephemeral = { flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } };

@@ -2,7 +2,7 @@ import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 
 process.env.DB_PATH = ':memory:';
-const { activePersonas, enabledModules, isMuted, moduleEnabled, setActivePersonas, setModules, setMutedChannels } = await import('./config.js');
+const { activePersonas, enabledModules, isMuted, moduleEnabled, setActivePersonas, setModules, setSettingList } = await import('./config.js');
 
 test('modules actifs par défaut sauf la bienvenue, puis réglables', () => {
   assert.equal(moduleEnabled('config-test', 'vote'), true);
@@ -18,7 +18,7 @@ test('personas actives et salons muets', () => {
   assert.deepEqual(activePersonas('config-test'), ['casper']);
   setActivePersonas('config-test', []);
   assert.deepEqual(activePersonas('config-test'), ['melchior', 'balthasar', 'casper']);
-  setMutedChannels('config-test', ['1']);
+  setSettingList('config-test', 'muted_channels', ['1']);
   assert.equal(isMuted({ id: '1', guild: { id: 'config-test' } }), true);
   assert.equal(isMuted({ id: '2', parentId: '1', guild: { id: 'config-test' }, isThread: () => true }), true);
   assert.equal(isMuted({ id: '3', guild: { id: 'config-test' } }), false);

@@ -7,6 +7,7 @@ import { flushAll } from '../../core/log/discord.js';
 import { forcedProvider } from '../../core/llm/client.js';
 import { panelPage, refreshPanel, showPage } from '../../panel/index.js';
 import { ACTIONS } from './actions.js';
+import { discordTime } from '../../core/util.js';
 
 const PREFIX = 'magi-debug:';
 const SESSION = 15 * 60_000;
@@ -17,7 +18,6 @@ const VERSION = JSON.parse(readFileSync(new URL('../../../package.json', import.
 const ephemeral = { flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } };
 const pending = new Map();
 const text = (content) => new TextDisplayBuilder().setContent(content);
-const seconds = (ms) => Math.floor(ms / 1000);
 const mb = (bytes) => `${(bytes / 1_048_576).toFixed(1)} Mo`;
 const button = (id, label, style = ButtonStyle.Secondary) => new ButtonBuilder().setCustomId(`${PREFIX}${id}`).setLabel(label).setStyle(style);
 
@@ -28,7 +28,7 @@ const isOwner = (interaction) => interaction.user.id === interaction.guild?.owne
 
 export function debugLine(guildId) {
   const until = debugUntil(guildId);
-  return until === FOREVER ? "jusqu'à désactivation" : `jusqu'à <t:${seconds(Number(until))}:t> (<t:${seconds(Number(until))}:R>)`;
+  return until === FOREVER ? "jusqu'à désactivation" : `jusqu'à ${discordTime(Number(until), 't')} (${discordTime(Number(until))})`;
 }
 
 function remember(entry) {
@@ -104,7 +104,7 @@ async function execute(interaction, { action: key, params = {} }, { confirmed = 
   const { label } = ACTIONS[key];
   let output;
   try {
-    if (confirmed) backupDatabase(key.replace(/_/g, '-'));
+    if (confirmed && !ACTIONS[key].ownBackup) backupDatabase(key.replace(/_/g, '-'));
     output = await ACTIONS[key].run(ctx);
     const summary = (typeof output === 'string' ? output : output.content).split('\n')[0].slice(0, 200);
     log.notice('debug', `${member} · ${label} : ${summary}`, { guild });

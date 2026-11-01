@@ -146,13 +146,13 @@ export function listBackups() {
     .sort((a, b) => b.at - a.at);
 }
 
-export function backupDatabase(label = 'copie') {
+export function backupDatabase(label = 'copie', keep = null) {
   if (!backupDir) return null;
   mkdirSync(backupDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const name = `magi-${stamp}-${label.replace(/[^a-z0-9-]/gi, '')}.db`;
   db.exec(`VACUUM INTO '${join(backupDir, name).replaceAll("'", "''")}'`);
-  for (const old of listBackups().filter((b) => b.name.startsWith('magi-')).slice(KEEP_BACKUPS)) rmSync(join(backupDir, old.name), { force: true });
+  for (const old of listBackups().filter((b) => b.name.startsWith('magi-') && b.name !== keep).slice(KEEP_BACKUPS)) rmSync(join(backupDir, old.name), { force: true });
   return name;
 }
 

@@ -3,8 +3,9 @@ import { framed, SIGNATURE } from '../../core/discord/embeds.js';
 import { deletePublication, findPublication, recentPublications, renamePublication, savePublication } from './publications-store.js';
 import { setSetting, setting } from '../../core/settings.js';
 import { targetChannel } from './resolve.js';
+import { discordTime } from '../../core/util.js';
 
-const KINDS = { annonce: 'Annonce', reglement: 'Règlement', information: 'Information', evenement: 'Événement', faq: 'FAQ' };
+const KINDS = { __proto__: null, annonce: 'Annonce', reglement: 'Règlement', information: 'Information', evenement: 'Événement', faq: 'FAQ' };
 const STYLE_VERSION = '2';
 const textArgs = {
   type: { type: 'string', enum: Object.keys(KINDS), description: "Nature du message, affichée en en-tête avec le nom du serveur. Déduis-la de la demande." },
@@ -153,7 +154,7 @@ export const PUBLICATION_TOOLS = [
     async run({ guild }) {
       const list = recentPublications(guild.id);
       if (!list.length) return 'Aucune publication de MAGI sur ce serveur.';
-      return list.map((p) => `- « ${p.title} » dans <#${p.channel_id}>, <t:${Math.floor(p.created_at / 1000)}:R> : https://discord.com/channels/${guild.id}/${p.channel_id}/${p.message_id}`).join('\n');
+      return list.map((p) => `- « ${p.title} » dans <#${p.channel_id}>, ${discordTime(p.created_at)} : https://discord.com/channels/${guild.id}/${p.channel_id}/${p.message_id}`).join('\n');
     },
   },
 ];

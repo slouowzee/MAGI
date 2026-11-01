@@ -38,3 +38,9 @@ test('rappel : délai relatif exact, persona et message d’origine conservés, 
   assert.match(stamp(now + 60_000, now), /^à <t:\d+:t> \(<t:\d+:R>\)$/);
   assert.match(stamp(now + 3 * 86_400_000, now), /^le <t:\d+:F>/);
 });
+
+test('un rappel ne peut être réservé qu’une fois', () => {
+  const { id } = addReminder({ ...base, dueAt: 2_000 }, 1_000);
+  assert.equal(markDone(id), true);
+  assert.equal(markDone(id), false);
+});

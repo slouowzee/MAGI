@@ -1,11 +1,11 @@
 import { StringSelectMenuBuilder } from 'discord.js';
 import { PERSONAS } from '../../core/personas.js';
-import { activePersonas, mutedChannels, settingList } from '../../core/config.js';
+import { activePersonas, settingList } from '../../core/config.js';
 import { id, row, text, separator, channelSelect } from '../ui.js';
 
 export function personasSection(guild) {
   const personas = activePersonas(guild.id);
-  const muted = mutedChannels(guild.id);
+  const muted = settingList(guild.id, 'muted_channels');
   return [
     text('**Unités actives**'),
     row(

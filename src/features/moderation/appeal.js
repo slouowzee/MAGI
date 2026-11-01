@@ -3,12 +3,12 @@ import { operatorRole } from '../../core/installation.js';
 import { log } from '../../core/log/log.js';
 import { alertCase, latestCase, updateCase } from './cases.js';
 import { getCase } from './store.js';
+import { discordTime as stamp } from '../../core/util.js';
 
 const PREFIX = 'magi-appeal:';
 const V2 = MessageFlags.IsComponentsV2;
 const COLORS = { avertissement: 0xef9f27, exclusion: 0xd85a30, expulsion: 0xd85a30, ban: 0xe24b4a, acceptée: 0x1d9e75, refusée: 0x888780, 'en attente': 0x888780 };
 const DECISIONS = { acceptée: 'Acceptée : la sanction est annulée.', refusée: 'Refusée : la sanction est maintenue.' };
-const stamp = (ms, style = 'R') => `<t:${Math.floor(ms / 1000)}:${style}>`;
 const text = (content) => new TextDisplayBuilder().setContent(content);
 const buttonRow = (id, label) => new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}${id}`).setLabel(label).setStyle(ButtonStyle.Secondary));
 const contestable = (c) => !c.observing && c.status !== 'annulee';

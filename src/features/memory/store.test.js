@@ -27,3 +27,12 @@ test('résumés retrouvés par participant, oubli complet et définitif', async 
   assert.deepEqual(await factsAbout('g-store', 'slou'), []);
   assert.deepEqual(await summariesAbout('g-store', 'lea', 3), ['Léa a parlé de son match.', 'Débat pizza contre sushi.']);
 });
+
+test('outil oublier : efface aussi les messages servant d’exemple de ton', async () => {
+  const { MEMORY_TOOLS } = await import('./tools.js');
+  const { learnTone, toneCountOf } = await import('../conversation/examples.js');
+  learnTone('g-oubli-ton', { authorId: 'lea', author: 'Lea', text: 'salut la bande', by: 'op' });
+  const output = await MEMORY_TOOLS.find((t) => t.name === 'oublier').run({ guild: { id: 'g-oubli-ton' }, member: { id: 'lea', displayName: 'Lea' } });
+  assert.equal(toneCountOf('g-oubli-ton', 'lea'), 0);
+  assert.match(output, /1 message\(s\) d'exemple/);
+});

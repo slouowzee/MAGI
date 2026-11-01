@@ -35,7 +35,7 @@ afterAll(() => {
 });
 
 const { handleMessage } = await import('./handle-message.js');
-const { setActivePersonas, setModules, setMutedChannels } = await import('../../core/config.js');
+const { setActivePersonas, setModules, setSettingList } = await import('../../core/config.js');
 const { welcome } = await import('../welcome/welcome.js');
 const { catchUp } = await import('./catch-up.js');
 
@@ -333,7 +333,7 @@ test('vote entre deux personas nommées', async () => {
 
 test('salon muet : aucune réponse', async () => {
   const w = world('muet');
-  setMutedChannels(w.guild.id, [w.channel.id]);
+  setSettingList(w.guild.id, 'muted_channels', [w.channel.id]);
   const message = await w.say('slou', 'melchior, tu es là ?');
   expect(message.answers).toHaveLength(0);
 });
@@ -407,4 +407,11 @@ test('au redémarrage, les messages restés sans réponse sont rattrapés, pas l
   await catchUp(w.client, Date.now());
   expect(w.posted.slice(before).map((p) => p.persona)).toEqual(['casper']);
   expect(lastContext('casper')).toContain('casper, tu es là ?');
+});
+
+test('vote : une unité désactivée ne vote pas', async () => {
+  const w = world('vote-actives');
+  setActivePersonas(w.guild.id, ['casper', 'melchior']);
+  await w.say('slou', 'magi, vote : on commande des pizzas ?');
+  expect(w.posted.filter((p) => p.persona !== 'magi').map((p) => p.persona)).toEqual(['casper', 'melchior']);
 });

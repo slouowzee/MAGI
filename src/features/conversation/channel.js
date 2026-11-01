@@ -1,4 +1,5 @@
 import { transcriptLine } from '../../core/discord/history.js';
+import { clamp } from '../../core/util.js';
 
 const MAX_CHARS = 8000;
 const STAMP = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -36,7 +37,7 @@ export const CHANNEL_TOOLS = [
     readonly: true,
     async run({ message, args }) {
       const period = periodOf(message.content, message.createdTimestamp);
-      const limit = period ? 100 : Math.min(Math.max(Number(args.nombre) || 50, 5), 100);
+      const limit = period ? 100 : clamp(Number(args.nombre) || 50, 5, 100);
       const fetched = await message.channel.messages.fetch({ limit, before: message.id });
       const kept = [...fetched.values()].reverse().filter((m) => !period || DAY.format(m.createdTimestamp) === period.day);
       if (period && !kept.length) return `Aucun message ${period.label} dans ce salon.`;

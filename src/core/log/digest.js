@@ -1,15 +1,14 @@
 import { addSink, severity } from './log.js';
+import { parisDate, parisParts } from '../util.js';
 import { listSettings, setSetting, setting } from '../settings.js';
 
 const CHECK_EVERY = 10 * 60_000;
 const HOUR = 9;
 const KEEP_DAYS = 8;
 const DAY = 86_400_000;
-const PARTS = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' });
 
 export function parisDay(ms) {
-  const p = Object.fromEntries(PARTS.formatToParts(ms).map(({ type, value }) => [type, value]));
-  return { day: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour) };
+  return { day: parisDate(ms), hour: parisParts(ms).hour };
 }
 
 export function bumpStat(scope, metric, n = 1, now = Date.now()) {

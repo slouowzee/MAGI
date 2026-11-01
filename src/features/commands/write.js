@@ -3,11 +3,13 @@ import { PERSONAS } from '../../core/personas.js';
 import { isOperator } from '../../core/installation.js';
 import { speak } from '../../core/discord/webhooks.js';
 import { log } from '../../core/log/log.js';
+import { parisParts } from '../../core/util.js';
 import { publicationEmbed } from '../admin/publications.js';
 import { savePublication } from '../admin/publications-store.js';
 import { db } from '../../core/db.js';
 import { resolveMentions, unknownNote } from './mentions.js';
 import { addFromModal, COLORS, createDraft, download, draftFromMeta, draftModal, dropDraft, dropFiles, getDraft, MAX_IMAGES, MAX_TEXT, previewPayload, publicationMeta, publishDraft, removeFromDraft, storedDraft, storeFiles, textLength, updatePublication } from './publication.js';
+import { discordTime } from '../../core/util.js';
 
 const PREFIX = 'magi-write:';
 const ephemeral = { flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } };
@@ -47,7 +49,6 @@ export const WRITE_COMMANDS = [
 
 const MAX_DELAY = 366 * 86_400_000;
 const WHEN_HINT = '18h30, demain 9h, 31/10 20h, dans 2h';
-const PARIS = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 const UNITS = { m: 60_000, min: 60_000, h: 3_600_000, j: 86_400_000, jour: 86_400_000, jours: 86_400_000 };
 const DAYS_AHEAD = { "aujourd'hui": 0, demain: 1, 'après-demain': 2 };
 
@@ -55,11 +56,6 @@ const insertScheduled = db.query('INSERT INTO scheduled (guild_id, channel_id, a
 const dueScheduled = db.query('SELECT * FROM scheduled WHERE done = 0 AND due_at <= ? ORDER BY due_at');
 const pendingScheduled = db.query('SELECT * FROM scheduled WHERE guild_id = ? AND done = 0 ORDER BY due_at');
 const closeScheduled = db.query('UPDATE scheduled SET done = 1 WHERE id = ? AND guild_id = ? AND done = 0');
-
-function parisParts(ms) {
-  const p = Object.fromEntries(PARIS.formatToParts(ms).map(({ type, value }) => [type, Number(value)]));
-  return { year: p.year, month: p.month, day: p.day, hour: p.hour, minute: p.minute };
-}
 
 function fromParis(year, month, day, hour, minute) {
   const guess = Date.UTC(year, month - 1, day, hour, minute);
@@ -127,6 +123,7 @@ export async function sendDueMessages(client, now = Date.now()) {
     const channel = guild.channels.cache.get(row.channel_id);
     if (!channel) {
       log.err('commandes', `message programmé n°${row.id} non envoyé : salon supprimé`, { guild });
+      dropFiles(row.id);
       continue;
     }
     await (row.draft ? publishDraft(guild, channel, storedDraft(row.id, JSON.parse(row.draft))) : publish(guild, channel, row.form, row.title, row.text))
@@ -146,7 +143,7 @@ export const SCHEDULE_TOOLS = [
     async run({ guild }) {
       const list = scheduledMessages(guild.id);
       if (!list.length) return 'Aucun message programmé.';
-      return `Messages programmés (recopie les dates telles quelles) :\n${list.map((r) => `- n°${r.id} · <#${r.channel_id}> · <t:${Math.floor(r.due_at / 1000)}:f> · par <@${r.author_id}> · ${(r.title || r.text).replace(/\s+/g, ' ').slice(0, 80)}`).join('\n')}`;
+      return `Messages programmés (recopie les dates telles quelles) :\n${list.map((r) => `- n°${r.id} · <#${r.channel_id}> · ${discordTime(r.due_at, 'f')} · par <@${r.author_id}> · ${(r.title || r.text).replace(/\s+/g, ' ').slice(0, 80)}`).join('\n')}`;
     },
   },
   {
@@ -163,7 +160,7 @@ export const SCHEDULE_TOOLS = [
 ];
 
 export function startScheduled(client) {
-  setInterval(() => sendDueMessages(client).catch(() => {}), 15_000);
+  setInterval(() => sendDueMessages(client).catch((err) => log.err('commandes', `échec des messages programmés : ${err.message}`)), 15_000);
 }
 
 const messageId = (ref) => String(ref ?? '').match(/(\d{17,20})\/?$/)?.[1] ?? null;
@@ -261,8 +258,8 @@ async function draftAction(interaction, action, token) {
   }
   if (draft.when) {
     const id = scheduleMessage({ guildId: guild.id, channelId: channel.id, authorId: interaction.user.id, form: 'publication', title: draft.title, text: draft.text, at: draft.when, draft });
-    log.notice('commandes', `${interaction.member} a programmé une publication dans ${channel} pour <t:${Math.floor(draft.when / 1000)}:f>`, { channel });
-    return interaction.editReply(notice(`Publication n°${id} programmée dans ${channel} pour <t:${Math.floor(draft.when / 1000)}:F> (<t:${Math.floor(draft.when / 1000)}:R>).`, [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}annuler:${id}`).setLabel('Annuler').setStyle(ButtonStyle.Danger))]));
+    log.notice('commandes', `${interaction.member} a programmé une publication dans ${channel} pour ${discordTime(draft.when, 'f')}`, { channel });
+    return interaction.editReply(notice(`Publication n°${id} programmée dans ${channel} pour ${discordTime(draft.when, 'F')} (${discordTime(draft.when)}).`, [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}annuler:${id}`).setLabel('Annuler').setStyle(ButtonStyle.Danger))]));
   }
   const sent = await publishDraft(guild, channel, draft).catch((err) => err);
   if (sent instanceof Error) {
@@ -348,9 +345,9 @@ export async function handleWriteModal(interaction) {
   }
   if (when.at) {
     const id = scheduleMessage({ guildId: guild.id, channelId: channel.id, authorId: interaction.user.id, form, title, text, at: when.at });
-    log.notice('commandes', `${interaction.member} a programmé un message (${FORMS[form].toLowerCase()}) dans ${channel} pour <t:${Math.floor(when.at / 1000)}:f>`, { channel });
+    log.notice('commandes', `${interaction.member} a programmé un message (${FORMS[form].toLowerCase()}) dans ${channel} pour ${discordTime(when.at, 'f')}`, { channel });
     return interaction.editReply({
-      content: `Message n°${id} programmé dans ${channel} pour <t:${Math.floor(when.at / 1000)}:F> (<t:${Math.floor(when.at / 1000)}:R>).${note}`,
+      content: `Message n°${id} programmé dans ${channel} pour ${discordTime(when.at, 'F')} (${discordTime(when.at)}).${note}`,
       components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}annuler:${id}`).setLabel('Annuler').setStyle(ButtonStyle.Danger))],
     });
   }
@@ -391,6 +388,6 @@ export async function clear(interaction) {
   const onlyMagi = interaction.options.getBoolean('magi');
   const { deleted, old } = await sweep(channel, count, (m) => (!author || m.author.id === author.id) && (!onlyMagi || fromMagi(m, interaction.client.user.id)));
   const who = `${author ? ` de ${author}` : ''}${onlyMagi ? ' de MAGI' : ''}`;
-  log.notice('commandes', `${interaction.member} a supprimé ${deleted} message${deleted > 1 ? 's' : ''}${author ? ` de ${author}` : ''}${onlyMagi ? ' de MAGI' : ''}`, { channel });
+  log.notice('commandes', `${interaction.member} a supprimé ${deleted} message${deleted > 1 ? 's' : ''}${who}`, { channel });
   return interaction.editReply({ content: `${deleted} message(s) supprimé(s)${who}.${old ? ` ${old} trop ancien(s) (plus de 14 jours) laissé(s) : Discord ne permet pas de les supprimer en lot.` : ''}` });
 }

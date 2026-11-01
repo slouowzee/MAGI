@@ -111,3 +111,14 @@ test('un exemple trop proche du message n’est pas montré, pour ne pas être r
   const shown = pickExamples('g-proche', 'melchior', 'question', () => 0.5, 'tu me fais une petite config pour un nas ?');
   assert.ok(!shown.some((e) => /NAS/.test(e.input)));
 });
+
+test('banque : un texte tronqué au stockage se retire et ne se réapprend pas en double', async () => {
+  const { learnTone } = await import('./examples.js');
+  const long = 'x'.repeat(1200);
+  assert.equal(learn('g-long', { persona: 'casper', input: 'a', output: long, by: 'u' }), true);
+  assert.equal(learn('g-long', { persona: 'casper', input: 'a', output: long, by: 'u' }), false);
+  assert.equal(unlearn('g-long', long), true);
+  assert.equal(learnTone('g-long', { authorId: '1', author: 'Lea', text: long, by: 'u' }), true);
+  assert.equal(learnTone('g-long', { authorId: '1', author: 'Lea', text: long, by: 'u' }), false);
+  assert.equal(unlearn('g-long', long), true);
+});

@@ -3,6 +3,7 @@ import { honeypotOf } from '../../features/security/honeypot.js';
 import { latestBackup } from '../../features/security/backup-store.js';
 import { MODES, moderationMode } from '../../features/moderation/store.js';
 import { MODE_LABELS, id, row, text, separator, feature } from '../ui.js';
+import { discordTime } from '../../core/util.js';
 
 export function securitySection(guild) {
   const trap = honeypotOf(guild);
@@ -19,7 +20,7 @@ export function securitySection(guild) {
     separator(),
     feature(guild, 'administration'),
     feature(guild, 'antinuke'),
-    feature(guild, 'sauvegardes', `dernière ${backup ? `<t:${Math.floor(backup.createdAt / 1000)}:R>` : 'jamais'}`),
+    feature(guild, 'sauvegardes', `dernière ${backup ? `${discordTime(backup.createdAt)}` : 'jamais'}`),
     separator(),
     new SectionBuilder()
       .addTextDisplayComponents(text(`**Honeypot**\n${trap ? `Actif · ${trap}` : 'Aucun'}\n-# Salon piège : tout message posté dedans entraîne un bannissement.`))

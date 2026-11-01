@@ -56,6 +56,18 @@ const client = new Client({
   partials: [Partials.Message, Partials.Reaction, Partials.User],
 });
 
+const ROUTES = [
+  [isRoleButton, handleRoleButton],
+  [isPanelInteraction, handlePanelInteraction],
+  [isSecurityButton, handleSecurityButton],
+  [isTicketInteraction, handleTicketInteraction],
+  [isWriteModal, handleWriteModal],
+  [isLookupInteraction, handleLookupInteraction],
+  [isDebugInteraction, handleDebugInteraction],
+  [isAppealInteraction, handleAppealInteraction],
+  [isLeaderboardInteraction, handleLeaderboardInteraction],
+];
+
 client.once(Events.ClientReady, async (c) => {
   await attachDiscord(c);
   await loadEmotes(c);
@@ -100,7 +112,7 @@ client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => watchAuditLog(entry
 client.on(Events.InteractionCreate, (interaction) => {
   if (isCommand(interaction)) return handleCommand(interaction);
   const id = interaction.customId ?? '';
-  const handler = isRoleButton(id) ? handleRoleButton : isPanelInteraction(id) ? handlePanelInteraction : isSecurityButton(id) ? handleSecurityButton : isTicketInteraction(id) ? handleTicketInteraction : isWriteModal(id) ? handleWriteModal : isLookupInteraction(id) ? handleLookupInteraction : isDebugInteraction(id) ? handleDebugInteraction : isAppealInteraction(id) ? handleAppealInteraction : isLeaderboardInteraction(id) ? handleLeaderboardInteraction : handleInteraction;
+  const handler = ROUTES.find(([matches]) => matches(id))?.[1] ?? handleInteraction;
   handler(interaction).catch((err) => log.err('interaction', `un bouton ou menu a échoué (${id.split(':').slice(0, 2).join(':')}) : ${err.message}`, { guild: interaction.guild, channel: interaction.channel }));
 });
 client.on(Events.MessageCreate, async (message) => {

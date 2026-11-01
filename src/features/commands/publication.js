@@ -2,17 +2,20 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { dirname, extname, join } from 'node:path';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelSelectMenuBuilder, ChannelType, ContainerBuilder, MediaGalleryBuilder, MessageFlags, ModalBuilder, SectionBuilder, SeparatorBuilder, StringSelectMenuBuilder, TextDisplayBuilder, TextInputStyle, ThumbnailBuilder } from 'discord.js';
-import { SIGNATURE } from '../../core/discord/embeds.js';
+import { COLOR, SIGNATURE } from '../../core/discord/embeds.js';
+import { fetchLimited } from '../../core/discord/media.js';
 import { setSetting, setting } from '../../core/settings.js';
 import { savePublication } from '../admin/publications-store.js';
 import { resolveMentions, unknownNote } from './mentions.js';
+import { discordTime } from '../../core/util.js';
 
-export const COLORS = { magi: ['Rouge MAGI', 0xd65c62], bleu: ['Bleu', 0x378add], vert: ['Vert', 0x1d9e75], jaune: ['Jaune', 0xef9f27], orange: ['Orange', 0xd85a30], violet: ['Violet', 0x7f77dd], rose: ['Rose', 0xd4537e], gris: ['Gris', 0x888780] };
+export const COLORS = { magi: ['Rouge MAGI', COLOR], bleu: ['Bleu', 0x378add], vert: ['Vert', 0x1d9e75], jaune: ['Jaune', 0xef9f27], orange: ['Orange', 0xd85a30], violet: ['Violet', 0x7f77dd], rose: ['Rose', 0xd4537e], gris: ['Gris', 0x888780] };
 export const MAX_IMAGES = 10;
 export const MAX_TEXT = 4000;
 const MAX_SECTIONS = 3;
 const MAX_BUTTONS = 5;
 const DRAFT_TTL = 30 * 60_000;
+const MAX_UPLOAD = 25 * 1024 * 1024;
 const IMAGE_TYPES = /^\.(png|jpe?g|gif|webp)$/;
 const FILES = join(process.env.DB_PATH === ':memory:' ? tmpdir() : dirname(process.env.DB_PATH ?? 'data/magi.db'), 'programmes');
 const drafts = new Map();
@@ -43,8 +46,10 @@ export async function download(attachments, prefix) {
   const files = [];
   for (const a of attachments ?? []) {
     if (!/^image\//.test(a.contentType ?? '')) continue;
+    const file = await fetchLimited(a.url, MAX_UPLOAD);
+    if (!file) continue;
     const ext = extname(a.name ?? '').toLowerCase();
-    files.push({ name: `${prefix}-${files.length + 1}${IMAGE_TYPES.test(ext) ? ext : '.png'}`, data: Buffer.from(await (await fetch(a.url)).arrayBuffer()) });
+    files.push({ name: `${prefix}-${files.length + 1}${IMAGE_TYPES.test(ext) ? ext : '.png'}`, data: file.buffer });
   }
   return files;
 }
@@ -69,7 +74,7 @@ const metaOf = (draft) => ({ title: draft.title, text: draft.text, color: draft.
 
 export function previewPayload(draft) {
   const control = (action, label, style = ButtonStyle.Secondary) => new ButtonBuilder().setCustomId(`magi-write:draft:${action}:${draft.token}`).setLabel(label).setStyle(style);
-  const when = draft.when ? ` · programmée pour <t:${Math.floor(draft.when / 1000)}:F>` : '';
+  const when = draft.when ? ` · programmée pour ${discordTime(draft.when, 'F')}` : '';
   const controls = [
     control('modifier', 'Modifier'),
     draft.buttons.length < MAX_BUTTONS && control('bouton', 'Ajouter un bouton lien'),

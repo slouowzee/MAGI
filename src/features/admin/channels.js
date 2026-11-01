@@ -1,10 +1,11 @@
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
 import { magiChannelIds, operatorRole } from '../../core/installation.js';
 import { findMember, findRole, PERMISSION_NAMES, permissionBits, targetChannel } from './resolve.js';
+import { clamp } from '../../core/util.js';
 
 const channelArg = { salon: { type: 'string', description: 'Mention, identifiant ou nom. Par défaut, le salon actuel.' } };
 const permList = { type: 'array', items: { type: 'string', enum: PERMISSION_NAMES } };
-const TYPES = { texte: ChannelType.GuildText, vocal: ChannelType.GuildVoice, categorie: ChannelType.GuildCategory };
+const TYPES = { __proto__: null, texte: ChannelType.GuildText, vocal: ChannelType.GuildVoice, categorie: ChannelType.GuildCategory };
 
 function category(guild, ref) {
   if (!ref) return null;
@@ -24,7 +25,7 @@ function notLogs(guild, channel) {
 }
 
 async function recentMessages(message, args) {
-  const count = Math.min(Math.max(Number(args.nombre) || 10, 1), 100);
+  const count = clamp(Number(args.nombre) || 10, 1, 100);
   const target = args.membre ? await findMember(message.guild, args.membre) : null;
   if (args.membre && !target) throw new Error(`membre introuvable : ${args.membre}`);
   const fetched = await message.channel.messages.fetch({ limit: 100, before: message.id });
@@ -66,7 +67,7 @@ export const CHANNEL_ADMIN_TOOLS = [
     access: 'operator',
     async run({ guild, message, args, reason }) {
       const channel = targetChannel(guild, args.salon, message.channel);
-      const seconds = Math.min(Math.max(Number(args.secondes) || 0, 0), 21_600);
+      const seconds = clamp(Number(args.secondes) || 0, 0, 21_600);
       await channel.setRateLimitPerUser(seconds, reason);
       return seconds ? `Mode lent de ${seconds} s sur #${channel.name}.` : `Mode lent désactivé sur #${channel.name}.`;
     },
@@ -158,6 +159,7 @@ export const CHANNEL_ADMIN_TOOLS = [
       required: ['cible'],
     },
     access: 'operator',
+    confirm: ({ guild, message, args }) => `Changer les permissions de ${args.cible} sur #${notLogs(guild, targetChannel(guild, args.salon, message.channel)).name}`,
     async run({ guild, message, args, reason }) {
       const channel = notLogs(guild, targetChannel(guild, args.salon, message.channel));
       const ref = String(args.cible);

@@ -122,9 +122,26 @@ test('modèles : enregistrer la structure, la retrouver et la réappliquer en co
   const plan = templateOf(source);
   assert.deepEqual(plan.categories[0].salons.map((s) => `${s.nom}:${s.acces}`), ['annonces:lecture', 'staff:staff']);
   assert.equal(saveTemplate(source, 'Mon modèle'), 'Mon modèle');
-  assert.ok(listTemplates().some((t) => t.name === 'Mon modèle'));
-  assert.equal(findTemplate('mon modele').from, 'Source');
+  assert.ok(listTemplates(source).some((t) => t.name === 'Mon modèle'));
+  assert.equal(findTemplate(source, 'mon modele').from, 'Source');
   const entry = templatePlan(guild, 'Mon modèle');
   assert.ok(entry.ops.some((o) => o.kind === 'creer_categorie' && o.category.name === 'INFOS'));
   assert.ok(entry.ops.every((o) => !['renommer', 'deplacer', 'archiver'].includes(o.kind)));
+});
+
+test('tables de choix : aucune clé héritée de Object.prototype', async () => {
+  const { ACCESS, FEATURES, FUNCTIONS, SELF_SERVICE, TYPES } = await import('./plan.js');
+  const { MODES, PRESETS, SEASONS } = await import('./styles.js');
+  const { PERSONAS } = await import('../../core/personas.js');
+  for (const table of [ACCESS, FEATURES, FUNCTIONS, SELF_SERVICE, TYPES, MODES, PRESETS, SEASONS, PERSONAS]) assert.equal(table.constructor, undefined);
+});
+
+test('modèles : invisibles pour le serveur d’un autre propriétaire', async () => {
+  const { findTemplate, listTemplates, saveTemplate } = await import('./templates.js');
+  const mine = { ...guild, id: 'g-a', name: 'A', ownerId: 'lea', channels: { cache: new Map() }, roles: { cache: new Map(), everyone } };
+  assert.equal(saveTemplate(mine, 'Privé'), 'Privé');
+  assert.ok(listTemplates({ ...mine, id: 'g-b' }).some((t) => t.name === 'Privé'));
+  const other = { ...guild, id: 'g-c', ownerId: 'tom' };
+  assert.deepEqual(listTemplates(other), []);
+  assert.throws(() => findTemplate(other, 'Privé'), /introuvable/);
 });

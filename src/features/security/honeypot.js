@@ -1,5 +1,6 @@
 import { ChannelType, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { setSetting, setting } from '../../core/settings.js';
+import { COLOR } from '../../core/discord/embeds.js';
 
 const NAME = '🍯・honeypot';
 const OLD_NAMES = ['ne-pas-écrire-ici', '⛔・ne-pas-écrire'];
@@ -10,7 +11,7 @@ const SEPARATOR = '────────────────────�
 export function warning(guild) {
   const count = Number(setting(guild.id, 'honeypot_count') ?? 0);
   return new EmbedBuilder()
-    .setColor(0xd65c62)
+    .setColor(COLOR)
     .setDescription(
       [
         "# N'écrivez rien ici",

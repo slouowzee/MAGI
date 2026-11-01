@@ -1,5 +1,6 @@
 import { activeInfractions, MODES, moderationMode, revokeLastInfraction, setModerationMode } from './store.js';
 import { findMember } from '../admin/resolve.js';
+import { discordTime } from '../../core/util.js';
 
 const MODE_TEXT = {
   observation: "observation : le bot note dans #magi-logs ce qu'il aurait fait, sans agir",
@@ -14,10 +15,11 @@ export const MODERATION_TOOLS = [
     parameters: { type: 'object', properties: { mode: { type: 'string', enum: MODES, description: 'Vide pour seulement afficher le mode actuel.' } } },
     access: 'operator',
     panel: true,
+    confirm: ({ args }) => (args.mode ? `Passer la modération en mode ${args.mode}` : null),
     async run({ guild, args }) {
       if (args.mode) setModerationMode(guild.id, args.mode);
       const { mode, since } = moderationMode(guild.id);
-      return `Modération automatique en mode ${MODE_TEXT[mode]} (depuis <t:${Math.floor(since / 1000)}:R>).`;
+      return `Modération automatique en mode ${MODE_TEXT[mode]} (depuis ${discordTime(since)}).`;
     },
   },
   {
@@ -30,7 +32,7 @@ export const MODERATION_TOOLS = [
       const m = await findMember(guild, args.membre);
       if (!m) return `Membre introuvable : ${args.membre}`;
       const list = activeInfractions(guild.id, m.id);
-      return list.length ? `${m.displayName} : ${list.length} infraction(s) sur 30 jours\n${list.map((i) => `- <t:${Math.floor(i.created_at / 1000)}:R> ${i.reason}`).join('\n')}` : `${m.displayName} n'a aucune infraction sur 30 jours.`;
+      return list.length ? `${m.displayName} : ${list.length} infraction(s) sur 30 jours\n${list.map((i) => `- ${discordTime(i.created_at)} ${i.reason}`).join('\n')}` : `${m.displayName} n'a aucune infraction sur 30 jours.`;
     },
   },
   {
@@ -38,12 +40,14 @@ export const MODERATION_TOOLS = [
     description: "Annule la dernière sanction automatique d'un membre : retire sa dernière infraction et lève son exclusion temporaire.",
     parameters: { type: 'object', properties: { membre: { type: 'string' } }, required: ['membre'] },
     access: 'operator',
+    confirm: ({ args }) => `Annuler la dernière sanction de ${args.membre}`,
     async run({ guild, args, reason }) {
       const m = await findMember(guild, args.membre);
       if (!m) return `Membre introuvable : ${args.membre}`;
       const revoked = revokeLastInfraction(guild.id, m.id);
-      if (m.communicationDisabledUntilTimestamp > Date.now()) await m.timeout(null, reason);
-      return `${revoked ? 'Dernière infraction retirée' : 'Aucune infraction à retirer'} et exclusion levée pour ${m.displayName}.`;
+      const excluded = m.communicationDisabledUntilTimestamp > Date.now();
+      if (excluded) await m.timeout(null, reason);
+      return `${m.displayName} : ${revoked ? 'dernière infraction retirée' : 'aucune infraction à retirer'}, ${excluded ? 'exclusion levée' : 'aucune exclusion en cours'}.`;
     },
   },
 ];

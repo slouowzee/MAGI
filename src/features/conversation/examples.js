@@ -92,11 +92,13 @@ const MAX_SHOWN = 5;
 const insert = db.query('INSERT INTO examples (guild_id, persona, register, input, output, added_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
 const ofGuild = db.query('SELECT * FROM examples WHERE guild_id = ? ORDER BY id DESC');
 const removeOne = db.query('DELETE FROM examples WHERE id = ? AND guild_id = ?');
-const removeByOutput = db.query('DELETE FROM examples WHERE guild_id = ? AND output = ?');
+const removeByOutput = db.query('DELETE FROM examples WHERE guild_id = ? AND output IN (?, ?)');
 const findOutput = db.query('SELECT id FROM examples WHERE guild_id = ? AND output = ?');
 
 export const TONE = 'serveur';
 const MAX_TONE = 4;
+const TONE_CHARS = 500;
+const OUTPUT_CHARS = 1000;
 const toneOf = db.query("SELECT * FROM examples WHERE guild_id = ? AND persona = 'serveur' ORDER BY id DESC");
 const toneOfAuthor = db.query("SELECT count(*) AS n FROM examples WHERE guild_id = ? AND persona = 'serveur' AND input LIKE ?");
 const forgetAuthor = db.query("DELETE FROM examples WHERE guild_id = ? AND persona = 'serveur' AND input LIKE ?");
@@ -107,8 +109,9 @@ export const toneCountOf = (guildId, userId) => toneOfAuthor.get(guildId, `${use
 export const forgetToneOf = (guildId, userId) => forgetAuthor.run(guildId, `${userId}:%`).changes;
 
 export function learnTone(guildId, { authorId, author, text, by }, now = Date.now()) {
-  if (findOutput.get(guildId, text)) return false;
-  insert.run(guildId, TONE, registerOf(text), `${authorId}:${author}`, text.slice(0, 500), by, now);
+  const kept = text.slice(0, TONE_CHARS);
+  if (findOutput.get(guildId, kept)) return false;
+  insert.run(guildId, TONE, registerOf(text), `${authorId}:${author}`, kept, by, now);
   return true;
 }
 
@@ -117,11 +120,12 @@ export function toneNote(guildId, random = Math.random) {
   return samples.length ? `Façon de parler de la bande sur ce serveur, pour t'en imprégner légèrement (vocabulaire, expressions, niveau de langue), sans recopier ces messages ni imiter quelqu'un en particulier :\n${samples.map((e) => `- « ${e.output.replace(/\s+/g, ' ')} »`).join('\n')}` : '';
 }
 export const forgetExample = (guildId, id) => removeOne.run(id, guildId).changes > 0;
-export const unlearn = (guildId, output) => removeByOutput.run(guildId, output).changes > 0;
+export const unlearn = (guildId, output) => removeByOutput.run(guildId, output.slice(0, TONE_CHARS), output.slice(0, OUTPUT_CHARS)).changes > 0;
 
 export function learn(guildId, { persona, input, output, by }, now = Date.now()) {
-  if (findOutput.get(guildId, output)) return false;
-  insert.run(guildId, persona, registerOf(input), input.slice(0, 500), output.slice(0, 1000), by, now);
+  const kept = output.slice(0, OUTPUT_CHARS);
+  if (findOutput.get(guildId, kept)) return false;
+  insert.run(guildId, persona, registerOf(input), input.slice(0, 500), kept, by, now);
   return true;
 }
 

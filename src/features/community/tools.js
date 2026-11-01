@@ -4,8 +4,9 @@ import { setSetting } from '../../core/settings.js';
 import { deleteBirthday, setBirthday, synchroOf, synchroTop } from './store.js';
 import { addReminder } from '../reminders/store.js';
 import { MILESTONES, orderMilestoneRoles, paliers, rateOf } from './synchro.js';
-import { DANGEROUS } from '../admin/role-panels.js';
+import { isDangerous } from '../admin/role-panels.js';
 import { findChannel, targetRole } from '../admin/resolve.js';
+import { clamp } from '../../core/util.js';
 
 const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
@@ -13,7 +14,7 @@ function eventDraft(guild, args) {
   const start = Date.parse(String(args.debut ?? ''));
   if (!Number.isFinite(start)) throw new Error('date de début invalide, il faut une date complète avec le fuseau horaire');
   if (start < Date.now() + 60_000) throw new Error('la date de début est déjà passée');
-  const end = start + Math.min(Math.max(Number(args.duree_minutes) || 120, 15), 24 * 60) * 60_000;
+  const end = start + clamp(Number(args.duree_minutes) || 120, 15, 24 * 60) * 60_000;
   const voice = args.salon_vocal ? findChannel(guild, args.salon_vocal) : null;
   if (args.salon_vocal && !voice?.isVoiceBased?.()) throw new Error(`salon vocal introuvable : ${args.salon_vocal}`);
   return { start, end, voice, title: String(args.titre ?? '').trim().slice(0, 100) };
@@ -41,7 +42,7 @@ export const COMMUNITY_TOOLS = [
       const answers = [...new Set((args.choix ?? []).map((c) => String(c).trim().slice(0, 55)).filter(Boolean))].slice(0, 10);
       if (answers.length < 2) throw new Error('il faut au moins deux réponses');
       const sent = await message.channel.send({
-        poll: { question: { text: String(args.question).slice(0, 300) }, answers: answers.map((text) => ({ text })), duration: Math.min(Math.max(Number(args.duree_heures) || 24, 1), 168), allowMultiselect: Boolean(args.choix_multiple) },
+        poll: { question: { text: String(args.question).slice(0, 300) }, answers: answers.map((text) => ({ text })), duration: clamp(Number(args.duree_heures) || 24, 1, 168), allowMultiselect: Boolean(args.choix_multiple) },
       });
       return `Sondage publié : ${sent.url}`;
     },
@@ -121,6 +122,7 @@ export const COMMUNITY_TOOLS = [
     description: 'Associe un rôle à un palier du taux de synchronisation (25, 50, 75, 100, 150, 200, 300 ou 400 %), ou retire l’association.',
     parameters: { type: 'object', properties: { pourcentage: { type: 'integer', enum: MILESTONES }, role: { type: 'string' }, retirer: { type: 'boolean' } }, required: ['pourcentage'] },
     access: 'operator',
+    confirm: ({ args }) => (args.retirer ? `Retirer le rôle du palier ${args.pourcentage} %` : `Donner ${args.role} au palier ${args.pourcentage} %`),
     async run({ guild, args }) {
       const threshold = Number(args.pourcentage);
       if (!MILESTONES.includes(threshold)) throw new Error(`palier inconnu, choisis parmi ${MILESTONES.join(', ')} %`);
@@ -131,7 +133,7 @@ export const COMMUNITY_TOOLS = [
         return `Palier ${threshold} % sans rôle.`;
       }
       const role = targetRole(guild, args.role);
-      if (DANGEROUS.some((p) => role.permissions.has(p, false))) throw new Error(`${role.name} donne des permissions de gestion ou de modération`);
+      if (isDangerous(role)) throw new Error(`${role.name} donne des permissions de gestion ou de modération`);
       if (!role.editable) throw new Error(`${role.name} est au-dessus du rôle de MAGI`);
       roles[threshold] = role.id;
       setSetting(guild.id, 'synchro_roles', JSON.stringify(roles));

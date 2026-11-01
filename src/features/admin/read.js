@@ -1,6 +1,7 @@
 import { AuditLogEvent, ChannelType } from 'discord.js';
 import { findMember } from './resolve.js';
 import { activeInfractions } from '../moderation/store.js';
+import { clamp, discordTime } from '../../core/util.js';
 
 const AUDIT_NAMES = Object.fromEntries(Object.entries(AuditLogEvent).filter(([, v]) => typeof v === 'number').map(([k, v]) => [v, k]));
 const day = (ms) => new Date(ms).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
@@ -17,7 +18,7 @@ export const READ_TOOLS = [
       const m = await findMember(guild, args.membre);
       if (!m) return `Membre introuvable : ${args.membre}`;
       const roles = m.roles.cache.filter((r) => r.id !== guild.id).map((r) => r.name).join(', ') || 'aucun';
-      const timeout = m.communicationDisabledUntilTimestamp > Date.now() ? `exclu jusqu'au <t:${Math.floor(m.communicationDisabledUntilTimestamp / 1000)}:F>` : 'aucune exclusion en cours';
+      const timeout = m.communicationDisabledUntilTimestamp > Date.now() ? `exclu jusqu'au ${discordTime(m.communicationDisabledUntilTimestamp, 'F')}` : 'aucune exclusion en cours';
       return `${m.displayName} (${m.user.username}) : arrivé le ${day(m.joinedTimestamp)}, compte créé le ${day(m.user.createdTimestamp)}, rôles : ${roles}, ${timeout}, ${activeInfractions(guild.id, m.id).length} infraction(s) sur 30 jours.`;
     },
   },
@@ -59,9 +60,9 @@ export const READ_TOOLS = [
     access: 'operator',
     readonly: true,
     async run({ guild, args }) {
-      const logs = await guild.fetchAuditLogs({ limit: Math.min(Math.max(Number(args.nombre) || 10, 1), 25) });
+      const logs = await guild.fetchAuditLogs({ limit: clamp(Number(args.nombre) || 10, 1, 25) });
       return [...logs.entries.values()]
-        .map((e) => `- <t:${Math.floor(e.createdTimestamp / 1000)}:R> ${e.executor?.username ?? '?'} : ${AUDIT_NAMES[e.action] ?? e.action}${e.target?.username || e.target?.name ? ` → ${e.target.username ?? e.target.name}` : ''}${e.reason ? ` (${e.reason})` : ''}`)
+        .map((e) => `- ${discordTime(e.createdTimestamp)} ${e.executor?.username ?? '?'} : ${AUDIT_NAMES[e.action] ?? e.action}${e.target?.username || e.target?.name ? ` → ${e.target.username ?? e.target.name}` : ''}${e.reason ? ` (${e.reason})` : ''}`)
         .join('\n') || 'Journal vide.';
     },
   },

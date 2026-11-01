@@ -5,9 +5,9 @@ import { auditStructure } from '../features/server/audit.js';
 import { discordTemplate, saveTemplate } from '../features/server/templates.js';
 import { dropPlan, pendingPlan, progressBar, proposePlan, runPlan, serverFeatures, serverStyle } from '../features/server/tools.js';
 import { id } from './ui.js';
+import { COLOR } from '../core/discord/embeds.js';
 
 const PRIVATE = { flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } };
-const COLOR = 0xd65c62;
 const buttons = (...list) => [new ActionRowBuilder().addComponents(list.map(([field, label, style]) => new ButtonBuilder().setCustomId(id(field)).setLabel(label).setStyle(style)))];
 
 function planMessage(entry) {
@@ -82,7 +82,7 @@ export const SERVER_ACTIONS = {
   server_template: (interaction) => interaction.showModal(modal('server_template_set', 'Enregistrer comme modèle', 'Nom du modèle', 'Mon serveur gaming')),
   server_template_set(interaction) {
     const name = saveTemplate(interaction.guild, interaction.fields.getTextInputValue('texte'));
-    return interaction.reply({ content: `Modèle « ${name} » enregistré. Demande « magi, applique le modèle ${name} » sur n'importe quel serveur où je suis.`, ...PRIVATE });
+    return interaction.reply({ content: `Modèle « ${name} » enregistré. Demande « magi, applique le modèle ${name} » sur n'importe lequel de tes serveurs où je suis.`, ...PRIVATE });
   },
   async server_link(interaction) {
     await interaction.deferReply(PRIVATE);

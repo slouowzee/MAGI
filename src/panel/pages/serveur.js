@@ -4,6 +4,7 @@ import { FEATURES } from '../../features/server/plan.js';
 import { lastSetup } from '../../features/server/apply.js';
 import { serverFeatures, serverStyle } from '../../features/server/tools.js';
 import { id, row, separator, text } from '../ui.js';
+import { discordTime } from '../../core/util.js';
 
 const select = (field, placeholder, entries, current) =>
   row(
@@ -18,7 +19,7 @@ export function serverSection(guild) {
   const features = serverFeatures(guild);
   const last = lastSetup(guild);
   return [
-    text(`**Mise en place du serveur**\n-# Choisis le style et ce qu'il faut préparer, puis prévisualise : rien n'est appliqué sans ton clic, et tout peut être annulé.${last ? `\n-# Dernière mise en place <t:${Math.floor(last.at / 1000)}:R>.` : ''}`),
+    text(`**Mise en place du serveur**\n-# Choisis le style et ce qu'il faut préparer, puis prévisualise : rien n'est appliqué sans ton clic, et tout peut être annulé.${last ? `\n-# Dernière mise en place ${discordTime(last.at)}.` : ''}`),
     select('server_style', 'Style du serveur', Object.fromEntries(Object.entries(PRESETS).map(([k, p]) => [k, p.label])), style.preset),
     select('server_mode', 'Mode', MODES, style.mode),
     separator(),

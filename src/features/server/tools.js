@@ -42,7 +42,7 @@ export async function proposePlan(guild, { consigne, style, features, retouche =
 }
 
 export function templatePlan(guild, name, mode = 'completer') {
-  const template = findTemplate(name);
+  const template = findTemplate(guild, name);
   const style = { ...serverStyle(guild), casing: 'libre', decor: 'libre', mode };
   const features = serverFeatures(guild);
   return remember(guild, { plan: template.plan, style, features, ops: diffPlan(guild, template.plan, style, features), season: null, template: template.name });
@@ -157,7 +157,7 @@ export const SERVER_TOOLS = [
   },
   {
     name: 'modele_serveur',
-    description: "Modèles de serveur : enregistrer la structure actuelle sous un nom, la réappliquer (ici ou sur un autre serveur où MAGI est), lister les modèles, ou obtenir un lien de modèle Discord (discord.new).",
+    description: "Modèles de serveur : enregistrer la structure actuelle sous un nom, la réappliquer (ici ou sur un autre serveur du même propriétaire où MAGI est), lister les modèles, ou obtenir un lien de modèle Discord (discord.new).",
     parameters: {
       type: 'object',
       properties: {
@@ -170,7 +170,7 @@ export const SERVER_TOOLS = [
     access: 'operator',
     async run(ctx) {
       const { guild, args, reason } = ctx;
-      if (args.action === 'lister') return listTemplates().map((t) => `- ${t.name} (depuis ${t.from})`).join('\n') || 'Aucun modèle enregistré.';
+      if (args.action === 'lister') return listTemplates(guild).map((t) => `- ${t.name} (depuis ${t.from})`).join('\n') || 'Aucun modèle enregistré.';
       if (args.action === 'enregistrer') return `Modèle « ${saveTemplate(guild, String(args.nom ?? guild.name))} » enregistré.`;
       if (args.action === 'lien_discord') return `Lien de modèle Discord : ${await discordTemplate(guild, reason)}`;
       const entry = templatePlan(guild, String(args.nom ?? ''), MODES[args.mode] ? args.mode : 'completer');

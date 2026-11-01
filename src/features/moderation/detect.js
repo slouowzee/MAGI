@@ -1,7 +1,7 @@
-const OFFICIAL = new Set(['discord.com', 'discord.gg', 'discordapp.com', 'discordapp.net', 'discord.gift', 'discord.media', 'discordstatus.com', 'steampowered.com', 'steamcommunity.com', 'steamstatic.com', 'discord.js.org', 'discordjs.guide', 'discord.dev', 'dis.gd']);
+const OFFICIAL = ['discord.com', 'discord.gg', 'discordapp.com', 'discordapp.net', 'discord.gift', 'discord.media', 'discordstatus.com', 'steampowered.com', 'steamcommunity.com', 'steamstatic.com', 'discord.js.org', 'discordjs.guide', 'discord.dev', 'dis.gd'];
 const MEDIA = ['tenor.com', 'giphy.com', 'klipy.com', 'imgur.com', 'youtube.com', 'youtu.be'];
 const LURE = /\b(nitro|free|gratuit|gift|cadeau|giveaway|airdrop|claim|r[ée]cup[eè]re|steam)\b/i;
-const URL = /\bhttps?:\/\/([^\s/<>]+)[^\s<>]*/gi;
+const LINK = /\bhttps?:\/\/([^\s/<>]+)[^\s<>]*/gi;
 const INVITE = /\b(?:discord(?:app)?\.com\/invite|discord\.gg)\/[\w-]+/i;
 const BURST = { count: 6, window: 10_000 };
 const DUPLICATE = { channels: 3, window: 120_000 };
@@ -11,13 +11,13 @@ const NEW_MEMBER = 24 * 3600_000;
 const INSULT = /(?<![\p{L}])(?:fdp|ntm|ftg|tg|nique[rsz]?|baise[rsz]?|baisais|baisait|encul\p{L}*|putes?|salopes?|connard\p{L}*|connasses?|b[aâ]tard\p{L}*|pd|tapettes?|enfoir[ée]\p{L}*|ta m[eè]re|ta race|va te faire)(?![\p{L}])/iu;
 
 export function hosts(content) {
-  return [...content.matchAll(URL)].map((m) => m[1].toLowerCase().replace(/^www\./, '').split(':')[0]);
+  return [...content.matchAll(LINK)].map((m) => m[1].toLowerCase().replace(/^www\./, '').split(':')[0]);
 }
 
 const within = (host, domains) => domains.some((d) => host === d || host.endsWith(`.${d}`));
 
 function official(host) {
-  return within(host, [...OFFICIAL]);
+  return within(host, OFFICIAL);
 }
 
 function distance(a, b) {
@@ -36,7 +36,7 @@ function distance(a, b) {
 
 function lookalike(host, text) {
   if (official(host)) return false;
-  if ([...OFFICIAL].some((d) => distance(host, d) <= 2)) return true;
+  if (OFFICIAL.some((d) => distance(host, d) <= 2)) return true;
   return /discord|steam|nitro/.test(host.replace(/[^a-z0-9]/g, '')) && LURE.test(text);
 }
 
@@ -58,7 +58,7 @@ export function createTracker() {
 export function detect({ content, mentionCount = 0, everyoneAttempt = false, accountAge = Infinity, memberAge = Infinity, activity = { burst: 0, duplicateChannels: 0 } }) {
   const found = [];
   const links = hosts(content);
-  const text = content.replace(URL, ' ');
+  const text = content.replace(LINK, ' ');
   const fakes = links.filter((h) => lookalike(h, text));
   if (fakes.length) found.push({ level: 'flagrant', reason: `lien d'arnaque imitant un site connu (${fakes[0]})` });
   else if (links.some((h) => !official(h)) && LURE.test(text)) found.push({ level: 'suspect', reason: 'lien accompagné d’une promesse de cadeau' });

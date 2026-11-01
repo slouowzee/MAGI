@@ -1,4 +1,5 @@
 import { factsAbout, forgetUser, rememberFact } from './store.js';
+import { forgetToneOf } from '../conversation/examples.js';
 
 export const MEMORY_TOOLS = [
   {
@@ -28,13 +29,14 @@ export const MEMORY_TOOLS = [
   },
   {
     name: 'oublier',
-    description: "Efface tout ce que MAGI sait sur la personne qui écrit (souvenirs et résumés de conversations), quand elle le demande.",
+    description: "Efface tout ce que MAGI sait sur la personne qui écrit (souvenirs, résumés de conversations et messages d'exemple), quand elle le demande.",
     parameters: { type: 'object', properties: {} },
     access: 'everyone',
     confirm: () => 'Tout oublier sur moi',
     async run({ guild, member }) {
       const { facts, summaries } = await forgetUser(guild.id, member.id);
-      return `Oublié : ${facts} souvenir(s) et ${summaries} résumé(s) de conversation concernant ${member.displayName}.`;
+      const tone = forgetToneOf(guild.id, member.id);
+      return `Oublié : ${facts} souvenir(s), ${summaries} résumé(s) de conversation et ${tone} message(s) d'exemple concernant ${member.displayName}.`;
     },
   },
 ];

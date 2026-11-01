@@ -132,3 +132,7 @@ test('export puis import de la configuration, sans les données de fonctionnemen
   assert.equal(setting('g-import', 'stars_threshold'), '10');
   assert.throws(() => readConfig('{"a":1}'), /export de configuration MAGI/);
 });
+
+test('import : des réglages nuls sont refusés', () => {
+  assert.throws(() => readConfig(JSON.stringify({ format: 'magi-config', settings: null })), /export de configuration/);
+});

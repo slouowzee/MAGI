@@ -2,6 +2,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder
 import { channelSetting, moduleEnabled, option, settingList } from '../../core/config.js';
 import { setSetting, setting } from '../../core/settings.js';
 import { log } from '../../core/log/log.js';
+import { COLOR } from '../../core/discord/embeds.js';
 
 const ROLE = 'Non vérifié';
 const CHANNEL = '✅・verification';
@@ -24,7 +25,7 @@ export function gateReasons(member, guild, { now = Date.now(), lockdown = false 
 
 function verifyMessage() {
   return {
-    embeds: [new EmbedBuilder().setColor(0xd65c62).setDescription("# Vérification\n### Clique sur le bouton pour accéder au serveur.")],
+    embeds: [new EmbedBuilder().setColor(COLOR).setDescription("# Vérification\n### Clique sur le bouton pour accéder au serveur.")],
     components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('magi-sec:verifier').setLabel('Je suis humain').setStyle(ButtonStyle.Success))],
   };
 }

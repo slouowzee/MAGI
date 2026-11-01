@@ -54,13 +54,12 @@ async function classify(message, reasons) {
   }
 }
 
-function report(guild, level, lines, component = 'moderation', mention = null, components = null) {
-  log[level](component, lines.join('\n').slice(0, 1800), { guild, mention, components });
+function report(guild, level, lines, component = 'moderation') {
+  log[level](component, lines.join('\n').slice(0, 1800), { guild });
 }
 
 const INCIDENT = 60_000;
 const incidents = new Map();
-const VERDICT_KIND = { spam: 'spam', indesirable: 'indesirable', flagrant: 'flagrant' };
 const BALLOT = { 'APPROUVÉ': '✅', 'REFUSÉ': '❌' };
 export const shortVote = (votes) => votes.map((v) => `${PERSONAS[v.persona]?.name ?? v.persona} ${BALLOT[v.verdict] ?? '➖'}`).join(' · ');
 
@@ -106,7 +105,7 @@ async function sanction(message, finding, observing) {
   const infraction = observing ? { id: null, count: activeInfractions(guild.id, member.id).length + 1 } : recordInfraction(guild.id, member.id, finding.reasons.join(' ; '));
   const action = decide(finding.level, infraction.count);
   const c = await openCase(guild, member.id, {
-    kind: VERDICT_KIND[verdict] ?? 'spam',
+    kind: verdict,
     channelId: message.channel.id,
     reasons: finding.reasons,
     verdict,

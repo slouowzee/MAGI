@@ -2,13 +2,13 @@ import { ButtonBuilder, ButtonStyle, ContainerBuilder, MessageFlags, SectionBuil
 import { logChannels } from '../../core/installation.js';
 import { bumpStat } from '../../core/log/digest.js';
 import { casesOf, createCase, getCase, saveCase } from './store.js';
+import { discordTime as stamp } from '../../core/util.js';
 
 export const KINDS = { spam: 'Spam', indesirable: 'Contenu indésirable', flagrant: 'Infraction flagrante', honeypot: 'Honeypot', manuel: 'Sanction manuelle' };
 const COLORS = { observation: 0x888780, avertissement: 0xef9f27, exclusion: 0xd85a30, ban: 0xe24b4a, annulee: 0x1d9e75 };
 const UPDATE_EVERY = 2_000;
 const timers = new Map();
 const text = (content) => new TextDisplayBuilder().setContent(content);
-const stamp = (ms, style = 'R') => `<t:${Math.floor(ms / 1000)}:${style}>`;
 
 export const excludedOf = (c) => c.excluded ?? Boolean(c.timeout || c.status === 'exclu');
 const counted = (c) => Boolean(c.infractionId) && !c.infractionRevoked;
@@ -110,7 +110,10 @@ export function updateCase(guild, id, change, { now = Date.now(), event = null }
   const next = { ...c, ...(typeof change === 'function' ? change(c) : change) };
   if (event) next.events = [...(c.events ?? []), { at: now, text: event }];
   saveCase(next);
-  if (!timers.has(id)) timers.set(id, setTimeout(() => timers.delete(id) && refreshCase(guild, id), UPDATE_EVERY).unref?.() ?? true);
+  if (!timers.has(id)) timers.set(id, setTimeout(() => {
+    timers.delete(id);
+    refreshCase(guild, id);
+  }, UPDATE_EVERY).unref());
   return next;
 }
 

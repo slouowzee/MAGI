@@ -4,7 +4,7 @@ import { listSettings, setSetting, setting } from '../../core/settings.js';
 import { PERMISSIONS } from '../admin/resolve.js';
 import { norm, structure, TYPES } from './plan.js';
 
-const SCOPE = 'modeles';
+const scopeOf = (guild) => `modeles:${guild.ownerId}`;
 const TYPE_NAMES = Object.fromEntries(Object.entries(TYPES).map(([k, v]) => [v, k]));
 const HOOKED = { welcome_channel: 'accueil', stars_channel: 'hall_of_fame', tickets_channel: 'tickets', birthday_channel: 'anniversaires', voice_hub: 'generateur_vocal', roles_channel: 'roles' };
 
@@ -43,17 +43,17 @@ export function templateOf(guild) {
 export function saveTemplate(guild, name) {
   const key = norm(name);
   if (!key) throw new Error('il faut un nom de modèle');
-  setSetting(SCOPE, `modele:${key}`, JSON.stringify({ name: name.trim().slice(0, 60), from: guild.name, at: Date.now(), plan: templateOf(guild) }));
+  setSetting(scopeOf(guild), `modele:${key}`, JSON.stringify({ name: name.trim().slice(0, 60), from: guild.name, at: Date.now(), plan: templateOf(guild) }));
   return name.trim().slice(0, 60);
 }
 
-export function listTemplates() {
-  return listSettings(SCOPE, 'modele:').map((row) => JSON.parse(row.value));
+export function listTemplates(guild) {
+  return listSettings(scopeOf(guild), 'modele:').map((row) => JSON.parse(row.value));
 }
 
-export function findTemplate(name) {
-  const raw = setting(SCOPE, `modele:${norm(name)}`);
-  if (!raw) throw new Error(`modèle introuvable : ${name}. Modèles : ${listTemplates().map((t) => t.name).join(', ') || 'aucun'}`);
+export function findTemplate(guild, name) {
+  const raw = setting(scopeOf(guild), `modele:${norm(name)}`);
+  if (!raw) throw new Error(`modèle introuvable : ${name}. Modèles : ${listTemplates(guild).map((t) => t.name).join(', ') || 'aucun'}`);
   return JSON.parse(raw);
 }
 

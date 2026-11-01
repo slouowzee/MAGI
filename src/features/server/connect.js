@@ -27,9 +27,9 @@ const HOOKS = {
   roles: { key: 'roles_channel' },
 };
 const SECURITY = { verification: 'filtre_arrivee', automod: 'automod' };
-const VERIFICATION = { aucune: GuildVerificationLevel.None, faible: GuildVerificationLevel.Low, moyenne: GuildVerificationLevel.Medium, elevee: GuildVerificationLevel.High, tres_elevee: GuildVerificationLevel.VeryHigh };
-const NOTIFICATIONS = { tout: GuildDefaultMessageNotifications.AllMessages, mentions: GuildDefaultMessageNotifications.OnlyMentions };
-const FILTER = { desactive: GuildExplicitContentFilter.Disabled, sans_role: GuildExplicitContentFilter.MembersWithoutRoles, tous: GuildExplicitContentFilter.AllMembers };
+const VERIFICATION = { __proto__: null, aucune: GuildVerificationLevel.None, faible: GuildVerificationLevel.Low, moyenne: GuildVerificationLevel.Medium, elevee: GuildVerificationLevel.High, tres_elevee: GuildVerificationLevel.VeryHigh };
+const NOTIFICATIONS = { __proto__: null, tout: GuildDefaultMessageNotifications.AllMessages, mentions: GuildDefaultMessageNotifications.OnlyMentions };
+const FILTER = { __proto__: null, desactive: GuildExplicitContentFilter.Disabled, sans_role: GuildExplicitContentFilter.MembersWithoutRoles, tous: GuildExplicitContentFilter.AllMembers };
 
 const community = (guild) => guild.features?.includes('COMMUNITY');
 const byName = (ctx, name) => ctx.channels.get(name) ?? ctx.guild.channels.cache.find((c) => c.name === name) ?? null;

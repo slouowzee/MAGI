@@ -90,7 +90,6 @@ test('Hall of Fame : carte enrichie avec auteur, contexte, galerie de 4 médias 
   };
   const parent = { content: 't’as vu sa tête quand il a perdu ?', author: { username: 'yui' }, member: { displayName: 'Yui' }, attachments: new Collection(), embeds: [] };
   const card = starCard(message, { count: 12, emoji: '🔥', parent }).toJSON();
-  const shown = JSON.stringify(card);
   assert.equal(card.accent_color, 0xd85a30);
   assert.equal(card.components[0].components.length, 1);
   assert.match(card.components[0].components[0].content, /^### 🔥 12 · Miss Fortune\n-# <#c> · <t:1793000000:f>\n-# ↪ Yui : t’as vu sa tête quand il a perdu \?\nLa réaction \?$/);
@@ -245,4 +244,14 @@ test('Hall of Fame : emoji réglable, emoji du serveur reconnu par son identifia
   assert.equal(parseEmoji(' 🏆 '), '🏆');
   assert.equal(parseEmoji('<a:dance:123456789012345678>'), '<a:dance:123456789012345678>');
   assert.equal(parseEmoji('trophée'), null);
+});
+
+test('tickets : seuls les fils non archivés de la personne comptent', async () => {
+  const { openTickets } = await import('./tickets.js');
+  const guild = { id: 'g-tickets', channels: { cache: new Map([['t1', { archived: false }], ['t2', { archived: true }], ['t3', { archived: false }]]) } };
+  setSetting(guild.id, 'ticket:t1', 'lea');
+  setSetting(guild.id, 'ticket:t2', 'lea');
+  setSetting(guild.id, 'ticket:t3', 'tom');
+  setSetting(guild.id, 'ticket:supprime', 'lea');
+  assert.equal(openTickets(guild, 'lea').length, 1);
 });

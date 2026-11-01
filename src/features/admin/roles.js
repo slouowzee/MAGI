@@ -16,6 +16,7 @@ export const ROLE_TOOLS = [
     description: 'Crée un rôle, avec une couleur et des permissions parmi la liste autorisée. Pour plusieurs rôles, un appel par rôle.',
     parameters: { type: 'object', properties: { nom: { type: 'string' }, couleur: { type: 'string', description: '#RRGGBB' }, permissions: permList, mentionnable: { type: 'boolean' } }, required: ['nom'] },
     access: 'operator',
+    confirm: ({ args }) => (args.permissions?.length ? `Créer ${args.nom} avec des permissions` : null),
     async run({ guild, args, reason }) {
       const hex = color(args.couleur);
       const role = await guild.roles.create({ name: String(args.nom), colors: hex ? { primaryColor: hex } : undefined, permissions: permissionBits(args.permissions ?? []), mentionable: Boolean(args.mentionnable), reason });
@@ -27,6 +28,7 @@ export const ROLE_TOOLS = [
     description: "Modifie le nom, la couleur ou les permissions d'un rôle (les permissions données remplacent les anciennes).",
     parameters: { type: 'object', properties: { ...roleArg, nom: { type: 'string' }, couleur: { type: 'string' }, permissions: permList }, required: ['role'] },
     access: 'operator',
+    confirm: ({ guild, args }) => (args.permissions ? `Changer les permissions de ${targetRole(guild, args.role).name}` : null),
     async run({ guild, args, reason }) {
       const role = targetRole(guild, args.role);
       const edit = { reason };

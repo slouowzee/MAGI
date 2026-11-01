@@ -7,7 +7,7 @@ const countPending = db.query('SELECT count(*) AS n FROM reminders WHERE guild_i
 const insert = db.query('INSERT INTO reminders (guild_id, channel_id, user_id, text, due_at, persona, message_id) VALUES (?, ?, ?, ?, ?, ?, ?)');
 const selectDue = db.query('SELECT * FROM reminders WHERE done = 0 AND due_at <= ? ORDER BY due_at');
 const selectPending = db.query('SELECT id, text, due_at FROM reminders WHERE guild_id = ? AND user_id = ? AND done = 0 ORDER BY due_at');
-const close = db.query('UPDATE reminders SET done = 1 WHERE id = ?');
+const close = db.query('UPDATE reminders SET done = 1 WHERE id = ? AND done = 0');
 const cancel = db.query('UPDATE reminders SET done = 1 WHERE id = ? AND guild_id = ? AND user_id = ? AND done = 0');
 
 export function addReminder({ guildId, channelId, userId, text, dueAt, persona = null, messageId = null }, now = Date.now()) {
@@ -24,7 +24,7 @@ export function dueReminders(now = Date.now()) {
 }
 
 export function markDone(id) {
-  close.run(id);
+  return close.run(id).changes > 0;
 }
 
 export function pendingReminders(guildId, userId) {

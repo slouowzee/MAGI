@@ -6,6 +6,7 @@ import { describe, displayName } from '../../core/discord/history.js';
 import { chat, forReply } from '../../core/llm/client.js';
 import { buildMessages, cleanReply, MAX_TOKENS } from '../../core/llm/prompts.js';
 import { log } from '../../core/log/log.js';
+import { discordTime } from '../../core/util.js';
 
 export const EMOJI_CHOICES = { '🔥': 'Flamme', '⭐': 'Étoile', '🏆': 'Trophée', '💯': 'Cent', '❤️': 'Cœur', '👑': 'Couronne', '✨': 'Étincelles', '😂': 'Rire' };
 const DEFAULT = '🔥';
@@ -14,6 +15,8 @@ const HEAT = [[25, 0xa32d2d], [15, 0xe24b4a], [10, 0xd85a30], [5, 0xef9f27], [0,
 export const heat = (count) => HEAT.find(([min]) => count >= min)[1];
 const MAX_MEDIA = 4;
 const REFRESH_DELAY = 3_000;
+const CLAIMED = 'en cours';
+const CLAIM_TTL = 5 * 60_000;
 const refreshing = new Map();
 const text = (content) => new TextDisplayBuilder().setContent(content);
 const clip = (value, max) => (value.length > max ? `${value.slice(0, max - 1)}…` : value);
@@ -25,8 +28,8 @@ export function sameEmoji(emoji, configured) {
   return custom ? emoji.id === custom[1] : !emoji.id && bare(emoji.name) === bare(configured);
 }
 
-export function parseEmoji(text) {
-  const value = String(text ?? '').trim();
+export function parseEmoji(raw) {
+  const value = String(raw ?? '').trim();
   if (/^<a?:\w{2,32}:\d{17,20}>$/.test(value)) return value;
   if (/^\p{Extended_Pictographic}/u.test(value) && !/\s/.test(value) && [...value].length <= 8) return value;
   return null;
@@ -39,7 +42,7 @@ export function starCard(message, { count, emoji, parent = null }) {
   ].slice(0, MAX_MEDIA);
   const content = media.length && /^https?:\/\/\S+$/.test(message.content.trim()) ? '' : message.content.trim();
   const body = content || (media.length ? '' : describe(message));
-  const header = `### ${emoji} ${count} · ${displayName(message)}\n-# <#${message.channel.id}> · <t:${Math.floor(message.createdTimestamp / 1000)}:f>`;
+  const header = `### ${emoji} ${count} · ${displayName(message)}\n-# <#${message.channel.id}> · ${discordTime(message.createdTimestamp, 'f')}`;
   const avatar = message.member?.displayAvatarURL?.({ size: 128 }) ?? message.author.displayAvatarURL?.({ size: 128 });
   const lines = text([header, parent && `-# ↪ ${displayName(parent)} : ${clip(describe(parent).replace(/\s+/g, ' '), 120)}`, body && clip(body, 3000)].filter(Boolean).join('\n'));
   const card = new ContainerBuilder().setAccentColor(heat(count));
@@ -80,11 +83,13 @@ export async function handleStar(reaction, { added = true } = {}) {
   const guild = message?.guild;
   if (!guild || !moduleEnabled(guild.id, 'etoiles') || message.author?.id === guild.client.user.id) return;
   const entry = setting(guild.id, `star:${message.id}`);
-  if (entry) return entry === 'en cours' ? undefined : scheduleRefresh(guild, message, entry);
+  const claimed = entry?.startsWith(CLAIMED);
+  if (entry && !claimed) return scheduleRefresh(guild, message, entry);
+  if (claimed && Date.now() - Number(entry.split(':')[1]) < CLAIM_TTL) return;
   const wall = channelSetting(guild, 'stars_channel');
   if (!added || !wall || message.channel.id === wall.id) return;
   if (reaction.count < (setting(guild.id, 'stars_test') ? 1 : Number(option(guild.id, 'stars_threshold')))) return;
-  setSetting(guild.id, `star:${message.id}`, 'en cours');
+  setSetting(guild.id, `star:${message.id}`, `${CLAIMED}:${Date.now()}`);
   const persona = activePersonas(guild.id).includes('casper') ? 'casper' : activePersonas(guild.id)[0];
   const STAR = wallEmoji(guild.id);
   let comment = `${reaction.count} ${STAR} pour ${displayName(message)}.`;
@@ -92,7 +97,9 @@ export async function handleStar(reaction, { added = true } = {}) {
     const prompt = `Ce message de ${displayName(message)} vient d'entrer au Hall of Fame du serveur avec ${reaction.count} ${STAR} :\n« ${describe(message).slice(0, 800)} »\nCommente-le en une phrase, avec ta voix.`;
     const { content } = await chat({ messages: buildMessages(persona, [{ role: 'user', content: prompt }], 'courte'), options: { num_predict: MAX_TOKENS.courte }, ...forReply() });
     comment = cleanReply(content) || comment;
-  } catch {}
+  } catch (err) {
+    log.info('etoiles', `commentaire de repli : ${err.message}`, { guild });
+  }
   const parent = message.reference?.messageId ? await message.fetchReference().catch(() => null) : null;
   const card = starCard(message, { count: reaction.count, emoji: STAR, parent });
   const posted = await speak(wall, persona, undefined, { components: [text(comment), card], flags: MessageFlags.IsComponentsV2 }).catch((err) => {

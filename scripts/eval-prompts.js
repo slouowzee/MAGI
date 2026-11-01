@@ -94,22 +94,12 @@ async function run(persona) {
   const times = [];
   let rewritten = 0;
   for (const text of MESSAGES) {
-    const register = registerOf(text);
-    const extra = [examplesNote('banc', persona, register, Math.random, text), repetitionNote('banc', persona)].filter(Boolean).join('\n');
-    const messages = buildMessages(persona, [{ role: 'user', content: conversationPrompt([`slou : ${text}`], 'slou') }], 'courte', extra);
     const started = performance.now();
-    let reply = await chat({ messages, options: { num_predict: MAX_TOKENS.courte }, ...forReply() }).catch((err) => ({ content: `ÉCHEC : ${err.message}`, model: '-' }));
-    const stale = staleness('banc', persona, cleanReply(reply.content));
-    if (stale) {
-      rewritten++;
-      const retry = await chat({ messages: [...messages, { role: 'assistant', content: reply.content }, { role: 'user', content: `Réécris ta réponse autrement : ${stale}. Même idée si elle est bonne, mais d'autres mots et une autre construction, sans reprendre aucune de tes réponses précédentes.` }], options: { num_predict: MAX_TOKENS.courte }, ...forReply() }).catch(() => null);
-      if (retry?.content?.trim() && acceptable('banc', persona, cleanReply(retry.content))) reply = retry;
-    }
+    const { cleaned, register, model, stale } = await reply(persona, text, [`slou : ${text}`]);
     const seconds = (performance.now() - started) / 1000;
     times.push(seconds);
-    const cleaned = cleanReply(reply.content);
-    rememberReply('banc', persona, cleaned);
-    lines.push(`[${register}] « ${text} »\n  → ${cleaned}  (${reply.model}, ${seconds.toFixed(1)} s${stale ? ', réécrite' : ''})`);
+    if (stale) rewritten++;
+    lines.push(`[${register}] « ${text} »\n  → ${cleaned}  (${model}, ${seconds.toFixed(1)} s${stale ? ', réécrite' : ''})`);
   }
   times.sort((a, b) => a - b);
   lines.push(`${times.length} réponses, médiane ${times[Math.floor(times.length / 2)].toFixed(1)} s, max ${times.at(-1).toFixed(1)} s, ${rewritten} réécrite(s)`);

@@ -7,7 +7,6 @@ export function statusSection(guild) {
   const items = settingList(guild.id, 'presence_items').filter((key) => PRESENCE_ITEMS[key]);
   const chosen = items.length ? items : Object.keys(PRESENCE_ITEMS);
   const night = option(guild.id, 'presence_night');
-  const idle = option(guild.id, 'presence_idle');
   return [
     feature(guild, 'statut', `${chosen.length} info(s) en rotation · veille ${night === 'aucune' ? 'jamais la nuit' : `de ${night.replace('-', ' h à ')} h`}`),
     separator(),

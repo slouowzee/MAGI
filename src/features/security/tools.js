@@ -2,6 +2,7 @@ import { auditReport } from './audit.js';
 import { backupGuild, missingFrom, restore } from './backup.js';
 import { disableHoneypot, enableHoneypot, honeypotOf } from './honeypot.js';
 import { latestBackup } from './backup-store.js';
+import { discordTime } from '../../core/util.js';
 
 export const SECURITY_TOOLS = [
   {
@@ -63,7 +64,7 @@ export const SECURITY_TOOLS = [
       const backup = latestBackup(guild.id);
       if (!backup) return 'Aucune sauvegarde pour ce serveur.';
       const { roles, channels } = await restore(guild, backup.data, reason);
-      return `Restauration depuis la sauvegarde du <t:${Math.floor(backup.createdAt / 1000)}:f> : ${roles} rôle(s) et ${channels} salon(s) recréés. Les rôles recréés sont en bas de la liste, à replacer à la main si besoin.`;
+      return `Restauration depuis la sauvegarde du ${discordTime(backup.createdAt, 'f')} : ${roles} rôle(s) et ${channels} salon(s) recréés. Les rôles recréés sont en bas de la liste, à replacer à la main si besoin.`;
     },
   },
 ];

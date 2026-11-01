@@ -1,6 +1,7 @@
 import { addSink, readable, severity, timestamp } from './log.js';
 import { logChannels } from '../installation.js';
 import { setting } from '../settings.js';
+import { discordTime } from '../util.js';
 
 export const DISCORD_LEVELS = {
   err: 'Erreurs seulement',
@@ -79,7 +80,7 @@ export function plain(text, guild) {
   return readable(text, guild).replaceAll(FENCE, "'''").replace(/\u001b/g, '');
 }
 
-const stamp = (at, style = 'T') => `<t:${Math.floor(new Date(at).getTime() / 1000)}:${style}>`;
+const stamp = (at, style) => discordTime(new Date(at).getTime(), style);
 const sanitize = (text) => text.replace(/\u001b\[[\d;]*m/g, '').replaceAll(FENCE, "'''").replace(/^(#{1,3} |-# |> )/gm, '\\$1');
 const clip = (line) => (line.length > LIMIT ? `${line.slice(0, LIMIT - 1)}…` : line);
 

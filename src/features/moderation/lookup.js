@@ -27,18 +27,18 @@ import { forgetToneOf, toneCountOf } from '../conversation/examples.js';
 import { moduleEnabled } from '../../core/config.js';
 import { gateRole } from '../security/gate.js';
 import { activeInfractions, casesOf, purgeMember, recordOf } from './store.js';
-import { excludedOf, KINDS, markPurged, sanctionOf } from './cases.js';
+import { KINDS, markPurged, sanctionOf } from './cases.js';
 import { log } from '../../core/log/log.js';
 import { decide } from './index.js';
 import { DURATIONS, mayPunish, parseDuration, PURGES, punish } from './manual.js';
+import { COLOR } from '../../core/discord/embeds.js';
+import { discordTime as stamp } from '../../core/util.js';
 
 const PREFIX = 'magi-look:';
-const COLOR = 0xd65c62;
 const WINDOW = 30 * 86_400_000;
 const KEY_PERMS = { Administrator: 'Administrateur', ManageGuild: 'Gérer le serveur', ManageRoles: 'Gérer les rôles', ManageChannels: 'Gérer les salons', ManageMessages: 'Gérer les messages', BanMembers: 'Bannir', KickMembers: 'Expulser', ModerateMembers: 'Exclure' };
 const ephemeral = { flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } };
 const text = (content) => new TextDisplayBuilder().setContent(content.slice(0, 3900));
-const stamp = (ms, style = 'R') => `<t:${Math.floor(ms / 1000)}:${style}>`;
 const day = (ms) => stamp(ms, 'd');
 const clipList = (lines, max) => (lines.length > max ? [...lines.slice(0, max), `-# et ${lines.length - max} autre(s)`] : lines);
 

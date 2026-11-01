@@ -3,12 +3,14 @@ import { chat } from '../../core/llm/client.js';
 import { magiChannelIds, operatorRole } from '../../core/installation.js';
 import { PERMISSION_NAMES } from '../admin/resolve.js';
 import { styleBrief, styleName } from './styles.js';
+import { clamp } from '../../core/util.js';
 
 const PLAN_MODEL = () => process.env.GEMINI_PLAN_MODEL || 'gemini-3.5-flash';
-export const TYPES = { texte: ChannelType.GuildText, vocal: ChannelType.GuildVoice, annonces: ChannelType.GuildAnnouncement, forum: ChannelType.GuildForum };
+export const TYPES = { __proto__: null, texte: ChannelType.GuildText, vocal: ChannelType.GuildVoice, annonces: ChannelType.GuildAnnouncement, forum: ChannelType.GuildForum };
 const TYPE_NAMES = Object.fromEntries(Object.entries(TYPES).map(([k, v]) => [v, k]));
-export const ACCESS = { public: 'public', lecture: 'lecture seule', staff: 'staff', nsfw: '18+' };
+export const ACCESS = { __proto__: null, public: 'public', lecture: 'lecture seule', staff: 'staff', nsfw: '18+' };
 export const FUNCTIONS = {
+  __proto__: null,
   regles: 'règlement',
   annonces: 'annonces',
   accueil: 'bienvenue et départs',
@@ -22,6 +24,7 @@ export const FUNCTIONS = {
 const PUBLIC_FUNCTIONS = new Set(['regles', 'annonces', 'accueil', 'hall_of_fame', 'tickets', 'anniversaires', 'generateur_vocal', 'roles']);
 
 export const FEATURES = {
+  __proto__: null,
   hall_of_fame: 'Hall of Fame',
   tickets: 'Tickets',
   accueil: 'Bienvenue',
@@ -35,7 +38,7 @@ export const FEATURES = {
   verification: "Filtre à l'arrivée",
   automod: 'AutoMod',
 };
-export const SELF_SERVICE = { couleurs: 'Couleurs', notifications: 'Notifications', jeux: 'Jeux', interets: "Centres d'intérêt" };
+export const SELF_SERVICE = { __proto__: null, couleurs: 'Couleurs', notifications: 'Notifications', jeux: 'Jeux', interets: "Centres d'intérêt" };
 
 const channelItem = {
   type: 'object',
@@ -199,33 +202,33 @@ export function diffPlan(guild, plan, style, features = []) {
   const channels = structure(guild);
   const kindOf = (type) => (type === 'vocal' ? 'vocal' : 'texte');
   const top = guild.members.me.roles.highest.position;
-  for (const [ci, cat] of (plan.categories ?? []).entries()) {
+  for (const cat of plan.categories ?? []) {
     const name = styleName(cat, style, 'categorie');
     const existingCat = lookup(channels.filter((c) => c.type === ChannelType.GuildCategory), cat.existant, cat.nom, name);
-    const catRef = { name, id: existingCat?.id ?? null, index: ci };
+    const catRef = { name, id: existingCat?.id ?? null };
     const catAccess = ACCESS[cat.acces] ? cat.acces : 'public';
     if (!existingCat) ops.push({ kind: 'creer_categorie', category: catRef, access: catAccess });
     else {
       if (existingCat.name !== name) ops.push({ kind: 'renommer', id: existingCat.id, from: existingCat.name, to: name });
       if (catAccess !== 'public') ops.push({ kind: 'regler', id: existingCat.id, name, access: catAccess });
     }
-    for (const [si, ch] of (cat.salons ?? []).entries()) {
+    for (const ch of cat.salons ?? []) {
       const chName = styleName(ch, style, kindOf(ch.type));
       const wanted = ACCESS[ch.acces] ? ch.acces : catAccess;
       const visible = PUBLIC_FUNCTIONS.has(ch.fonction) && wanted === 'staff' ? (ch.type === 'vocal' ? 'public' : 'lecture') : wanted;
       const access = visible !== catAccess ? visible : null;
-      const settings = { slowmode: Math.min(Math.max(Number(ch.lent) || 0, 0), 21_600), limit: Math.min(Math.max(Number(ch.places) || 0, 0), 99), topic: ch.sujet?.trim() || null };
+      const settings = { slowmode: clamp(Number(ch.lent) || 0, 0, 21_600), limit: clamp(Number(ch.places) || 0, 0, 99), topic: ch.sujet?.trim() || null };
       const existing = lookup(channels.filter((c) => c.type !== ChannelType.GuildCategory), ch.existant, ch.nom, chName);
-      if (!existing) ops.push({ kind: 'creer_salon', category: catRef, name: chName, type: TYPES[ch.type] ?? ChannelType.GuildText, access, ...settings, index: si });
+      if (!existing) ops.push({ kind: 'creer_salon', category: catRef, name: chName, type: TYPES[ch.type] ?? ChannelType.GuildText, access, ...settings });
       else {
         if (existing.name !== chName) ops.push({ kind: 'renommer', id: existing.id, from: existing.name, to: chName });
-        if (existing.parentId !== catRef.id || !catRef.id) ops.push({ kind: 'deplacer', id: existing.id, name: chName, category: catRef, index: si });
+        if (existing.parentId !== catRef.id || !catRef.id) ops.push({ kind: 'deplacer', id: existing.id, name: chName, category: catRef });
         if (access || settings.slowmode || settings.limit) ops.push({ kind: 'regler', id: existing.id, name: chName, access, slowmode: settings.slowmode, limit: settings.limit });
       }
       if (FUNCTIONS[ch.fonction]) ops.push({ kind: 'fonction', fn: ch.fonction, channel: chName });
     }
   }
-  if (style.mode === 'creer') for (const c of missingFromPlan(guild, plan).filter((c) => c.type !== ChannelType.GuildCategory)) ops.push({ kind: 'archiver', id: c.id, name: c.name });
+  if (style.mode === 'creer') for (const gone of missingFromPlan(guild, plan).filter((c) => c.type !== ChannelType.GuildCategory)) ops.push({ kind: 'archiver', id: gone.id, name: gone.name });
 
   const allRoles = [...guild.roles.cache.values()].filter((r) => r.id !== guild.id);
   const editable = (r) => !r.managed && r.id !== operatorRole(guild)?.id && r.position < top;

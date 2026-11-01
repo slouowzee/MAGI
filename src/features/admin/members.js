@@ -1,4 +1,5 @@
 import { targetMember, targetRole } from './resolve.js';
+import { clamp } from '../../core/util.js';
 
 const memberArg = { membre: { type: 'string', description: 'Mention, identifiant ou pseudo.' } };
 const reasonArg = { raison: { type: 'string' } };
@@ -10,9 +11,12 @@ export const MEMBER_TOOLS = [
     description: 'Exclut temporairement un membre (il ne peut plus écrire ni parler), de 1 minute à 28 jours.',
     parameters: { type: 'object', properties: { ...memberArg, duree_minutes: { type: 'integer' }, ...reasonArg }, required: ['membre', 'duree_minutes'] },
     access: 'operator',
+    async confirm({ guild, args }) {
+      return `Exclure ${(await targetMember(guild, args.membre)).displayName}`;
+    },
     async run({ guild, args, reason }) {
       const m = await targetMember(guild, args.membre);
-      const minutes = Math.min(Math.max(Number(args.duree_minutes) || 10, 1), 28 * 24 * 60);
+      const minutes = clamp(Number(args.duree_minutes) || 10, 1, 28 * 24 * 60);
       await m.timeout(minutes * 60_000, why(reason, args));
       return `${m.displayName} est exclu temporairement pour ${minutes} minute(s).`;
     },
@@ -22,6 +26,9 @@ export const MEMBER_TOOLS = [
     description: "Lève l'exclusion temporaire d'un membre.",
     parameters: { type: 'object', properties: memberArg, required: ['membre'] },
     access: 'operator',
+    async confirm({ guild, args }) {
+      return `Lever l'exclusion de ${(await targetMember(guild, args.membre)).displayName}`;
+    },
     async run({ guild, args, reason }) {
       const m = await targetMember(guild, args.membre);
       await m.timeout(null, reason);
@@ -52,7 +59,7 @@ export const MEMBER_TOOLS = [
     },
     async run({ guild, args, reason }) {
       const m = await targetMember(guild, args.membre);
-      const days = Math.min(Math.max(Number(args.supprimer_messages_jours) || 0, 0), 7);
+      const days = clamp(Number(args.supprimer_messages_jours) || 0, 0, 7);
       await guild.members.ban(m, { reason: why(reason, args), deleteMessageSeconds: days * 86_400 });
       return `${m.displayName} a été banni${days ? `, messages des ${days} derniers jours supprimés` : ''}.`;
     },
@@ -62,6 +69,7 @@ export const MEMBER_TOOLS = [
     description: "Lève le bannissement d'un utilisateur (identifiant ou nom d'utilisateur).",
     parameters: { type: 'object', properties: { utilisateur: { type: 'string' } }, required: ['utilisateur'] },
     access: 'operator',
+    confirm: ({ args }) => `Débannir ${args.utilisateur}`,
     async run({ guild, args, reason }) {
       const bans = await guild.bans.fetch();
       const ref = String(args.utilisateur).replace(/^@/, '').toLowerCase();
@@ -87,6 +95,9 @@ export const MEMBER_TOOLS = [
     description: 'Donne un rôle à un membre.',
     parameters: { type: 'object', properties: { ...memberArg, role: { type: 'string' } }, required: ['membre', 'role'] },
     access: 'operator',
+    async confirm({ guild, args }) {
+      return `Donner ${targetRole(guild, args.role).name} à ${(await targetMember(guild, args.membre)).displayName}`;
+    },
     async run({ guild, args, reason }) {
       const m = await targetMember(guild, args.membre);
       const role = targetRole(guild, args.role);
@@ -99,6 +110,9 @@ export const MEMBER_TOOLS = [
     description: 'Retire un rôle à un membre.',
     parameters: { type: 'object', properties: { ...memberArg, role: { type: 'string' } }, required: ['membre', 'role'] },
     access: 'operator',
+    async confirm({ guild, args }) {
+      return `Retirer ${targetRole(guild, args.role).name} à ${(await targetMember(guild, args.membre)).displayName}`;
+    },
     async run({ guild, args, reason }) {
       const m = await targetMember(guild, args.membre);
       const role = targetRole(guild, args.role);

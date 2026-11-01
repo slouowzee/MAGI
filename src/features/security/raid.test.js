@@ -70,3 +70,26 @@ test('filtre : un nouveau salon est masqué aux non vérifiés, sauf le salon de
   await hideNewChannel(channel('verification', true));
   assert.deepEqual(edits, ['general']);
 });
+
+test('anti-raid : une arrivée pendant le verrouillage ne relance rien et tout est rouvert', async () => {
+  const everyone = { id: 'everyone' };
+  const channel = (id) => {
+    const cache = new Collection();
+    return { id, type: ChannelType.GuildText, parentId: null, permissionOverwrites: { cache, edit: async () => { await Bun.sleep(10); cache.set(everyone.id, { deny: { has: () => true } }); } } };
+  };
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f'];
+  const guild = { id: 'g-raid-double', ownerId: 'owner', roles: { everyone, cache: new Map() }, channels: { cache: new Collection(ids.map((id) => [id, channel(id)])) } };
+  setSetting(guild.id, 'raid_threshold', '5');
+  const alerts = [];
+  const detach = addSink((e) => e.component === 'antiraid' && e.guild?.id === guild.id && alerts.push(e));
+  const join = () => trackJoin({ guild }, now);
+  for (let i = 0; i < 4; i++) await join();
+  const first = join();
+  await Bun.sleep(25);
+  await Promise.all([first, join()]);
+  assert.equal(alerts.length, 1);
+  const { settingList } = await import('../../core/config.js');
+  assert.deepEqual(settingList(guild.id, 'raid_locked'), ids);
+  await unlock(guild, 'test');
+  detach();
+});

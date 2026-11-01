@@ -58,7 +58,7 @@ function normalize(text) {
     .replace(NAMES, ' ')
     .toLowerCase()
     .replace(/[’]/g, "'")
-    .replace(/[!?.,;:…~*_\-]+/g, ' ')
+    .replace(/[!?.,;:…~*_-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

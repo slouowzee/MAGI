@@ -18,7 +18,7 @@ import { restylePublications } from '../features/admin/publications.js';
 import { replaceInterventions } from '../features/conversation/interventions.js';
 import { setModerationMode } from '../features/moderation/store.js';
 import { setSetting, setting } from '../core/settings.js';
-import { moduleEnabled, MODULES, setActivePersonas, setModule, setMutedChannels, setSettingList } from '../core/config.js';
+import { moduleEnabled, MODULES, setActivePersonas, setModule, setSettingList } from '../core/config.js';
 import { installAndReport, isOperator, magiCategory, operatorRole } from '../core/installation.js';
 import { log } from '../core/log/log.js';
 import { COMMANDS, syncCommands } from '../features/commands/commands.js';
@@ -46,8 +46,8 @@ import { permissionsSection } from './pages/permissions.js';
 import { repliesSection } from './pages/reponses.js';
 import { forgetExample } from '../features/conversation/examples.js';
 import { debugActive, debugBlocks } from '../features/debug/console.js';
+import { COLOR } from '../core/discord/embeds.js';
 
-const COLOR = 0xd65c62;
 const DEBUG_COLOR = 0xef9f27;
 const V2 = MessageFlags.IsComponentsV2;
 
@@ -241,7 +241,7 @@ const resyncAutomod = (guild) => syncAutomod(guild).catch((err) => log.err('auto
 
 const APPLY = {
   personas: { page: 'personas', apply: (guild, values) => setActivePersonas(guild.id, values) },
-  muted: { page: 'personas', apply: (guild, values) => setMutedChannels(guild.id, values) },
+  muted: { page: 'personas', apply: (guild, values) => setSettingList(guild.id, 'muted_channels', values) },
   interventions: { page: 'conversation', apply: (guild, values) => replaceInterventions(guild.id, values) },
   stars_threshold: { page: 'communaute', apply: single('stars_threshold') },
   stars_channel: { page: 'communaute', apply: single('stars_channel') },
@@ -275,64 +275,100 @@ const APPLY = {
   server_features: { page: 'serveur', apply: (guild, values) => setSetting(guild.id, 'server_features', values.join(',') || 'aucune') },
 };
 
-export async function handlePanelInteraction(interaction) {
-  const { guild, member } = interaction;
-  const field = interaction.customId.slice(PREFIX.length);
-  const ephemeral = (content) => interaction.reply({ content: content.slice(0, 2000), flags: MessageFlags.Ephemeral, ...silent });
-  if (!isOperator(member)) return ephemeral('Ce panneau est réservé aux opérateurs MAGI.');
-  const show = (page) => showPage(interaction, page);
-  const changed = (summary) => log.notice('config', `${summary} par ${member.displayName}`, { guild });
+const NOT_EMOJI = 'Ce n\u2019est pas un emoji : colle un emoji, ou un emoji du serveur sous la forme <:nom:id> (tape \\:nom: dans Discord pour l\u2019obtenir).';
 
-  if (field === 'page' || field.startsWith('page:') || field.startsWith('goto:')) {
-    const page = field === 'page' ? interaction.values?.[0] : field.split(':')[1];
-    return pagesFor(guild).includes(page) ? show(page) : ephemeral(PAGES[page] ? 'Cette page n’est pas disponible.' : 'Page inconnue.');
+const pickEmoji = (field, page, title, summary) => async ({ interaction, guild, show, changed }) => {
+  const value = interaction.values?.[0];
+  if (value === 'autre') {
+    const input = new TextInputBuilder().setCustomId('emoji').setLabel('Emoji, ou emoji du serveur <:nom:id>').setStyle(TextInputStyle.Short).setMaxLength(60).setRequired(true);
+    return interaction.showModal(new ModalBuilder().setCustomId(id(`${field}_set`)).setTitle(title).addComponents(row(input)));
   }
-  if (SERVER_ACTIONS[field]) return SERVER_ACTIONS[field](interaction);
-  if (field === 'examples_good' || field === 'examples_bad') {
-    const value = interaction.values?.[0];
-    if (value === 'autre') {
-      const input = new TextInputBuilder().setCustomId('emoji').setLabel('Emoji, ou emoji du serveur <:nom:id>').setStyle(TextInputStyle.Short).setMaxLength(60).setRequired(true);
-      return interaction.showModal(new ModalBuilder().setCustomId(id(`${field}_set`)).setTitle(field === 'examples_good' ? 'Emoji pour ajouter une réponse' : 'Emoji pour retirer une réponse').addComponents(row(input)));
-    }
-    if (value !== 'actuel') setSetting(guild.id, field, value);
-    await show('reponses');
-    return value === 'actuel' ? null : changed(`emoji de la banque d'exemples (${field === 'examples_good' ? 'ajout' : 'retrait'}) = ${value}`);
-  }
-  if ((field === 'examples_good_set' || field === 'examples_bad_set') && interaction.isModalSubmit()) {
-    const emoji = parseEmoji(interaction.fields.getTextInputValue('emoji'));
-    if (!emoji) return ephemeral('Ce n’est pas un emoji : colle un emoji, ou un emoji du serveur sous la forme <:nom:id> (tape \\:nom: dans Discord pour l’obtenir).');
-    const key = field.slice(0, -'_set'.length);
-    setSetting(guild.id, key, emoji);
-    await show('reponses');
-    return changed(`emoji de la banque d'exemples (${key === 'examples_good' ? 'ajout' : 'retrait'}) = ${emoji}`);
-  }
-  if (field === 'tone_forget') {
-    const removed = forgetExample(guild.id, Number(interaction.values?.[0]));
-    await show('reponses');
-    return removed ? changed('message retiré du ton du serveur') : null;
-  }
-  if (field === 'examples_forget') {
-    const removed = forgetExample(guild.id, Number(interaction.values?.[0]));
-    await show('reponses');
-    return removed ? changed('réponse retirée de la banque d’exemples') : null;
-  }
-  if (field === 'stars_emoji') {
-    const value = interaction.values?.[0];
-    if (value === 'autre') {
-      const input = new TextInputBuilder().setCustomId('emoji').setLabel('Emoji, ou emoji du serveur <:nom:id>').setStyle(TextInputStyle.Short).setMaxLength(60).setRequired(true);
-      return interaction.showModal(new ModalBuilder().setCustomId(id('stars_emoji_set')).setTitle('Emoji du Hall of Fame').addComponents(row(input)));
-    }
-    if (value !== 'actuel') setSetting(guild.id, 'stars_emoji', value);
-    await show('communaute');
-    return value === 'actuel' ? null : changed(`emoji du Hall of Fame = ${value}`);
-  }
-  if (field === 'synchro_palier') {
-    const threshold = interaction.values?.[0];
+  if (value !== 'actuel') setSetting(guild.id, field, value);
+  await show(page);
+  return value === 'actuel' ? null : changed(summary(value));
+};
+
+const saveEmoji = (field, page, summary) => async ({ interaction, guild, show, changed, ephemeral }) => {
+  const emoji = parseEmoji(interaction.fields.getTextInputValue('emoji'));
+  if (!emoji) return ephemeral(NOT_EMOJI);
+  setSetting(guild.id, field, emoji);
+  await show(page);
+  return changed(summary(emoji));
+};
+
+const forget = (summary) => async ({ interaction, guild, show, changed }) => {
+  const removed = forgetExample(guild.id, Number(interaction.values?.[0]));
+  await show('reponses');
+  return removed ? changed(summary) : null;
+};
+
+const goodEmojiSummary = (value) => `emoji de la banque d'exemples (ajout) = ${value}`;
+const badEmojiSummary = (value) => `emoji de la banque d'exemples (retrait) = ${value}`;
+const starsEmojiSummary = (value) => `emoji du Hall of Fame = ${value}`;
+
+const FIELD_ACTIONS = {
+  __proto__: null,
+  examples_good: pickEmoji('examples_good', 'reponses', 'Emoji pour ajouter une r\u00E9ponse', goodEmojiSummary),
+  examples_bad: pickEmoji('examples_bad', 'reponses', 'Emoji pour retirer une r\u00E9ponse', badEmojiSummary),
+  examples_good_set: saveEmoji('examples_good', 'reponses', goodEmojiSummary),
+  examples_bad_set: saveEmoji('examples_bad', 'reponses', badEmojiSummary),
+  stars_emoji: pickEmoji('stars_emoji', 'communaute', 'Emoji du Hall of Fame', starsEmojiSummary),
+  stars_emoji_set: saveEmoji('stars_emoji', 'communaute', starsEmojiSummary),
+  tone_forget: forget('message retir\u00E9 du ton du serveur'),
+  examples_forget: forget('r\u00E9ponse retir\u00E9e de la banque d\u2019exemples'),
+  synchro_palier({ interaction, guild }) {
     interaction.message?.edit(panelPage(guild)).catch(() => {});
-    return interaction.showModal(milestoneModal(guild, threshold));
-  }
-  if (field.startsWith('synchro_palier_set:') && interaction.isModalSubmit()) {
-    const threshold = Number(field.split(':')[1]);
+    return interaction.showModal(milestoneModal(guild, interaction.values?.[0]));
+  },
+  async digest({ guild, show, changed }) {
+    const on = setting(guild.id, 'digest') === 'off';
+    setSetting(guild.id, 'digest', on ? 'on' : 'off');
+    await show('logs');
+    return changed(`résumé quotidien ${on ? 'activé' : 'coupé'}`);
+  },
+  automod_allow({ interaction, guild }) {
+    const input = new TextInputBuilder().setCustomId('mots').setLabel('Un mot ou une expression par ligne').setStyle(TextInputStyle.Paragraph).setMaxLength(4000).setRequired(false);
+    const current = automodAllowList(guild.id).join('\n');
+    if (current) input.setValue(current);
+    return interaction.showModal(new ModalBuilder().setCustomId(id('automod_allow_set')).setTitle('Liste blanche AutoMod').addComponents(row(input)));
+  },
+  async automod_allow_set({ interaction, guild, show, changed }) {
+    const words = setAutomodAllowList(guild.id, interaction.fields.getTextInputValue('mots'));
+    resyncAutomod(guild);
+    await show('automod');
+    return changed(`liste blanche AutoMod = ${words.length} mot(s)`);
+  },
+  audit: ({ guild, ephemeral }) => ephemeral(auditReport(guild)),
+  async tickets_post({ guild, show, changed, ephemeral }) {
+    const posted = await postTicketPanel(guild).catch((err) => err);
+    if (posted instanceof Error) return ephemeral(`Impossible : ${posted.message}.`);
+    await show('services');
+    return changed(`panneau de tickets publié dans ${posted.channel}`);
+  },
+  async voice_hub_create({ guild, show, changed }) {
+    const hub = await createHub(guild);
+    await show('services');
+    return changed(`salon générateur ${hub} créé`);
+  },
+  async backup({ guild, show, changed }) {
+    backupGuild(guild);
+    await show('securite');
+    return changed('structure sauvegard\u00E9e');
+  },
+  async honeypot({ guild, member, show, changed }) {
+    const reason = `MAGI, demandé par ${member.user.tag}`;
+    const existed = Boolean(honeypotOf(guild));
+    if (existed) await disableHoneypot(guild, reason);
+    else await enableHoneypot(guild, reason);
+    resyncAutomod(guild);
+    await show('securite');
+    return changed(existed ? 'honeypot supprim\u00E9' : 'honeypot cr\u00E9\u00E9');
+  },
+};
+
+const PREFIXED_ACTIONS = {
+  async 'synchro_palier_set:'({ interaction, guild, show, changed, ephemeral }, rest) {
+    const threshold = Number(rest);
     const message = interaction.fields.getTextInputValue('message');
     const roleId = interaction.fields.getSelectedRoles('role', false)?.first()?.id ?? null;
     try {
@@ -343,22 +379,8 @@ export async function handlePanelInteraction(interaction) {
     orderMilestoneRoles(guild).catch((err) => log.err('synchro', `échec du rangement des rôles de palier : ${err.message}`, { guild }));
     await show('communaute');
     return changed(`palier ${threshold} % : ${roleId ? `<@&${roleId}>` : 'sans rôle'}, ${message.trim() ? 'message perso' : 'message par défaut'}`);
-  }
-  if (field === 'stars_emoji_set' && interaction.isModalSubmit()) {
-    const emoji = parseEmoji(interaction.fields.getTextInputValue('emoji'));
-    if (!emoji) return ephemeral('Ce n’est pas un emoji : colle un emoji, ou un emoji du serveur sous la forme <:nom:id> (tape \\:nom: dans Discord pour l’obtenir).');
-    setSetting(guild.id, 'stars_emoji', emoji);
-    await show('communaute');
-    return changed(`emoji du Hall of Fame = ${emoji}`);
-  }
-  if (field === 'digest') {
-    const on = setting(guild.id, 'digest') === 'off';
-    setSetting(guild.id, 'digest', on ? 'on' : 'off');
-    await show('logs');
-    return changed(`résumé quotidien ${on ? 'activé' : 'coupé'}`);
-  }
-  if (field.startsWith('module:')) {
-    const key = field.slice('module:'.length);
+  },
+  async 'module:'({ guild, show, changed, ephemeral }, key) {
     if (!MODULES[key]) return ephemeral('Module inconnu.');
     const on = !moduleEnabled(guild.id, key);
     setModule(guild.id, key, on);
@@ -367,59 +389,41 @@ export async function handlePanelInteraction(interaction) {
     if (key === 'filtre_arrivee') ensureGate(guild).catch((err) => log.err('filtre', `échec mise en place du filtre : ${err.message}`, { guild }));
     await show(pageOf(key));
     return changed(`${MODULES[key]} ${on ? 'activé' : 'coupé'}`);
-  }
-  if (field.startsWith('persona_ch:')) {
-    const persona = field.slice('persona_ch:'.length);
+  },
+  async 'persona_ch:'({ interaction, guild, show, changed, ephemeral }, persona) {
     if (!PERSONAS[persona]) return ephemeral('Persona inconnue.');
-    setSettingList(guild.id, `persona_channels:${persona}`, interaction.values ?? []);
+    const values = interaction.values ?? [];
+    setSettingList(guild.id, `persona_channels:${persona}`, values);
     await show('personas');
-    return changed(`salons de ${PERSONAS[persona].name} = ${(interaction.values ?? []).map((v) => `<#${v}>`).join(', ') || 'aucun'}`);
+    return changed(`salons de ${PERSONAS[persona].name} = ${values.map((v) => `<#${v}>`).join(', ') || 'aucun'}`);
+  },
+};
+
+async function applyField({ interaction, guild, show, changed }, field) {
+  const { page, apply } = APPLY[field];
+  apply(guild, interaction.values ?? []);
+  if (field.startsWith('automod_')) resyncAutomod(guild);
+  await show(page);
+  const values = (interaction.values ?? []).map((v) => (interaction.isChannelSelectMenu?.() ? `<#${v}>` : v));
+  return changed(`${FIELD_LABELS[field] ?? field} = ${values.join(', ') || 'aucun'}`);
+}
+
+export async function handlePanelInteraction(interaction) {
+  const { guild, member } = interaction;
+  const field = interaction.customId.slice(PREFIX.length);
+  const ephemeral = (content) => interaction.reply({ content: content.slice(0, 2000), flags: MessageFlags.Ephemeral, ...silent });
+  if (!isOperator(member)) return ephemeral('Ce panneau est r\u00E9serv\u00E9 aux op\u00E9rateurs MAGI.');
+  const show = (page) => showPage(interaction, page);
+  const changed = (summary) => log.notice('config', `${summary} par ${member.displayName}`, { guild });
+  const ctx = { interaction, guild, member, ephemeral, show, changed };
+  if (field === 'page' || field.startsWith('page:') || field.startsWith('goto:')) {
+    const page = field === 'page' ? interaction.values?.[0] : field.split(':')[1];
+    return pagesFor(guild).includes(page) ? show(page) : ephemeral(PAGES[page] ? 'Cette page n\u2019est pas disponible.' : 'Page inconnue.');
   }
-  if (APPLY[field]) {
-    const { page, apply } = APPLY[field];
-    apply(guild, interaction.values ?? []);
-    if (field.startsWith('automod_')) resyncAutomod(guild);
-    await show(page);
-    const values = (interaction.values ?? []).map((v) => (interaction.isChannelSelectMenu?.() ? `<#${v}>` : v));
-    return changed(`${FIELD_LABELS[field] ?? field} = ${values.join(', ') || 'aucun'}`);
-  }
-  if (field === 'automod_allow') {
-    const input = new TextInputBuilder().setCustomId('mots').setLabel('Un mot ou une expression par ligne').setStyle(TextInputStyle.Paragraph).setMaxLength(4000).setRequired(false);
-    const current = automodAllowList(guild.id).join('\n');
-    if (current) input.setValue(current);
-    return interaction.showModal(new ModalBuilder().setCustomId(id('automod_allow_set')).setTitle('Liste blanche AutoMod').addComponents(row(input)));
-  }
-  if (field === 'automod_allow_set' && interaction.isModalSubmit()) {
-    const words = setAutomodAllowList(guild.id, interaction.fields.getTextInputValue('mots'));
-    resyncAutomod(guild);
-    await show('automod');
-    return changed(`liste blanche AutoMod = ${words.length} mot(s)`);
-  }
-  if (field === 'audit') return ephemeral(auditReport(guild));
-  if (field === 'tickets_post') {
-    const posted = await postTicketPanel(guild).catch((err) => err);
-    if (posted instanceof Error) return ephemeral(`Impossible : ${posted.message}.`);
-    await show('services');
-    return changed(`panneau de tickets publié dans ${posted.channel}`);
-  }
-  if (field === 'voice_hub_create') {
-    const hub = await createHub(guild);
-    await show('services');
-    return changed(`salon générateur ${hub} créé`);
-  }
-  if (field === 'backup') {
-    backupGuild(guild);
-    await show('securite');
-    return changed('structure sauvegardée');
-  }
-  if (field === 'honeypot') {
-    const reason = `MAGI, demandé par ${member.user.tag}`;
-    const existed = Boolean(honeypotOf(guild));
-    if (existed) await disableHoneypot(guild, reason);
-    else await enableHoneypot(guild, reason);
-    resyncAutomod(guild);
-    await show('securite');
-    return changed(existed ? 'honeypot supprimé' : 'honeypot créé');
-  }
-  return ephemeral('Réglage inconnu.');
+  if (SERVER_ACTIONS[field]) return SERVER_ACTIONS[field](interaction);
+  if (FIELD_ACTIONS[field]) return FIELD_ACTIONS[field](ctx);
+  const prefix = Object.keys(PREFIXED_ACTIONS).find((key) => field.startsWith(key));
+  if (prefix) return PREFIXED_ACTIONS[prefix](ctx, field.slice(prefix.length));
+  if (APPLY[field]) return applyField(ctx, field);
+  return ephemeral('R\u00E9glage inconnu.');
 }

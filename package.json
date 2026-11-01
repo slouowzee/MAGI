@@ -6,10 +6,16 @@
   "scripts": {
     "start": "bun src/index.js",
     "test": "bun test",
-    "eval": "bun scripts/eval-prompts.js"
+    "eval": "bun scripts/eval-prompts.js",
+    "lint": "eslint src scripts"
   },
   "dependencies": {
     "discord.js": "14.27.0",
     "fortunememory": "1.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "eslint": "9.39.5",
+    "globals": "15.15.0"
   }
 }

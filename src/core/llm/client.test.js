@@ -290,3 +290,32 @@ test('image : un modèle sans vision attend et ne met pas en pause ceux qui voie
   assert.deepEqual(calls, ['gemini']);
   clearPauses();
 });
+
+test('choose refuse un choix hors de la liste', async () => {
+  process.env.GEMINI_API_KEY = 'test';
+  const { clearPauses } = await import('./client.js');
+  clearPauses();
+  geminiResponse = () => ok('{"choix":"hors_enum"}');
+  await assert.rejects(choose({ messages: [{ role: 'user', content: 'x' }], choices: ['a', 'b'] }), LLMUnavailable);
+});
+
+test('délai dépassé avec des candidats non lancés : chat échoue au lieu de rester bloqué', async () => {
+  const { clearPauses } = await import('./client.js');
+  clearPauses();
+  process.env.GEMINI_API_KEY = 'test';
+  process.env.MISTRAL_API_KEY = 'test';
+  process.env.GROQ_API_KEY = 'test';
+  const start = Date.now();
+  geminiResponse = () => (Date.now() - start < 1_000 ? new Response('saturé', { status: 503 }) : new Promise(() => {}));
+  otherResponse = () => new Response('saturé', { status: 503 });
+  const outcome = await Promise.race([
+    chat({ messages: [{ role: 'user', content: 'x' }], timeoutMs: 3_000 }).then(() => 'réponse', (err) => err),
+    Bun.sleep(6_000).then(() => 'bloqué'),
+  ]);
+  delete process.env.MISTRAL_API_KEY;
+  delete process.env.GROQ_API_KEY;
+  clearPauses();
+  geminiResponse = () => ok('gemini ok');
+  otherResponse = (url) => ok(String(url).includes('mistral') ? 'mistral ok' : 'groq ok');
+  assert.ok(outcome instanceof LLMUnavailable, String(outcome));
+}, 10_000);

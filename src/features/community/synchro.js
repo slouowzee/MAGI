@@ -4,7 +4,7 @@ import { saveSynchro, synchroOf } from './store.js';
 import { listSettings, setSetting, setting } from '../../core/settings.js';
 import { speak } from '../../core/discord/webhooks.js';
 import { log } from '../../core/log/log.js';
-import { DANGEROUS } from '../admin/role-panels.js';
+import { isDangerous } from '../admin/role-panels.js';
 
 const COOLDOWN = 60_000;
 const NOTICE_TTL = 30_000;
@@ -21,7 +21,7 @@ export function setMilestone(guild, threshold, { message = '', roleId = null }) 
   if (!MILESTONES.includes(threshold)) throw new Error(`palier inconnu, choisis parmi ${MILESTONES.join(', ')} %`);
   const role = roleId && guild.roles.cache.get(roleId);
   if (roleId && !role) throw new Error('rôle introuvable');
-  if (role && DANGEROUS.some((p) => role.permissions.has(p, false))) throw new Error(`${role.name} donne des permissions de gestion ou de modération`);
+  if (role && isDangerous(role)) throw new Error(`${role.name} donne des permissions de gestion ou de modération`);
   if (role && !role.editable) throw new Error(`${role.name} est au-dessus du rôle de MAGI`);
   const roles = paliers(guild.id);
   const messages = milestoneMessages(guild.id);

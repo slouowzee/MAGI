@@ -6,7 +6,7 @@ process.env.DB_PATH = ':memory:';
 const { openPanel, panelPage } = await import('./index.js');
 const { setSetting, setting } = await import('../core/settings.js');
 const { alerts, PAGE_MODULES } = await import('./ui.js');
-const { MODULES, setModules, setMutedChannels } = await import('../core/config.js');
+const { MODULES, setModules, setSettingList } = await import('../core/config.js');
 
 const guild = { id: 'panel-test', client: { user: { id: '1' } }, members: { me: { permissions: new PermissionsBitField() } }, channels: { cache: new Collection() } };
 const pages = ['accueil', 'conversation', 'statut', 'personas', 'reponses', 'communaute', 'services', 'arrivees', 'securite', 'automod', 'serveur', 'logs', 'permissions'];
@@ -14,7 +14,7 @@ const pages = ['accueil', 'conversation', 'statut', 'personas', 'reponses', 'com
 const walk = (node) => [node, ...(node.components ?? []).flatMap(walk), ...(node.accessory ? [node.accessory] : [])];
 
 test('chaque page tient dans les limites de Components V2, avec la navigation', () => {
-  setMutedChannels('panel-test', ['111111111111111111']);
+  setSettingList('panel-test', 'muted_channels', ['111111111111111111']);
   for (const [i, name] of pages.entries()) {
     const { components, flags } = panelPage(guild, name, { live: true });
     assert.equal(flags, MessageFlags.IsComponentsV2);

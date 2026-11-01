@@ -24,7 +24,7 @@ export function readConfig(text) {
   } catch {
     throw new Error("ce fichier n'est pas du JSON");
   }
-  if (data?.format !== 'magi-config' || typeof data.settings !== 'object') throw new Error("ce n'est pas un export de configuration MAGI");
+  if (data?.format !== 'magi-config' || !data.settings || typeof data.settings !== 'object') throw new Error("ce n'est pas un export de configuration MAGI");
   return data;
 }
 

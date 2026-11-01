@@ -1,4 +1,5 @@
 export const PRESETS = {
+  __proto__: null,
   libre: { label: 'Libre (selon la consigne)', brief: '' },
   gaming: { label: 'Gaming', brief: "Serveur de jeux : annonces, discussion générale, un salon par jeu principal, recherche de coéquipiers, clips et captures, vocaux de jeu avec places limitées, rôles par jeu en libre-service, notifications d'événements." },
   communaute: { label: 'Communauté chill', brief: 'Communauté détendue : accueil, présentations, discussion, médias, mèmes, musique, jeux, vocaux pour traîner, rôles de couleurs et de centres d’intérêt.' },
@@ -13,8 +14,8 @@ export const PRESETS = {
 export const SEPARATORS = { point: '・', barre: '┃', fine: '︱', chevron: '»', tiret: '-' };
 export const CASES = { minuscules: 'minuscules', capitales: 'ᴘᴇᴛɪᴛᴇꜱ ᴄᴀᴘɪᴛᴀʟᴇꜱ', gras: '𝐠𝐫𝐚𝐬', libre: 'Tel quel' };
 export const DECORS = { lignes: '─── 📢 INFOS ───', simple: '📢 INFOS', sobre: 'INFOS', libre: 'Tel quel' };
-export const MODES = { restyler: 'Restyler l’existant', completer: 'Compléter ce qui manque', creer: 'Créer de zéro (l’ancien part aux archives)' };
-export const SEASONS = { halloween: 'Halloween', noel: 'Noël', printemps: 'Printemps', ete: 'Été' };
+export const MODES = { __proto__: null, restyler: 'Restyler l’existant', completer: 'Compléter ce qui manque', creer: 'Créer de zéro (l’ancien part aux archives)' };
+export const SEASONS = { __proto__: null, halloween: 'Halloween', noel: 'Noël', printemps: 'Printemps', ete: 'Été' };
 
 const SMALL = Object.fromEntries([...'abcdefghijklmnopqrstuvwxyz'].map((c, i) => [c, [...'ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡxʏᴢ'][i]]));
 const bold = (c) => {

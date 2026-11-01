@@ -6,14 +6,14 @@ import { unitEmote } from '../../core/discord/emotes.js';
 import { chat, forReply } from '../../core/llm/client.js';
 import { buildMessages, cleanReply, MAX_TOKENS } from '../../core/llm/prompts.js';
 import { log } from '../../core/log/log.js';
+import { parisDate, parisParts } from '../../core/util.js';
 
 const CHECK_EVERY = 10 * 60_000;
 const HOUR = 9;
-const PARIS = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' });
 
 export function parisDay(now = Date.now()) {
-  const p = Object.fromEntries(PARIS.formatToParts(now).map(({ type, value }) => [type, value]));
-  return { key: `${p.year}-${p.month}-${p.day}`, year: Number(p.year), month: Number(p.month), day: Number(p.day), hour: Number(p.hour) };
+  const { year, month, day, hour } = parisParts(now);
+  return { key: parisDate(now), year, month, day, hour };
 }
 
 export function datesToCelebrate({ year, month, day }) {
@@ -36,7 +36,9 @@ export async function celebrate(guild, now = Date.now(), { force = false } = {})
     try {
       const { content } = await chat({ messages: buildMessages(persona, [{ role: 'user', content: `C'est l'anniversaire de ${member.displayName} aujourd'hui. Souhaite-le-lui en une phrase, sans citer son pseudo (il sera mentionné avant ton message).` }], 'courte'), options: { num_predict: MAX_TOKENS.courte }, ...forReply() });
       text = cleanReply(content) || text;
-    } catch {}
+    } catch (err) {
+      log.info('anniversaires', `message de repli : ${err.message}`, { guild });
+    }
     const posted = await speak(channel, persona, `<@${member.id}> ${text}`, { mentions: [member.id] });
     for (const emote of [unitEmote('balthasar', 'bisou', '🎂'), unitEmote('casper', 'fete', '🎉')]) await posted.react?.(emote).catch(() => {});
     log.info('anniversaires', `anniversaire de ${member.user.tag} souhaité`, { guild });

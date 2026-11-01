@@ -2,6 +2,7 @@ import { PermissionFlagsBits } from 'discord.js';
 import { operatorRole } from '../../core/installation.js';
 
 export const PERMISSIONS = {
+  __proto__: null,
   voir_salon: PermissionFlagsBits.ViewChannel,
   envoyer_messages: PermissionFlagsBits.SendMessages,
   envoyer_dans_fils: PermissionFlagsBits.SendMessagesInThreads,

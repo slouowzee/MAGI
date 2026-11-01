@@ -31,80 +31,101 @@ async function archive(guild, reason, journal) {
   return cat;
 }
 
+const categoryId = (ctx, ref) => ref.id ?? ctx.categories.get(ref.name) ?? null;
+
+function trackRole(ctx, op, role) {
+  ctx.roles.set(op.name, role);
+  if (op.staff) ctx.staff.push(role.id);
+  if (op.self) ctx.self.push({ role, kind: op.self });
+}
+
+const APPLIERS = {
+  __proto__: null,
+  async creer_role(ctx, op) {
+    const { guild, reason, journal } = ctx;
+    const role = await guild.roles.create({ name: op.name, colors: hex(op.color) ? { primaryColor: hex(op.color) } : undefined, hoist: op.hoist, mentionable: Boolean(op.self), permissions: permissionBits(op.permissions), reason });
+    journal.push({ t: 'role', id: role.id });
+    trackRole(ctx, op, role);
+  },
+  async modifier_role(ctx, op) {
+    const { guild, reason, journal } = ctx;
+    const role = guild.roles.cache.get(op.id);
+    journal.push({ t: 'role_edit', id: role.id, before: { name: role.name, hoist: role.hoist, color: role.hexColor } });
+    await role.edit({ name: op.name, hoist: op.hoist || role.hoist, ...(hex(op.color) ? { colors: { primaryColor: hex(op.color) } } : {}), reason });
+    trackRole(ctx, op, role);
+  },
+  async creer_categorie(ctx, op) {
+    const { guild, reason, journal } = ctx;
+    const cat = await guild.channels.create({ name: op.category.name, type: ChannelType.GuildCategory, permissionOverwrites: accessOverwrites(guild, op.access, ctx.staff) ?? undefined, reason });
+    journal.push({ t: 'channel', id: cat.id });
+    ctx.categories.set(op.category.name, cat.id);
+  },
+  async creer_salon(ctx, op) {
+    const { guild, reason, journal } = ctx;
+    const parent = categoryId(ctx, op.category);
+    const custom = op.access && op.access !== 'nsfw' ? accessOverwrites(guild, op.access, ctx.staff) : null;
+    const overwrites = op.access === 'public' ? [] : custom;
+    const channel = await guild.channels.create({
+      name: op.name,
+      type: op.type,
+      parent,
+      topic: op.type === ChannelType.GuildVoice ? undefined : op.topic || undefined,
+      nsfw: op.access === 'nsfw' || undefined,
+      rateLimitPerUser: op.slowmode || undefined,
+      userLimit: op.type === ChannelType.GuildVoice ? op.limit || undefined : undefined,
+      permissionOverwrites: overwrites ?? (parent ? guild.channels.cache.get(parent)?.permissionOverwrites.cache : undefined),
+      reason,
+    });
+    journal.push({ t: 'channel', id: channel.id });
+    ctx.channels.set(op.name, channel);
+  },
+  async renommer({ guild, reason, journal }, op) {
+    const channel = guild.channels.cache.get(op.id);
+    journal.push({ t: 'name', id: op.id, from: channel.name });
+    await channel.setName(op.to, reason);
+  },
+  async deplacer(ctx, op) {
+    const channel = ctx.guild.channels.cache.get(op.id);
+    ctx.journal.push({ t: 'parent', id: op.id, from: channel.parentId, overwrites: dump(channel) });
+    await channel.setParent(categoryId(ctx, op.category), { lockPermissions: false, reason: ctx.reason });
+  },
+  async regler(ctx, op) {
+    const { guild, reason, journal } = ctx;
+    const channel = guild.channels.cache.get(op.id);
+    journal.push({ t: 'settings', id: op.id, overwrites: dump(channel), before: { rateLimitPerUser: channel.rateLimitPerUser ?? 0, userLimit: channel.userLimit ?? 0, nsfw: Boolean(channel.nsfw) } });
+    const overwrites = op.access && op.access !== 'nsfw' ? accessOverwrites(guild, op.access, ctx.staff) : null;
+    if (overwrites) await channel.permissionOverwrites.set([...dump(channel).filter((o) => o.id !== guild.roles.everyone.id), ...overwrites], reason);
+    const edit = {};
+    if (op.access === 'nsfw') edit.nsfw = true;
+    if (op.slowmode && channel.type !== ChannelType.GuildVoice && channel.type !== ChannelType.GuildCategory) edit.rateLimitPerUser = op.slowmode;
+    if (op.limit && channel.type === ChannelType.GuildVoice) edit.userLimit = op.limit;
+    if (Object.keys(edit).length) await channel.edit({ ...edit, reason });
+  },
+  async archiver({ guild, reason, journal }, op) {
+    const channel = guild.channels.cache.get(op.id);
+    const cat = await archive(guild, reason, journal);
+    journal.push({ t: 'parent', id: op.id, from: channel.parentId, overwrites: dump(channel) });
+    await channel.setParent(cat.id, { lockPermissions: true, reason });
+  },
+  async ordre_roles(ctx, op) {
+    const { guild, journal } = ctx;
+    const top = guild.members.me.roles.highest.position;
+    const roles = op.names.map((name) => ctx.roles.get(name)).filter((r) => r && r.position < top);
+    journal.push({ t: 'positions', before: roles.map((r) => ({ role: r.id, position: r.position })) });
+    await guild.roles.setPositions(roles.map((r, k) => ({ role: r.id, position: Math.max(top - 1 - k, 1) })));
+  },
+};
+
 export async function applyPlan(guild, ops, { reason, progress = () => {}, features = [], journalKey = 'server_journal' }) {
   backupGuild(guild);
   const journal = [];
   const ctx = { guild, reason, journal, categories: new Map(), roles: new Map(), channels: new Map(), functions: new Map(), staff: [], self: [], features };
-  const catId = (ref) => ref.id ?? ctx.categories.get(ref.name) ?? null;
   const done = [];
   const failed = [];
   const sorted = sortOps(ops);
   for (const [i, op] of sorted.entries()) {
     try {
-      if (op.kind === 'creer_role') {
-        const role = await guild.roles.create({ name: op.name, colors: hex(op.color) ? { primaryColor: hex(op.color) } : undefined, hoist: op.hoist, mentionable: Boolean(op.self), permissions: permissionBits(op.permissions), reason });
-        journal.push({ t: 'role', id: role.id });
-        ctx.roles.set(op.name, role);
-        if (op.staff) ctx.staff.push(role.id);
-        if (op.self) ctx.self.push({ role, kind: op.self });
-      } else if (op.kind === 'modifier_role') {
-        const role = guild.roles.cache.get(op.id);
-        journal.push({ t: 'role_edit', id: role.id, before: { name: role.name, hoist: role.hoist, color: role.hexColor } });
-        await role.edit({ name: op.name, hoist: op.hoist || role.hoist, ...(hex(op.color) ? { colors: { primaryColor: hex(op.color) } } : {}), reason });
-        ctx.roles.set(op.name, role);
-        if (op.staff) ctx.staff.push(role.id);
-        if (op.self) ctx.self.push({ role, kind: op.self });
-      } else if (op.kind === 'creer_categorie') {
-        const cat = await guild.channels.create({ name: op.category.name, type: ChannelType.GuildCategory, permissionOverwrites: accessOverwrites(guild, op.access, ctx.staff) ?? undefined, reason });
-        journal.push({ t: 'channel', id: cat.id });
-        ctx.categories.set(op.category.name, cat.id);
-      } else if (op.kind === 'creer_salon') {
-        const parent = catId(op.category);
-        const overwrites = op.access === 'public' ? [] : op.access && op.access !== 'nsfw' ? accessOverwrites(guild, op.access, ctx.staff) : null;
-        const channel = await guild.channels.create({
-          name: op.name,
-          type: op.type,
-          parent,
-          topic: op.type === ChannelType.GuildVoice ? undefined : op.topic || undefined,
-          nsfw: op.access === 'nsfw' || undefined,
-          rateLimitPerUser: op.slowmode || undefined,
-          userLimit: op.type === ChannelType.GuildVoice ? op.limit || undefined : undefined,
-          permissionOverwrites: overwrites ?? (parent ? guild.channels.cache.get(parent)?.permissionOverwrites.cache : undefined),
-          reason,
-        });
-        journal.push({ t: 'channel', id: channel.id });
-        ctx.channels.set(op.name, channel);
-      } else if (op.kind === 'renommer') {
-        const channel = guild.channels.cache.get(op.id);
-        journal.push({ t: 'name', id: op.id, from: channel.name });
-        await channel.setName(op.to, reason);
-      } else if (op.kind === 'deplacer') {
-        const channel = guild.channels.cache.get(op.id);
-        journal.push({ t: 'parent', id: op.id, from: channel.parentId, overwrites: dump(channel) });
-        await channel.setParent(catId(op.category), { lockPermissions: false, reason });
-      } else if (op.kind === 'regler') {
-        const channel = guild.channels.cache.get(op.id);
-        journal.push({ t: 'settings', id: op.id, overwrites: dump(channel), before: { rateLimitPerUser: channel.rateLimitPerUser ?? 0, userLimit: channel.userLimit ?? 0, nsfw: Boolean(channel.nsfw) } });
-        const overwrites = op.access && op.access !== 'nsfw' ? accessOverwrites(guild, op.access, ctx.staff) : null;
-        if (overwrites) await channel.permissionOverwrites.set([...dump(channel).filter((o) => o.id !== guild.roles.everyone.id), ...overwrites], reason);
-        const edit = {};
-        if (op.access === 'nsfw') edit.nsfw = true;
-        if (op.slowmode && channel.type !== ChannelType.GuildVoice && channel.type !== ChannelType.GuildCategory) edit.rateLimitPerUser = op.slowmode;
-        if (op.limit && channel.type === ChannelType.GuildVoice) edit.userLimit = op.limit;
-        if (Object.keys(edit).length) await channel.edit({ ...edit, reason });
-      } else if (op.kind === 'archiver') {
-        const channel = guild.channels.cache.get(op.id);
-        const cat = await archive(guild, reason, journal);
-        journal.push({ t: 'parent', id: op.id, from: channel.parentId, overwrites: dump(channel) });
-        await channel.setParent(cat.id, { lockPermissions: true, reason });
-      } else if (op.kind === 'ordre_roles') {
-        const top = guild.members.me.roles.highest.position;
-        const roles = op.names.map((name) => ctx.roles.get(name)).filter((r) => r && r.position < top);
-        journal.push({ t: 'positions', before: roles.map((r) => ({ role: r.id, position: r.position })) });
-        await guild.roles.setPositions(roles.map((r, k) => ({ role: r.id, position: Math.max(top - 1 - k, 1) })));
-      } else {
-        await connect(ctx, op);
-      }
+      await (APPLIERS[op.kind] ?? connect)(ctx, op);
       done.push(op);
     } catch (err) {
       failed.push(`${describe(op)} : ${err.message}`);
@@ -113,7 +134,7 @@ export async function applyPlan(guild, ops, { reason, progress = () => {}, featu
   }
   const notes = await finish(ctx).catch((err) => [`accueil natif de Discord : ${err.message}`]);
   setSetting(guild.id, journalKey, JSON.stringify({ at: Date.now(), journal }));
-  return [`${done.length} changement(s) appliqué(s) sur ${sorted.length}. Une sauvegarde a été faite avant, et « annuler la mise en place » défait tout.`, ...notes, ...(failed.length ? ['Échecs :', ...failed] : [])].join('\n');
+  return [`${done.length} changement(s) appliqué(s) sur ${sorted.length}. Une sauvegarde a été faite avant, et « annuler la mise en place » défait tout.`, ...notes, ...(failed.length ? ['\u00C9checs :', ...failed] : [])].join('\n');
 }
 
 async function undo(guild, entry, reason) {

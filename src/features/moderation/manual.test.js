@@ -181,3 +181,7 @@ test('lookup : la fenêtre Mute applique la sanction', async () => {
   assert.match(replies[0], /^<@yui> exclu 6 h · cas #\d+/);
   assert.deepEqual(w.calls.at(-1), ['timeout', 'yui', 6 * 3_600_000]);
 });
+
+test('durée : une clé héritée de Object.prototype est refusée', () => {
+  for (const key of ['constructor', '__proto__', 'tostring']) assert.equal(parseDuration(key), null);
+});

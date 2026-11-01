@@ -36,9 +36,7 @@ export const OPTIONS = {
   presence_idle: { default: '30', values: ['0', '15', '30', '60'] },
 };
 
-const list = (guildId, key) => setting(guildId, key)?.split(',').filter(Boolean) ?? [];
-
-export const settingList = list;
+export const settingList = (guildId, key) => setting(guildId, key)?.split(',').filter(Boolean) ?? [];
 
 export function setSettingList(guildId, key, ids) {
   setSetting(guildId, key, ids.join(',') || null);
@@ -55,7 +53,7 @@ export function channelSetting(guild, key) {
 
 export function personaForChannel(channel) {
   const id = channel.isThread?.() ? channel.parentId : channel.id;
-  return Object.keys(PERSONAS).find((p) => list(channel.guild.id, `persona_channels:${p}`).includes(id)) ?? null;
+  return Object.keys(PERSONAS).find((p) => settingList(channel.guild.id, `persona_channels:${p}`).includes(id)) ?? null;
 }
 
 export function moduleEnabled(guildId, name) {
@@ -76,7 +74,7 @@ export function setModules(guildId, enabled) {
 }
 
 export function activePersonas(guildId) {
-  const chosen = list(guildId, 'personas').filter((p) => PERSONAS[p]);
+  const chosen = settingList(guildId, 'personas').filter((p) => PERSONAS[p]);
   return chosen.length ? chosen : Object.keys(PERSONAS);
 }
 
@@ -84,15 +82,7 @@ export function setActivePersonas(guildId, personas) {
   setSetting(guildId, 'personas', personas.filter((p) => PERSONAS[p]).join(',') || null);
 }
 
-export function mutedChannels(guildId) {
-  return list(guildId, 'muted_channels');
-}
-
-export function setMutedChannels(guildId, ids) {
-  setSetting(guildId, 'muted_channels', ids.join(',') || null);
-}
-
 export function isMuted(channel) {
-  const ids = mutedChannels(channel.guild.id);
+  const ids = settingList(channel.guild.id, 'muted_channels');
   return ids.includes(channel.id) || Boolean(channel.isThread?.() && ids.includes(channel.parentId));
 }

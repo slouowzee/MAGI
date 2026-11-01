@@ -33,3 +33,12 @@ test('une action de nettoyage efface la demande et la réponse, et répond en pr
   assert.deepEqual(deleted.sort(), ['demande', 'réponse']);
   assert.equal(replies[0].flags, MessageFlags.Ephemeral);
 });
+
+test('plus de 5 boutons : plusieurs rangées, et les actions expirées sont purgées', async () => {
+  const { buttonsFor } = await import('./buttons.js');
+  const rows = buttonsFor(Array.from({ length: 7 }, (_, i) => ({ ...action, label: `B${i}` })));
+  assert.deepEqual(rows.map((r) => r.components.length), [5, 2]);
+  const id = registerAction(action, 0);
+  registerAction(action, 16 * 60_000);
+  assert.deepEqual(takeAction(id, owner, 1_000), { error: 'Cette demande a expiré. Redemande-moi.' });
+});

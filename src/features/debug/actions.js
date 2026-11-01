@@ -16,13 +16,14 @@ import { handleMessage } from '../conversation/handle-message.js';
 import { cancelAnyReminder, guildReminders } from '../reminders/store.js';
 import { celebrate } from '../community/birthdays.js';
 import { saveSynchro, synchroOf } from '../community/store.js';
-import { rateOf } from '../community/synchro.js';
+import { pointsFor, rateOf } from '../community/synchro.js';
 import { unlock } from '../security/raid.js';
 import { syncAutomod } from '../security/automod.js';
 import { gateChannel, gateRole } from '../security/gate.js';
 import { refreshPanel } from '../../panel/index.js';
 import { syncCommands } from '../commands/commands.js';
 import { exportConfig, importConfig, readConfig } from './config.js';
+import { clamp, discordTime } from '../../core/util.js';
 
 const DEBUG_LEVEL_FOR = 15 * 60_000;
 const SOURCES = ['logs', 'moderation', 'securite', 'systeme'];
@@ -141,7 +142,7 @@ export const ACTIONS = {
       if (!setting(guild.id, 'log_level_until')) setSetting(guild.id, 'log_level_before', setting(guild.id, 'log_level') ?? 'notice');
       setSetting(guild.id, 'log_level', 'debug');
       setSetting(guild.id, 'log_level_until', Date.now() + DEBUG_LEVEL_FOR);
-      return `Logs en niveau débogage jusqu'à <t:${Math.floor((Date.now() + DEBUG_LEVEL_FOR) / 1000)}:t>, puis retour au niveau d'avant.`;
+      return `Logs en niveau débogage jusqu'à ${discordTime((Date.now() + DEBUG_LEVEL_FOR), 't')}, puis retour au niveau d'avant.`;
     },
   },
   memoire: {
@@ -184,7 +185,7 @@ export const ACTIONS = {
     async run({ params }) {
       const choice = params.choix.toLowerCase();
       if (choice === 'panne') {
-        const minutes = Math.min(Math.max(Number(params.minutes) || 5, 1), 60);
+        const minutes = clamp(Number(params.minutes) || 5, 1, 60);
         simulateOutage('gemini', minutes * 60_000);
         return `Gemini en pause simulée pendant ${minutes} min : les réponses passent par le relais.`;
       }
@@ -205,7 +206,7 @@ export const ACTIONS = {
     async run() {
       const call = lastCall();
       if (!call) return 'Aucune requête depuis le démarrage.';
-      return { content: `Dernière requête <t:${Math.floor(call.at / 1000)}:R>, ${call.ms} ms, ${call.answer?.model ?? 'échec'}${call.error ? ` : ${call.error}` : ''}.`, files: [{ attachment: Buffer.from(JSON.stringify(call, null, 2)), name: 'derniere-requete.json' }] };
+      return { content: `Dernière requête ${discordTime(call.at)}, ${call.ms} ms, ${call.answer?.model ?? 'échec'}${call.error ? ` : ${call.error}` : ''}.`, files: [{ attachment: Buffer.from(JSON.stringify(call, null, 2)), name: 'derniere-requete.json' }] };
     },
   },
   rappels: {
@@ -215,7 +216,7 @@ export const ACTIONS = {
       const id = Number(params.numero);
       if (id) return cancelAnyReminder(id, guild.id) ? `Rappel n°${id} supprimé.` : `Aucun rappel n°${id} en attente.`;
       const list = guildReminders(guild.id);
-      return list.length ? `**${plural(list.length, 'rappel')} en attente**\n${list.slice(0, 25).map((r) => `- n°${r.id} · <@${r.user_id}> · ${r.text} · <t:${Math.floor(r.due_at / 1000)}:R>`).join('\n')}` : 'Aucun rappel en attente.';
+      return list.length ? `**${plural(list.length, 'rappel')} en attente**\n${list.slice(0, 25).map((r) => `- n°${r.id} · <@${r.user_id}> · ${r.text} · ${discordTime(r.due_at)}`).join('\n')}` : 'Aucun rappel en attente.';
     },
   },
   anniversaires: {
@@ -242,7 +243,7 @@ export const ACTIONS = {
       if (!userId) throw new Error('membre introuvable');
       const value = Number(params.valeur.replace(/[^\d.]/g, ''));
       if (!Number.isFinite(value)) throw new Error('valeur invalide');
-      const points = params.valeur.includes('%') ? Math.ceil((Math.min(value, 400) / 4) ** 2) : Math.round(value);
+      const points = params.valeur.includes('%') ? pointsFor(Math.min(value, 400)) : Math.round(value);
       saveSynchro(guild.id, userId, points, synchroOf(guild.id, userId).last_at ?? 0);
       return `Synchro de <@${userId}> : ${points} points, soit ${rateOf(points)} %.`;
     },
@@ -317,7 +318,7 @@ export const ACTIONS = {
       if (!params.fichier) throw new Error('joins le fichier .json exporté pour importer');
       params.data = readConfig(await (await fetch(params.fichier)).text());
       const { data } = params;
-      return `Importer la configuration de « ${data.guild?.name ?? '?'} » exportée <t:${Math.floor((Date.parse(data.at) || Date.now()) / 1000)}:R> : ${Object.keys(data.settings).length} réglages, modération ${data.moderation} ? Les réglages du même nom sont remplacés.`;
+      return `Importer la configuration de « ${data.guild?.name ?? '?'} » exportée ${discordTime((Date.parse(data.at) || Date.now()))} : ${Object.keys(data.settings).length} réglages, modération ${data.moderation} ? Les réglages du même nom sont remplacés.`;
     },
     async run({ guild, params }) {
       if (params.mode === 'importer') {
@@ -355,6 +356,7 @@ export const ACTIONS = {
   },
   restaurer: {
     label: 'Restaurer une copie de la base',
+    ownBackup: true,
     fields: [field('copie', 'Nom de la copie (vide = la plus récente)', { required: false })],
     confirm: ({ params }) => {
       const name = params.copie?.trim() || listBackups()[0]?.name;
@@ -363,7 +365,7 @@ export const ACTIONS = {
     },
     async run(ctx) {
       const name = ctx.params.copie?.trim() || listBackups()[0]?.name;
-      backupDatabase('avant-restauration');
+      backupDatabase('avant-restauration', name);
       scheduleRestore(name);
       ctx.restart = true;
       return `Restauration de ${name} programmée : MAGI redémarre.`;

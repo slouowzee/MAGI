@@ -26,6 +26,7 @@ export async function trackJoin(member, now = Date.now()) {
 }
 
 export async function lockdown(guild, count, now = Date.now()) {
+  setSetting(guild.id, 'raid_lock_until', now + LOCK);
   const everyone = guild.roles.everyone;
   const spared = new Set([...magiChannelIds(guild), gateChannel(guild)?.id].filter(Boolean));
   const locked = [];
@@ -39,7 +40,6 @@ export async function lockdown(guild, count, now = Date.now()) {
     if (ok) locked.push(channel.id);
   }
   setSettingList(guild.id, 'raid_locked', locked);
-  setSetting(guild.id, 'raid_lock_until', now + LOCK);
   schedule(guild, LOCK);
   const operators = operatorRole(guild);
   log.alert('antiraid', `Raid probable : ${count} arrivées en moins d'une minute. ${locked.length} salon${locked.length > 1 ? 's' : ''} verrouillé${locked.length > 1 ? 's' : ''} pendant 30 min.`, {

@@ -16,10 +16,6 @@ const getMode = db.query('SELECT mode, since FROM moderation WHERE guild_id = ?'
 const setModeQuery = db.query(`INSERT INTO moderation (guild_id, mode, since) VALUES (?1, ?2, ?3)
   ON CONFLICT(guild_id) DO UPDATE SET mode = ?2, since = ?3`);
 
-export function addInfraction(guildId, userId, reason, now = Date.now()) {
-  return recordInfraction(guildId, userId, reason, now).count;
-}
-
 export function recordInfraction(guildId, userId, reason, now = Date.now()) {
   const { lastInsertRowid } = insert.run(guildId, userId, reason, now);
   return { id: Number(lastInsertRowid), count: count.get(guildId, userId, now - WINDOW).n };

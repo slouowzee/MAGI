@@ -8,6 +8,7 @@ import { findPublication } from '../admin/publications-store.js';
 import { setting } from '../../core/settings.js';
 import { activePersonas, moduleEnabled } from '../../core/config.js';
 import { log } from '../../core/log/log.js';
+import { discordTime } from '../../core/util.js';
 
 function welcomeChannel(guild) {
   return guild.channels.cache.get(setting(guild.id, 'welcome_channel')) ?? guild.systemChannel ?? null;
@@ -15,7 +16,7 @@ function welcomeChannel(guild) {
 
 export function logArrival(member) {
   const young = Date.now() - member.user.createdTimestamp < 7 * 86_400_000;
-  log.notice('membres', `${member} est arrivé · compte créé <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>${young ? ' ⚠️' : ''}`, { guild: member.guild });
+  log.notice('membres', `${member} est arrivé · compte créé ${discordTime(member.user.createdTimestamp)}${young ? ' ⚠️' : ''}`, { guild: member.guild });
 }
 
 export async function welcome(member) {
@@ -38,7 +39,9 @@ export async function welcome(member) {
       ...forReply(),
     });
     text = cleanReply(content) || text;
-  } catch {}
+  } catch (err) {
+    log.info('membres', `bienvenue de repli : ${err.message}`, { guild });
+  }
   const posted = await speak(channel, persona, `<@${member.id}> ${text}`, { mentions: [member.id] }).catch((err) => log.err('membres', `message de bienvenue non envoyé : ${err.message}`, { guild, channel }));
   if (!posted) return;
   rememberAnswer(posted, member.displayName);
@@ -49,6 +52,6 @@ export async function welcome(member) {
 
 export async function farewell(member) {
   const { guild } = member;
-  const since = member.joinedTimestamp ? ` · membre depuis <t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : '';
+  const since = member.joinedTimestamp ? ` · membre depuis ${discordTime(member.joinedTimestamp)}` : '';
   log.notice('membres', `${member.user.tag} est parti${since}`, { guild });
 }

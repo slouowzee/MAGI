@@ -38,3 +38,7 @@ test('aucune permission dangereuse ne peut être accordée', () => {
     assert.equal(PERMISSION_NAMES.includes(forbidden), false);
   }
 });
+
+test('permissions : une clé héritée de Object.prototype est refusée', () => {
+  assert.throws(() => permissionBits(['constructor']), /non autorisée/);
+});

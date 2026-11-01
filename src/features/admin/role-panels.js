@@ -7,7 +7,7 @@ const PREFIX = 'magi-role:';
 const UNIQUE_PREFIX = 'magi-role1:';
 const REASON = 'MAGI, rôle en libre-service';
 const silent = { allowedMentions: { parse: [] } };
-export const DANGEROUS = [
+const DANGEROUS = [
   PermissionFlagsBits.Administrator,
   PermissionFlagsBits.ManageGuild,
   PermissionFlagsBits.ManageRoles,
@@ -20,9 +20,11 @@ export const DANGEROUS = [
   PermissionFlagsBits.MentionEveryone,
 ];
 
+export const isDangerous = (role) => DANGEROUS.some((p) => role.permissions.has(p, false));
+
 function selfAssignable(guild, ref) {
   const role = targetRole(guild, ref);
-  if (DANGEROUS.some((p) => role.permissions.has(p, false))) throw new Error(`${role.name} donne des permissions de gestion ou de modération, il ne peut pas être en libre-service`);
+  if (isDangerous(role)) throw new Error(`${role.name} donne des permissions de gestion ou de modération, il ne peut pas être en libre-service`);
   return role;
 }
 

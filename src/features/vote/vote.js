@@ -49,7 +49,7 @@ export async function castVote(persona, question) {
     });
     const { avis, verdict } = JSON.parse(content);
     return { persona, avis: cleanReply(avis), verdict: VERDICTS.includes(verdict) ? verdict : 'ABSTENTION' };
-  } catch (err) {
+  } catch {
     return { persona, avis: 'Unité hors ligne.', verdict: 'ABSTENTION' };
   }
 }

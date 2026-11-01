@@ -3,27 +3,28 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'disc
 const TTL = 15 * 60_000;
 const PREFIX = 'magi:';
 const silent = { allowedMentions: { parse: [] } };
+const MAX_BUTTONS = 25;
 const pending = new Map();
 
 export function registerAction(action, now = Date.now()) {
+  for (const [key, old] of pending) if (now - old.at > TTL) pending.delete(key);
   const id = crypto.randomUUID();
   pending.set(id, { ...action, at: now });
   return id;
 }
 
 export function buttonsFor(actions) {
-  if (!actions.length) return [];
-  const row = new ActionRowBuilder().addComponents(
-    actions.map((action) =>
-      action.url
-        ? new ButtonBuilder().setURL(action.url).setLabel(action.label).setStyle(ButtonStyle.Link)
-        : new ButtonBuilder()
-            .setCustomId(PREFIX + registerAction(action))
-            .setLabel(action.label)
-            .setStyle(action.danger ? ButtonStyle.Danger : ButtonStyle.Primary),
-    ),
+  const buttons = actions.slice(0, MAX_BUTTONS).map((action) =>
+    action.url
+      ? new ButtonBuilder().setURL(action.url).setLabel(action.label).setStyle(ButtonStyle.Link)
+      : new ButtonBuilder()
+          .setCustomId(PREFIX + registerAction(action))
+          .setLabel(action.label)
+          .setStyle(action.danger ? ButtonStyle.Danger : ButtonStyle.Primary),
   );
-  return [row];
+  const rows = [];
+  for (let i = 0; i < buttons.length; i += 5) rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
+  return rows;
 }
 
 export function previewsFor(actions) {

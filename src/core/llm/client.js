@@ -118,15 +118,15 @@ async function post(url, headers, body, timeoutMs, signal) {
     throw Object.assign(new LLMUnavailable(timedOut ? `délai de ${Math.round(timeoutMs / 100) / 10} s dépassé` : err.message), { timedOut });
   }
   if (!res.ok) {
-    const body = await res.text();
+    const raw = await res.text();
     let detail;
     try {
-      const parsed = JSON.parse(body);
+      const parsed = JSON.parse(raw);
       const error = (Array.isArray(parsed) ? parsed[0] : parsed)?.error;
       const limit = error?.message?.match(/\bon ([^:`]+): Limit (\d+), Used (\d+), Requested (\d+)/);
       detail = [error?.status ?? error?.code, limit && `${limit[1]}, limite ${limit[2]}, utilisé ${limit[3]}, demandé ${limit[4]}`].filter(Boolean).join(' ') || undefined;
     } catch {}
-    const error = new LLMUnavailable(`HTTP ${res.status} ${detail ?? body.replace(/\s+/g, ' ').slice(0, 120)}`);
+    const error = new LLMUnavailable(`HTTP ${res.status} ${detail ?? raw.replace(/\s+/g, ' ').slice(0, 120)}`);
     error.status = res.status;
     throw error;
   }
@@ -265,7 +265,10 @@ function race(list, args, deadline, stagger) {
       }
       const candidate = list[next++];
       const left = deadline - Date.now();
-      if (left <= 0) return settle();
+      if (left <= 0) {
+        next = list.length;
+        return settle();
+      }
       const controller = new AbortController();
       const started = Date.now();
       running.set(candidate.id, { candidate, controller, started });
@@ -343,5 +346,7 @@ export async function choose({ messages, choices, timeoutMs = 60_000 }) {
     options: { temperature: 0 },
     timeoutMs,
   });
-  return JSON.parse(content).choix;
+  const { choix } = JSON.parse(content);
+  if (!choices.includes(choix)) throw new LLMUnavailable(`choix hors de la liste : ${choix}`);
+  return choix;
 }

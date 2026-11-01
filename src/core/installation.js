@@ -1,7 +1,8 @@
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
 import { db } from './db.js';
 import { log } from './log/log.js';
-import { setSetting, setting } from './settings.js';
+import { channelSetting } from './config.js';
+import { setSetting } from './settings.js';
 import { atLeast } from './permissions.js';
 
 const OPERATOR_ROLE = 'Opérateur MAGI';
@@ -22,8 +23,6 @@ export function logChannel(guild) {
   const id = getConfig.get(guild.id)?.log_channel_id;
   return id ? guild.channels.cache.get(id) ?? null : null;
 }
-
-const channelSetting = (guild, key) => guild.channels.cache.get(setting(guild.id, key)) ?? null;
 
 export function magiCategory(guild) {
   return channelSetting(guild, 'category');

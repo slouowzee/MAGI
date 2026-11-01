@@ -2,14 +2,15 @@ import { speak } from '../../core/discord/webhooks.js';
 import { activePersonas } from '../../core/config.js';
 import { addReminder, cancelReminder, dueReminders, markDone, pendingReminders } from './store.js';
 import { log } from '../../core/log/log.js';
+import { discordTime } from '../../core/util.js';
 
 const CHECK_EVERY = 10_000;
 const DAY = 24 * 3600_000;
 const LINES = { melchior: 'Rappel', balthasar: 'Petit rappel', casper: "C'est l'heure" };
 
 export function stamp(ms, now = Date.now()) {
-  const s = Math.floor(ms / 1000);
-  return ms - now < DAY ? `à <t:${s}:t> (<t:${s}:R>)` : `le <t:${s}:F> (<t:${s}:R>)`;
+  const relative = discordTime(ms);
+  return ms - now < DAY ? `à ${discordTime(ms, 't')} (${relative})` : `le ${discordTime(ms, 'F')} (${relative})`;
 }
 
 export function dueFrom(args, now = Date.now()) {
@@ -84,8 +85,7 @@ async function deliver(client, reminder) {
 export function startReminders(client) {
   setInterval(async () => {
     for (const reminder of dueReminders()) {
-      markDone(reminder.id);
-      await deliver(client, reminder);
+      if (markDone(reminder.id)) await deliver(client, reminder);
     }
   }, CHECK_EVERY);
 }

@@ -79,14 +79,15 @@ export async function runTool(call, ctx, tools = TOOLS) {
     const { member } = ctx;
     let label;
     try {
-      label = String(await tool.confirm({ guild: member.guild, member, message: ctx.message, args: call.args })).slice(0, 80);
+      label = await tool.confirm({ guild: member.guild, member, message: ctx.message, args: call.args });
     } catch (err) {
       return `Impossible : ${err.message}`;
     }
+    if (!label) return execute(tool, call.args, ctx);
     ctx.actions?.push({
-      label,
+      label: String(label).slice(0, 80),
       danger: true,
-      allowed: (m) => m.id === member.id,
+      allowed: (m) => m.id === member.id && canUse(tool, m),
       refusal: `Seul ${member.displayName} peut confirmer.`,
       cleanup: tool.cleanup ? ctx.message : undefined,
       preview: tool.preview?.({ guild: member.guild, args: call.args }),

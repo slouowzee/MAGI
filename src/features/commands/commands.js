@@ -120,12 +120,12 @@ export function statusReport(status = llmStatus(), now = Date.now(), uptime = pr
   return [`**Modèles de langage**, dans l'ordre d'essai :`, ...lines, '', `En ligne depuis ${Math.floor(uptime / 3600)} h ${Math.floor((uptime % 3600) / 60)} min.`].join('\n').slice(0, 2000);
 }
 
-async function status(interaction) {
+async function showStatus(interaction) {
   if (!isOperator(interaction.member)) return interaction.reply({ content: "Tu n'as pas les droits : /magi statut est réservé aux opérateurs MAGI.", ...ephemeral });
   await interaction.reply({ content: statusReport(), ...ephemeral });
 }
 
-const MAGI_SUBCOMMANDS = { statut: status, config: openPanel };
+const MAGI_SUBCOMMANDS = { statut: showStatus, config: openPanel };
 const HANDLERS = {
   [SUMMARY]: summarizeFrom,
   chuchoter: whisper,
@@ -147,10 +147,9 @@ export async function handleCommand(interaction) {
   const name = interaction.commandName;
   const sub = name === 'magi' ? interaction.options.getSubcommand(false) : null;
   const handler = ASK[name] ? (i) => askPersona(i, ASK[name]) : name === 'magi' ? MAGI_SUBCOMMANDS[sub] : (HANDLERS[name] ?? (MANUAL_NAMES.has(name) ? runManual : null));
-  const run = handler && (() => handler(interaction));
-  if (!run) return;
+  if (!handler) return;
   try {
-    await run();
+    await handler(interaction);
   } catch (err) {
     log.err('commandes', `échec ${interaction.commandName} : ${err.message}`, { channel: interaction.channel });
     const reply = { content: 'Unité hors ligne, réessaie dans un instant.', ...ephemeral };

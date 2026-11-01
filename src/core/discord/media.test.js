@@ -13,7 +13,7 @@ const files = { 'https://gif.test/court.mp4': mp4(0.3), 'https://gif.test/long.m
 const realFetch = globalThis.fetch;
 globalThis.fetch = (url, init) => (files[url] ? Promise.resolve(new Response(files[url], { headers: { 'content-type': url.endsWith('webp') ? 'image/webp' : 'video/mp4' } })) : realFetch(url, init));
 
-const gifv = (video) => ({ embeds: [{ data: { type: 'gifv' }, video: { url: video }, thumbnail: { url: 'https://gif.test/fixe.webp' } }] });
+const gifv = (video) => ({ embeds: [{ data: { type: 'gifv' }, video: { proxyURL: video }, thumbnail: { proxyURL: 'https://gif.test/fixe.webp' } }] });
 
 test('emotes du serveur : une image par emote distincte, animées comprises', () => {
   expect(emotesOf({ content: 'ok <:casper_juge:12> <a:danse:34> <:casper_juge:12>' })).toEqual([
@@ -42,4 +42,13 @@ test('messages vocaux joints seulement si le module est actif', async () => {
   expect(mediaOf(msg)).toEqual([{ url: 'https://cdn.test/vocal.ogg', mime: 'audio/ogg' }]);
   setModules('g-vocaux', Object.keys(MODULES).filter((m) => m !== 'vocaux'));
   expect(mediaOf(msg)).toEqual([]);
+});
+
+test('média : jamais l’URL d’origine d’un aperçu, et taille limitée même sans content-length', async () => {
+  const { fetchLimited } = await import('./media.js');
+  expect(mediaOf({ embeds: [{ data: { type: 'image' }, image: { url: 'http://origine.test/a.png', proxyURL: 'https://proxy.test/a.png' } }] })).toEqual([{ url: 'https://proxy.test/a.png' }]);
+  expect(mediaOf({ embeds: [{ data: { type: 'image' }, image: { url: 'http://origine.test/a.png' } }] })).toEqual([]);
+  files['https://gif.test/gros.mp4'] = Buffer.alloc(32);
+  expect(await fetchLimited('https://gif.test/gros.mp4', 16)).toBeNull();
+  expect((await fetchLimited('https://gif.test/gros.mp4', 64)).buffer.length).toBe(32);
 });

@@ -45,7 +45,7 @@ function webhookFor(channel, persona) {
 export const REPLY_HEADER = /^-# ↪ <@(\d+)>[^\n]*\n?/;
 
 export function replyHeader(msg) {
-  const text = msg.content.replace(/https?:\/\/\S+/g, 'lien').replace(/[\[\]]/g, '').replace(/\s+/g, ' ').trim();
+  const text = msg.content.replace(/https?:\/\/\S+/g, 'lien').replace(/[[\]]/g, '').replace(/\s+/g, ' ').trim();
   const snippet = text.length > 50 ? `${text.slice(0, 50)}…` : text || 'message';
   return `-# ↪ <@${msg.author.id}> [${escapeMarkdown(snippet)}](${msg.url})`;
 }
