@@ -7,6 +7,7 @@ const memoryDb = dbPath === ':memory:';
 export const backupDir = memoryDb ? null : join(dirname(dbPath), 'copies');
 const restoreMarker = memoryDb ? null : join(dirname(dbPath), 'restaurer');
 const KEEP_BACKUPS = 10;
+export const KEEP_BACKUP_DAYS = 30;
 if (!memoryDb) mkdirSync(dirname(dbPath), { recursive: true });
 
 if (restoreMarker && existsSync(restoreMarker)) {
@@ -154,6 +155,13 @@ export function backupDatabase(label = 'copie', keep = null) {
   db.exec(`VACUUM INTO '${join(backupDir, name).replaceAll("'", "''")}'`);
   for (const old of listBackups().filter((b) => b.name !== keep).slice(KEEP_BACKUPS)) rmSync(join(backupDir, old.name), { force: true });
   return name;
+}
+
+export function pruneBackups(dir = backupDir, now = Date.now()) {
+  if (!dir || !existsSync(dir)) return 0;
+  const old = readdirSync(dir).filter((name) => name.startsWith('magi-') && name.endsWith('.db') && now - statSync(join(dir, name)).mtimeMs > KEEP_BACKUP_DAYS * 86_400_000);
+  for (const name of old) rmSync(join(dir, name), { force: true });
+  return old.length;
 }
 
 export function scheduleRestore(name) {

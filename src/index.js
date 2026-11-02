@@ -1,3 +1,4 @@
+import { pruneBackups } from './core/db.js';
 import { pruneMemoryCopies } from './features/memory/store.js';
 import { loadEmotes } from './core/discord/emotes.js';
 import { forGuild } from './core/llm/budget.js';
@@ -94,8 +95,9 @@ client.once(Events.ClientReady, async (c) => {
   cleanTemporary(c).catch(() => {});
   sweepNotices(c);
   startDepartures(c);
-  pruneMemoryCopies();
-  setInterval(pruneMemoryCopies, 86_400_000);
+  const prune = () => pruneBackups() + pruneMemoryCopies();
+  prune();
+  setInterval(prune, 86_400_000);
 });
 
 client.on(Events.GuildCreate, (guild) => {

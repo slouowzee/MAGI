@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 process.env.DB_PATH = ':memory:';
 const { KEEP_MEMORY_COPIES, pruneMemoryCopies } = await import('./store.js');
+const { KEEP_BACKUP_DAYS, pruneBackups } = await import('../../core/db.js');
 
 test('copies de la mémoire supprimées après 7 jours, copies de la base intactes', () => {
   const dir = mkdtempSync(join(tmpdir(), 'magi-copies-'));
@@ -19,6 +20,22 @@ test('copies de la mémoire supprimées après 7 jours, copies de la base intact
     assert.equal(existsSync(join(dir, 'memoire-recente.db')), true);
     assert.equal(existsSync(join(dir, 'magi-vieille.db')), true);
     assert.equal(pruneMemoryCopies(null, now), 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('copies de la base supprimées après 30 jours, copies récentes gardées', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'magi-copies-'));
+  try {
+    const now = Date.now();
+    for (const name of ['magi-vieille.db', 'magi-recente.db', 'memoire-vieille.db']) writeFileSync(join(dir, name), 'x');
+    const old = (now - KEEP_BACKUP_DAYS * 86_400_000 - 60_000) / 1000;
+    for (const name of ['magi-vieille.db', 'memoire-vieille.db']) utimesSync(join(dir, name), old, old);
+    assert.equal(pruneBackups(dir, now), 1);
+    assert.equal(existsSync(join(dir, 'magi-vieille.db')), false);
+    assert.equal(existsSync(join(dir, 'magi-recente.db')), true);
+    assert.equal(existsSync(join(dir, 'memoire-vieille.db')), true);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
