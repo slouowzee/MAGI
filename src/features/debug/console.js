@@ -19,6 +19,15 @@ const ephemeral = { flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] 
 const pending = new Map();
 const text = (content) => new TextDisplayBuilder().setContent(content);
 const mb = (bytes) => `${(bytes / 1_048_576).toFixed(1)} Mo`;
+export const SECTIONS = {
+  moderation: ['Modération', ['cas_reset', 'cas_modifier', 'infractions', 'casiers']],
+  securite: ['Sécurité', ['simulation', 'securite', 'filtre']],
+  communaute: ['Communauté', ['rappels', 'anniversaires', 'hall', 'synchro']],
+  conversation: ['Conversation', ['memoire', 'conversations', 'rejouer', 'modeles', 'requete']],
+  donnees: ['Données et système', ['purger', 'reglage', 'configuration', 'config_reset', 'republier', 'logs_vider', 'logs_debug', 'resume', 'restaurer', 'redemarrer']],
+};
+const sectionOf = (guildId) => (SECTIONS[setting(guildId, 'debug_section')] ? setting(guildId, 'debug_section') : 'moderation');
+
 const button = (id, label, style = ButtonStyle.Secondary) => new ButtonBuilder().setCustomId(`${PREFIX}${id}`).setLabel(label).setStyle(style);
 
 export const isDebugInteraction = (id) => id.startsWith(PREFIX);
@@ -50,15 +59,17 @@ export function systemInfo(guild) {
 
 export function debugBlocks(guild) {
   const forever = debugUntil(guild.id) === FOREVER;
+  const section = sectionOf(guild.id);
   return [
     text(`**Mode débogage actif ${debugLine(guild.id)}**\n-# Réservé au propriétaire. Chaque action est notée dans #magi-systeme, les suppressions demandent une confirmation et une copie de la base est faite avant.`),
     new SeparatorBuilder(),
     text(systemInfo(guild)),
+    new ActionRowBuilder().addComponents(Object.entries(SECTIONS).map(([key, [label]]) => button(`section:${key}`, label, key === section ? ButtonStyle.Primary : ButtonStyle.Secondary))),
     new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId(`${PREFIX}action`)
-        .setPlaceholder('Choisir une action')
-        .addOptions(Object.entries(ACTIONS).filter(([, a]) => !a.global || isAppOwner(guild.ownerId)).map(([value, a]) => ({ label: a.label.slice(0, 100), value, description: a.confirm ? 'Demande une confirmation' : undefined }))),
+        .setPlaceholder(`Actions : ${SECTIONS[section][0]}`)
+        .addOptions(SECTIONS[section][1].filter((key) => !ACTIONS[key].global || isAppOwner(guild.ownerId)).map((value) => ({ label: ACTIONS[value].label.slice(0, 100), value, description: ACTIONS[value].confirm ? 'Demande une confirmation' : undefined }))),
     ),
     new ActionRowBuilder().addComponents(forever ? [button('on:15', 'Limiter à 15 min'), button('off', 'Désactiver', ButtonStyle.Danger)] : [button('extend', 'Prolonger 15 min'), button(`on:${FOREVER}`, "Jusqu'à désactivation"), button('off', 'Désactiver', ButtonStyle.Danger)]),
   ];
@@ -151,6 +162,10 @@ export async function handleDebugInteraction(interaction) {
     return showPage(interaction, 'accueil');
   }
   if (!debugActive(guild.id)) return interaction.reply({ content: 'Le mode débogage est désactivé : réactive-le depuis l’accueil du panneau.', ...ephemeral });
+  if (kind === 'section' && SECTIONS[arg]) {
+    setSetting(guild.id, 'debug_section', arg);
+    return showPage(interaction, 'debug');
+  }
   const key = kind === 'action' ? interaction.values[0] : kind === 'form' ? arg : pending.get(arg)?.action;
   if (ACTIONS[key]?.global && !isAppOwner(interaction.user.id)) return interaction.reply({ content: 'Réservé au propriétaire de MAGI : cette action touche tous les serveurs.', ...ephemeral });
   if (kind === 'action') {

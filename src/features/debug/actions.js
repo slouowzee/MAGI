@@ -23,6 +23,7 @@ import { gateChannel, gateRole } from '../security/gate.js';
 import { refreshPanel } from '../../panel/index.js';
 import { syncCommands } from '../commands/commands.js';
 import { exportConfig, importConfig, readConfig } from './config.js';
+import { PURGE_ALL, PURGES, purge, purgeCount } from './purges.js';
 import { clamp, discordTime } from '../../core/util.js';
 
 const DEBUG_LEVEL_FOR = 15 * 60_000;
@@ -292,6 +293,19 @@ export const ACTIONS = {
       for (const key of ['gate_role', 'gate_channel']) setSetting(guild.id, key, null);
       setModule(guild.id, 'filtre_arrivee', false);
       return 'Filtre réinitialisé : rôle et salon supprimés, module coupé.';
+    },
+  },
+  purger: {
+    label: 'Purger des données du serveur',
+    fields: [field('quoi', 'Quoi ?', { choices: { ...Object.fromEntries(Object.entries(PURGES).map(([key, p]) => [key, p.label])), [PURGE_ALL]: 'Tout ce qui précède' } })],
+    confirm: ({ guild, params }) => {
+      const n = purgeCount(guild.id, params.quoi);
+      if (!n) throw new Error('rien à effacer');
+      const what = params.quoi === PURGE_ALL ? 'toutes les données de la liste' : PURGES[params.quoi].label;
+      return `Effacer ${plural(n, 'entrée')} (${what}) ?${PURGES[params.quoi]?.note ? ` ${PURGES[params.quoi].note}` : ''}`;
+    },
+    async run({ guild, params }) {
+      return `${plural(purge(guild.id, params.quoi), 'entrée')} effacée(s).`;
     },
   },
   reglage: {

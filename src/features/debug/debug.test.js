@@ -2,7 +2,7 @@ import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { Collection, PermissionsBitField } from 'discord.js';
 
-const { debugActive, handleDebugInteraction, tickDebug } = await import('./console.js');
+const { debugActive, handleDebugInteraction, SECTIONS, tickDebug } = await import('./console.js');
 const { panelPage } = await import('../../panel/index.js');
 const { ACTIONS } = await import('./actions.js');
 const { exportConfig, importConfig, readConfig } = await import('./config.js');
@@ -60,8 +60,13 @@ test('panneau : activation par le propriétaire, page Débogage, bannière et re
   assert.match(JSON.stringify(json), /Mode débogage actif/);
   assert.ok(navPages(page).includes('debug'));
   const select = walk(json).find((c) => c.custom_id === 'magi-debug:action');
-  assert.equal(select.options.length, Object.keys(ACTIONS).length);
-  assert.ok(select.options.length <= 25);
+  assert.deepEqual(select.options.map((o) => o.value), SECTIONS.moderation[1]);
+  assert.deepEqual(Object.values(SECTIONS).flatMap(([, keys]) => keys).sort(), Object.keys(ACTIONS).sort());
+  for (const [, keys] of Object.values(SECTIONS)) assert.ok(keys.length <= 25);
+  await w.click('magi-debug:section:donnees');
+  const donnees = walk(w.out.at(-1)[1].components[0].toJSON());
+  assert.ok(donnees.find((c) => c.custom_id === 'magi-debug:action').options.some((o) => o.value === 'purger'));
+  assert.equal(donnees.find((c) => c.custom_id === 'magi-debug:section:donnees').style, 1);
   for (const a of Object.values(ACTIONS)) for (const f of a.fields ?? []) assert.ok(f.label.length <= 45, f.label);
   assert.match(JSON.stringify(panelPage(w.guild).components[0].toJSON()), /Débogage/);
   await w.click('magi-debug:on:infini');
@@ -144,6 +149,7 @@ test('autre serveur : les actions qui touchent tout MAGI sont cachées et refus�
   w.guild.ownerId = 'fortune';
   const { click, out } = w;
   await click('magi-debug:on:15', { userId: 'fortune' });
+  await click('magi-debug:section:donnees', { userId: 'fortune' });
   const select = walk(panelPage(w.guild).components[0].toJSON()).find((c) => c.custom_id === 'magi-debug:action');
   const hidden = Object.entries(ACTIONS).filter(([, a]) => a.global).map(([key]) => key);
   assert.deepEqual(hidden.sort(), ['modeles', 'redemarrer', 'requete', 'restaurer']);
