@@ -1,11 +1,13 @@
+import { existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { FortuneMemoryManager, SqliteProvider } from 'fortunememory';
-import { db } from '../../core/db.js';
+import { backupDir, db } from '../../core/db.js';
 import { setSetting, setting } from '../../core/settings.js';
 
 const MAX_FACTS = 100;
 const FACTS_IN_CONTEXT = 6;
 const SUMMARIES_IN_CONTEXT = 3;
+export const KEEP_MEMORY_COPIES = 7 * 86_400_000;
 
 const dbPath = process.env.DB_PATH ?? 'data/magi.db';
 const provider = new SqliteProvider(dbPath === ':memory:' ? ':memory:' : join(dirname(dbPath), 'memoire.db'));
@@ -79,7 +81,15 @@ export async function backupMemory(path) {
   await ready;
   if (dbPath === ':memory:') return null;
   provider.require().exec(`VACUUM INTO '${path.replaceAll("'", "''")}'`);
+  pruneMemoryCopies();
   return path;
+}
+
+export function pruneMemoryCopies(dir = backupDir, now = Date.now()) {
+  if (!dir || !existsSync(dir)) return 0;
+  const old = readdirSync(dir).filter((name) => name.startsWith('memoire-') && name.endsWith('.db') && now - statSync(join(dir, name)).mtimeMs > KEEP_MEMORY_COPIES);
+  for (const name of old) rmSync(join(dir, name), { force: true });
+  return old.length;
 }
 
 export async function forgetUser(guildId, userId) {

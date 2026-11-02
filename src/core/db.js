@@ -141,7 +141,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS synchro (
 export function listBackups() {
   if (!backupDir || !existsSync(backupDir)) return [];
   return readdirSync(backupDir)
-    .filter((name) => name.endsWith('.db'))
+    .filter((name) => name.startsWith('magi-') && name.endsWith('.db'))
     .map((name) => ({ name, at: statSync(join(backupDir, name)).mtimeMs, size: statSync(join(backupDir, name)).size }))
     .sort((a, b) => b.at - a.at);
 }
@@ -152,7 +152,7 @@ export function backupDatabase(label = 'copie', keep = null) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const name = `magi-${stamp}-${label.replace(/[^a-z0-9-]/gi, '')}.db`;
   db.exec(`VACUUM INTO '${join(backupDir, name).replaceAll("'", "''")}'`);
-  for (const old of listBackups().filter((b) => b.name.startsWith('magi-') && b.name !== keep).slice(KEEP_BACKUPS)) rmSync(join(backupDir, old.name), { force: true });
+  for (const old of listBackups().filter((b) => b.name !== keep).slice(KEEP_BACKUPS)) rmSync(join(backupDir, old.name), { force: true });
   return name;
 }
 
