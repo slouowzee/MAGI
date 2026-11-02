@@ -5,7 +5,7 @@ import { setModule } from '../../core/config.js';
 import { logChannels, operatorRole } from '../../core/installation.js';
 import { log } from '../../core/log/log.js';
 import { digestText, parisDay, statsOf } from '../../core/log/digest.js';
-import { ownerGuilds } from '../../core/log/discord.js';
+import { isAppOwner, ownerGuilds } from '../../core/log/discord.js';
 import { clearPauses, forceProvider, lastCall, simulateOutage } from '../../core/llm/client.js';
 import { deleteCase, getCase, guildCases, purgeMember, resetCases, usersOnRecord, wipeInfractions } from '../moderation/store.js';
 import { markPurged, updateCase } from '../moderation/cases.js';
@@ -117,11 +117,11 @@ export const ACTIONS = {
     label: 'Résumé quotidien : envoyer ou remettre à zéro',
     fields: [field('choix', 'Que faire ?', { choices: { envoyer: 'Envoyer le résumé du jour maintenant', reset: 'Remettre les compteurs à zéro' } })],
     confirm: ({ params }) => (params.choix === 'reset' ? 'Remettre à zéro tous les compteurs du résumé quotidien ?' : null),
-    async run({ guild, client, params }) {
+    async run({ guild, client, member, params }) {
       const choice = params.choix.toLowerCase();
       if (choice === 'reset') {
         let n = 0;
-        for (const scope of [guild.id, 'global']) {
+        for (const scope of isAppOwner(member.id) ? [guild.id, 'global'] : [guild.id]) {
           for (const row of listSettings(scope, 'stats:')) {
             setSetting(scope, row.key, null);
             n++;
@@ -177,6 +177,7 @@ export const ACTIONS = {
     },
   },
   modeles: {
+    global: true,
     label: 'Modèles : pauses, forcer un modèle, simuler une panne',
     fields: [
       field('choix', 'Que faire ?', { choices: { lever: 'Lever toutes les pauses', gemini: 'Ne faire répondre que Gemini', groq: 'Ne faire répondre que Groq', auto: "Revenir à l'ordre normal", panne: 'Simuler une panne de Gemini' } }),
@@ -202,6 +203,7 @@ export const ACTIONS = {
     },
   },
   requete: {
+    global: true,
     label: 'Voir la dernière requête au modèle',
     async run() {
       const call = lastCall();
@@ -355,6 +357,7 @@ export const ACTIONS = {
     },
   },
   restaurer: {
+    global: true,
     label: 'Restaurer une copie de la base',
     ownBackup: true,
     fields: [field('copie', 'Nom de la copie (vide = la plus récente)', { required: false })],
@@ -372,6 +375,7 @@ export const ACTIONS = {
     },
   },
   redemarrer: {
+    global: true,
     label: 'Redémarrer MAGI',
     confirm: () => 'Redémarrer MAGI maintenant ? Quelques secondes de coupure.',
     async run(ctx) {

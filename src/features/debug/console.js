@@ -3,7 +3,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, ModalBuilde
 import { backupDatabase, databaseSize, listBackups, tableCounts } from '../../core/db.js';
 import { setSetting, setting } from '../../core/settings.js';
 import { log } from '../../core/log/log.js';
-import { flushAll } from '../../core/log/discord.js';
+import { flushAll, isAppOwner } from '../../core/log/discord.js';
 import { forcedProvider } from '../../core/llm/client.js';
 import { panelPage, refreshPanel, showPage } from '../../panel/index.js';
 import { ACTIONS } from './actions.js';
@@ -58,7 +58,7 @@ export function debugBlocks(guild) {
       new StringSelectMenuBuilder()
         .setCustomId(`${PREFIX}action`)
         .setPlaceholder('Choisir une action')
-        .addOptions(Object.entries(ACTIONS).map(([value, a]) => ({ label: a.label.slice(0, 100), value, description: a.confirm ? 'Demande une confirmation' : undefined }))),
+        .addOptions(Object.entries(ACTIONS).filter(([, a]) => !a.global || isAppOwner(guild.ownerId)).map(([value, a]) => ({ label: a.label.slice(0, 100), value, description: a.confirm ? 'Demande une confirmation' : undefined }))),
     ),
     new ActionRowBuilder().addComponents(forever ? [button('on:15', 'Limiter à 15 min'), button('off', 'Désactiver', ButtonStyle.Danger)] : [button('extend', 'Prolonger 15 min'), button(`on:${FOREVER}`, "Jusqu'à désactivation"), button('off', 'Désactiver', ButtonStyle.Danger)]),
   ];
@@ -151,8 +151,9 @@ export async function handleDebugInteraction(interaction) {
     return showPage(interaction, 'accueil');
   }
   if (!debugActive(guild.id)) return interaction.reply({ content: 'Le mode débogage est désactivé : réactive-le depuis l’accueil du panneau.', ...ephemeral });
+  const key = kind === 'action' ? interaction.values[0] : kind === 'form' ? arg : pending.get(arg)?.action;
+  if (ACTIONS[key]?.global && !isAppOwner(interaction.user.id)) return interaction.reply({ content: 'Réservé au propriétaire de MAGI : cette action touche tous les serveurs.', ...ephemeral });
   if (kind === 'action') {
-    const key = interaction.values[0];
     interaction.message?.edit(panelPage(guild)).catch(() => {});
     return ACTIONS[key].fields ? interaction.showModal(form(key, ACTIONS[key])) : prepare(interaction, key, {});
   }

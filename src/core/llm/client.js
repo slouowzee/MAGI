@@ -1,4 +1,5 @@
 import { log } from '../log/log.js';
+import { spend } from './budget.js';
 
 export class LLMUnavailable extends Error {}
 export class ContentRefused extends Error {}
@@ -304,6 +305,7 @@ function race(list, args, deadline, stagger) {
 
 export async function chat({ messages, format, options, tools, model, reasoning, timeoutMs = 90_000 }) {
   if (!activeProviders().length) throw new LLMUnavailable('aucune clé de LLM configurée');
+  if (!spend()) throw new LLMUnavailable('quota horaire du serveur atteint');
   busy++;
   notify();
   const started = Date.now();

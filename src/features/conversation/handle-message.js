@@ -48,7 +48,7 @@ async function reactQuick(message, quick, trigger, conversation, line, now) {
 }
 
 async function floodBlocked(message) {
-  const flood = floodCheck(message.author.id, message.createdTimestamp);
+  const flood = floodCheck(`${message.guild.id}:${message.author.id}`, message.createdTimestamp);
   if (flood === 'warn') {
     const facepalm = unitEmote('casper', 'facepalm');
     await (facepalm ? message.react(facepalm) : speak(message.channel, 'balthasar', 'Doucement. Une question \u00E0 la fois, je ne vais nulle part.')).catch(() => {});

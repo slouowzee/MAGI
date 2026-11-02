@@ -197,11 +197,18 @@ export async function deliver(guild, entry) {
   await send(channel, { content: pings || undefined, embeds: [card(text, colorOf(entry), entry.at)], allowedMentions: { users, roles }, components: entry.components ?? [] });
 }
 
+export const isAppOwner = (userId) => Boolean(ownerId) && userId === ownerId;
+
 export const ownerGuilds = (client) => (ownerId ? [...client.guilds.cache.values()].filter((g) => g.ownerId === ownerId) : []);
 
-export async function attachDiscord(client) {
+export async function loadAppOwner(client) {
   const application = await client.application.fetch().catch(() => null);
   ownerId = application?.owner?.ownerId ?? application?.owner?.id ?? null;
+  return ownerId;
+}
+
+export async function attachDiscord(client) {
+  await loadAppOwner(client);
   return addSink((entry) => {
     const guilds = entry.guild ? [entry.guild] : ownerGuilds(client);
     for (const guild of guilds) deliver(guild, entry).catch((err) => console.error(`${timestamp()} magi log: err: ${err.message}`));

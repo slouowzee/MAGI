@@ -9,6 +9,8 @@ const { exportConfig, importConfig, readConfig } = await import('./config.js');
 const { recordInfraction, recordOf } = await import('../moderation/store.js');
 const { setSetting, setting } = await import('../../core/settings.js');
 const { forcedProvider } = await import('../../core/llm/client.js');
+const { loadAppOwner } = await import('../../core/log/discord.js');
+await loadAppOwner({ application: { fetch: async () => ({ owner: { id: 'owner' } }) } });
 
 function world(id) {
   const guild = { id, name: 'Test', ownerId: 'owner', channels: { cache: new Collection() }, roles: { cache: new Collection() }, members: { cache: new Collection(), me: { permissions: new PermissionsBitField() } }, client: { user: { id: 'magi' }, guilds: { cache: new Map() } } };
@@ -135,4 +137,18 @@ test('export puis import de la configuration, sans les données de fonctionnemen
 
 test('import : des réglages nuls sont refusés', () => {
   assert.throws(() => readConfig(JSON.stringify({ format: 'magi-config', settings: null })), /export de configuration/);
+});
+
+test('autre serveur : les actions qui touchent tout MAGI sont cachées et refusées à son propriétaire', async () => {
+  const w = world('g-ailleurs');
+  w.guild.ownerId = 'fortune';
+  const { click, out } = w;
+  await click('magi-debug:on:15', { userId: 'fortune' });
+  const select = walk(panelPage(w.guild).components[0].toJSON()).find((c) => c.custom_id === 'magi-debug:action');
+  const hidden = Object.entries(ACTIONS).filter(([, a]) => a.global).map(([key]) => key);
+  assert.deepEqual(hidden.sort(), ['modeles', 'redemarrer', 'requete', 'restaurer']);
+  assert.ok(select.options.every((o) => !hidden.includes(o.value)));
+  await click('magi-debug:form:modeles', { userId: 'fortune', fields: { choix: 'groq' } });
+  assert.match(out.at(-1)[1].content, /Réservé au propriétaire de MAGI/);
+  assert.equal(forcedProvider(), null);
 });

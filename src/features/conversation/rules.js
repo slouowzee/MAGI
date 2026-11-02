@@ -80,13 +80,13 @@ const COOLDOWN = 5_000;
 const lastRequest = new Map();
 const warned = new Map();
 
-export function floodCheck(userId, now = Date.now()) {
-  const last = lastRequest.get(userId) ?? -Infinity;
+export function floodCheck(key, now = Date.now()) {
+  const last = lastRequest.get(key) ?? -Infinity;
   if (now - last < COOLDOWN) {
-    const alreadyWarned = (warned.get(userId) ?? -Infinity) >= last;
-    warned.set(userId, now);
+    const alreadyWarned = (warned.get(key) ?? -Infinity) >= last;
+    warned.set(key, now);
     return alreadyWarned ? 'ignore' : 'warn';
   }
-  lastRequest.set(userId, now);
+  lastRequest.set(key, now);
   return 'ok';
 }

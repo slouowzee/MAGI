@@ -1,4 +1,6 @@
 import { loadEmotes } from './core/discord/emotes.js';
+import { forGuild } from './core/llm/budget.js';
+import { markBack, markLeft, startDepartures } from './features/admin/departures.js';
 import { Client, Events, GatewayIntentBits, Partials } from 'discord.js';
 import { handleMessage } from './features/conversation/handle-message.js';
 import { moderate } from './features/moderation/index.js';
@@ -90,10 +92,19 @@ client.once(Events.ClientReady, async (c) => {
   startBirthdays(c);
   cleanTemporary(c).catch(() => {});
   sweepNotices(c);
+  startDepartures(c);
 });
 
-client.on(Events.GuildCreate, setupGuild);
-client.on(Events.GuildMemberAdd, async (member) => {
+client.on(Events.GuildCreate, (guild) => {
+  markBack(guild.id);
+  return setupGuild(guild);
+});
+client.on(Events.GuildDelete, (guild) => {
+  if (guild.available === false) return;
+  markLeft(guild.id);
+  log.notice('installation', `MAGI a quitté ${guild.name ?? guild.id} : ses données seront effacées dans 30 jours s'il ne revient pas`);
+});
+client.on(Events.GuildMemberAdd, (member) => forGuild(member.guild, async () => {
   logArrival(member);
   try {
     const raid = await trackJoin(member);
@@ -102,29 +113,29 @@ client.on(Events.GuildMemberAdd, async (member) => {
   } catch (err) {
     log.err('membres', `arrivée de ${member} mal traitée : ${err.message}`, { guild: member.guild });
   }
-});
+}));
 client.on(Events.ChannelCreate, (channel) => channel.guild && hideNewChannel(channel).catch(() => {}));
 client.on(Events.GuildMemberRemove, (member) => farewell(member).catch(() => {}));
 client.on(Events.GuildRoleUpdate, (before, after) => {
   if (after.tags?.botId === client.user.id && before.permissions.bitfield !== after.permissions.bitfield) setupGuild(after.guild);
 });
 client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => watchAuditLog(entry, guild).catch((err) => log.err('antinuke', err.message, { guild })));
-client.on(Events.InteractionCreate, (interaction) => {
+client.on(Events.InteractionCreate, (interaction) => forGuild(interaction.guild, () => {
   if (isCommand(interaction)) return handleCommand(interaction);
   const id = interaction.customId ?? '';
   const handler = ROUTES.find(([matches]) => matches(id))?.[1] ?? handleInteraction;
   handler(interaction).catch((err) => log.err('interaction', `un bouton ou menu a échoué (${id.split(':').slice(0, 2).join(':')}) : ${err.message}`, { guild: interaction.guild, channel: interaction.channel }));
-});
-client.on(Events.MessageCreate, async (message) => {
+}));
+client.on(Events.MessageCreate, (message) => forGuild(message.guild, async () => {
   if (await moderate(message).catch((err) => log.err('moderation', err.message, { guild: message.guild, channel: message.channel }))) return;
   noteMessage(message);
   trackActivity(message).catch((err) => log.err('synchro', err.message, { guild: message.guild }));
   await handleMessage(message);
-});
-client.on(Events.MessageReactionAdd, (reaction, user) => {
+}));
+client.on(Events.MessageReactionAdd, (reaction, user) => forGuild(reaction.message.guild, () => {
   handleStar(reaction).catch((err) => log.err('etoiles', err.message, { guild: reaction.message.guild }));
   handleExampleReaction(reaction, user).catch((err) => log.err('exemples', err.message, { guild: reaction.message.guild }));
-});
+}));
 client.on(Events.MessageReactionRemove, (reaction) => handleStar(reaction, { added: false }).catch((err) => log.err('etoiles', err.message, { guild: reaction.message.guild })));
 client.on(Events.VoiceStateUpdate, (before, after) => handleVoiceState(before, after).catch((err) => log.err('vocal', err.message, { guild: after.guild })));
 

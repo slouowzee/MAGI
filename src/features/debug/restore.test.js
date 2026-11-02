@@ -7,6 +7,8 @@ const SCRIPT = `
   const { backupDatabase, listBackups } = await import(${JSON.stringify(new URL('../../core/db.js', import.meta.url).href)});
   const { handleDebugInteraction } = await import(${JSON.stringify(new URL('./console.js', import.meta.url).href)});
   const { setSetting } = await import(${JSON.stringify(new URL('../../core/settings.js', import.meta.url).href)});
+  const { loadAppOwner } = await import(${JSON.stringify(new URL('../../core/log/discord.js', import.meta.url).href)});
+  await loadAppOwner({ application: { fetch: async () => ({ owner: { id: 'owner' } }) } });
   for (let i = 0; i < 10; i++) {
     backupDatabase('c' + i);
     await Bun.sleep(15);
