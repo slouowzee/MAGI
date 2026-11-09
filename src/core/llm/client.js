@@ -280,7 +280,7 @@ function race(list, args, deadline, stagger) {
           strikes.delete(candidate.id);
           track(candidate.id, { ms: Date.now() - started });
           for (const { candidate: slower, started: since } of running.values()) {
-            if (media || since > started) continue;
+            if (media || since > started || slower.model === args.model) continue;
             pause(slower.id);
             log.info('llm', `${slower.model} : plus lent que ${candidate.model}`);
           }

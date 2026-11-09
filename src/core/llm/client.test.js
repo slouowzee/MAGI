@@ -319,3 +319,26 @@ test('délai dépassé avec des candidats non lancés : chat échoue au lieu de 
   otherResponse = (url) => ok(String(url).includes('mistral') ? 'mistral ok' : 'groq ok');
   assert.ok(outcome instanceof LLMUnavailable, String(outcome));
 }, 10_000);
+
+test('le modèle demandé battu en vitesse n’est pas mis en pause, il reste essayé en premier', async () => {
+  const { clearPauses } = await import('./client.js');
+  clearPauses();
+  process.env.GEMINI_API_KEY = 'test';
+  process.env.GEMINI_MODEL = 'leger';
+  process.env.GEMINI_BACKUP_MODEL = 'leger';
+  const tried = [];
+  geminiResponse = (body) => {
+    tried.push(body.model);
+    return body.model === 'reponse' ? Bun.sleep(700).then(() => ok('lent')) : ok('rapide');
+  };
+  const r = await chat({ messages: [{ role: 'user', content: 'a' }], model: 'reponse', timeoutMs: 900 });
+  assert.deepEqual([r.content, r.model], ['rapide', 'leger']);
+  tried.length = 0;
+  geminiResponse = (body) => {
+    tried.push(body.model);
+    return ok('vite');
+  };
+  assert.equal((await chat({ messages: [{ role: 'user', content: 'a' }], model: 'reponse', timeoutMs: 900 })).model, 'reponse');
+  assert.deepEqual(tried, ['reponse']);
+  clearPauses();
+});
