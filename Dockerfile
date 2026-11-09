@@ -5,7 +5,7 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production --omit optional
 
 COPY src ./src
-COPY assets ./assets
+COPY .github/assets ./.github/assets
 RUN mkdir -p data && chown bun:bun data
 USER bun
 

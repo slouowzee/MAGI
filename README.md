@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/avatars/banner.png" alt="Melchior, Balthasar et Casper" width="100%">
+  <img src=".github/assets/banner.png" alt="Melchior, Balthasar et Casper" width="100%">
 </p>
 
 <h1 align="center">MAGI</h1>

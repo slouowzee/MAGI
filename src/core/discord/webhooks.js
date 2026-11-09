@@ -5,7 +5,7 @@ import { PERSONAS } from '../personas.js';
 const AVATAR_VERSION = 12;
 const cache = new Map();
 const cleanups = new Map();
-const avatarFile = (persona) => readFileSync(new URL(`../../../assets/avatars/${persona}.png`, import.meta.url));
+const avatarFile = (persona) => readFileSync(new URL(`../../../.github/assets/${persona}.png`, import.meta.url));
 const webhookName = (persona) => `MAGI ${PERSONAS[persona].name} v${AVATAR_VERSION}`;
 const CURRENT = new Set(Object.keys(PERSONAS).map(webhookName));
 const parentOf = (channel) => (channel.isThread() ? channel.parent : channel);
